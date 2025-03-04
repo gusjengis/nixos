@@ -10,6 +10,13 @@
       ./hardware-configuration.nix
     ];
 
+  services.xserver.videoDrivers = [ "nvidia" ];
+
+  hardware.nvidia = {
+    modesetting.enable = true;
+    package = config.boot.kernelPackages.nvidiaPackages.latest;
+    open = true;
+  };
 
   # Bootloader.
   boot.loader.systemd-boot.enable = true;
@@ -59,6 +66,11 @@ programs.hyprland = {
     xwayland.enable = true;    
 }; 
 
+programs.nix-ld.enable = true;
+programs.nix-ld.libraries = with pkgs; [
+
+];
+
   # Configure keymap in X11
   services.xserver.xkb = {
     layout = "us";
@@ -97,6 +109,11 @@ programs.hyprland = {
     ];
   };
 
+  # Turn of password for sudo, so annoying
+  security.sudo.extraConfig = ''
+    %wheel ALL=(ALL) NOPASSWD: ALL
+  '';
+
   # Enable automatic login for the user.
   services.xserver.displayManager.autoLogin.enable = true;
   services.xserver.displayManager.autoLogin.user = "gusjengis";
@@ -123,8 +140,10 @@ programs.hyprland = {
 	rustup
 	libgcc
 	cargo
-
+	wl-clipboard
+	gh
   ];
+
 
   # Some programs need SUID wrappers, can be configured further or are
   # started in user sessions.
