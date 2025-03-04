@@ -70,7 +70,9 @@ programs.nix-ld.enable = true;
 programs.nix-ld.libraries = with pkgs; [
 
 ];
-
+programs.bash.shellAliases = {
+  nvim = "sudo -E -s nvim";
+};
   # Configure keymap in X11
   services.xserver.xkb = {
     layout = "us";
