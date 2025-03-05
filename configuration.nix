@@ -148,6 +148,7 @@
     gh
     steam
     waybar
+    nwg-displays
     unzip
     # make
     wget
