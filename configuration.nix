@@ -147,11 +147,13 @@
     wl-clipboard
     gh
     steam
+    steam-run
     waybar
     unzip
     # make
     wget
     fzf
+    rofi
   ];
 
   programs.waybar = {
