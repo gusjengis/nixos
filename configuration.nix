@@ -19,6 +19,8 @@
     open = true;
   };
 
+  nix.settings.experimental-features = [ "nix-command" "flakes" ];
+
   # Bootloader.
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
@@ -62,12 +64,12 @@
   # Enable Hyprland <
   services.xserver.displayManager.gdm.wayland = true;
 
-  # programs.hyprland = {
-  #   enable = true;
-  #   xwayland.enable = true;
-  # };
+  programs.hyprland = {
+    enable = true;
+    xwayland.enable = true;
+  };
 
-  services.desktopManager.plasma6.enable = true;
+  # services.desktopManager.plasma6.enable = true;
 
 
   programs.nix-ld.enable = true;
@@ -157,6 +159,7 @@
     wget
     fzf
     rofi
+    hyprland.unstable
   ];
 
   programs.thunar.enable = true;
