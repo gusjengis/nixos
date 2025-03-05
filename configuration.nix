@@ -62,10 +62,13 @@
   # Enable Hyprland <
   services.xserver.displayManager.gdm.wayland = true;
 
-  programs.hyprland = {
-    enable = true;
-    xwayland.enable = true;
-  };
+  # programs.hyprland = {
+  #   enable = true;
+  #   xwayland.enable = true;
+  # };
+
+  services.desktopManager.plasma6.enable = true;
+
 
   programs.nix-ld.enable = true;
   programs.nix-ld.libraries = with pkgs; [
@@ -155,6 +158,8 @@
     fzf
     rofi
   ];
+
+  programs.thunar.enable = true;
 
   programs.waybar = {
     enable = true;
