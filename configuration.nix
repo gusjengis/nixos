@@ -147,7 +147,6 @@
     wl-clipboard
     gh
     steam
-    steam-run
     waybar
     unzip
     # make
