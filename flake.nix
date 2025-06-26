@@ -24,7 +24,7 @@
           modules = [
             ./hardware-configuration.nix
             ./configuration.nix
-            ./nixosModules
+            /etc/nix-modules/nixosModules
           ];
         };
       };
