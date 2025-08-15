@@ -8,7 +8,6 @@
   pkgs,
   ...
 }:
-
 {
   imports = [
     ./users.nix
@@ -21,6 +20,9 @@
 
   networking.hostName = "nixos"; # Define your hostname.
 
+  # FUCK steam
+  steam.enable = false;
+
   # networking.wireless.enable = true; # Enables wireless support via wpa_supplicant.
   # networking.wireless.networks = {
   #   "Casa de la Muerte" = {
@@ -30,9 +32,41 @@
   #     psk = "prbv7532";
   #   };
   # };
+  services.xserver.excludePackages = [
+    # pkgs.xterm
+    pkgs.nano
+  ];
 
   # Enable networking
   networking.networkmanager.enable = true;
+  networking.firewall.allowedTCPPorts = [
+    47984
+    47985
+    47986
+    47987
+    47988
+    47989
+    47990
+    48010
+  ];
+  networking.firewall.allowedUDPPorts = [
+    47998
+    47999
+    48000
+    48001
+    48002
+    48003
+    48004
+    48005
+    48006
+    48007
+    48008
+    48009
+    48010
+  ];
+
+  services.avahi.publish.enable = true;
+  services.avahi.publish.userServices = true;
 
   # Set your time zone.
   time.timeZone = "America/Los_Angeles";
@@ -122,13 +156,22 @@
     udiskie
   ];
 
+  fonts.packages =
+    with pkgs;
+    [ cozette ] ++ builtins.filter lib.attrsets.isDerivation (builtins.attrValues pkgs.nerd-fonts);
+
   xdg.portal.enable = true;
 
   environment.sessionVariables.NIXOS_OZONE_WL = "1";
 
+  environment.sessionVariables = {
+    EDITOR = "nvim";
+    TERMINAL = "kitty";
+  };
+
   system.stateVersion = "25.05";
 
-  services.gnome.core-apps.enable = false;
+  services.gnome.core-apps.enable = true;
   # Enable automatic login for the user.
   services.displayManager.autoLogin.enable = true;
   services.displayManager.autoLogin.user = "gusjengis";

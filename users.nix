@@ -12,6 +12,7 @@
     extraGroups = [
       "networkmanager"
       "wheel"
+      "dialout"
     ];
     packages = with pkgs; [ home-manager ];
   };
