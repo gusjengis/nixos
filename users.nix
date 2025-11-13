@@ -13,6 +13,7 @@
       "networkmanager"
       "wheel"
       "dialout"
+      "docker"
     ];
     packages = with pkgs; [ home-manager ];
   };

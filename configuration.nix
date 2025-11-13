@@ -1,11 +1,9 @@
-# Edit this configuration file to define what should be installed on
-# your system.  Help is available in the configuration.nix(5) man page
-# and in the NixOS manual (accessible by running ‘nixos-help’).
-
 {
   config,
+  lib,
   inputs,
   pkgs,
+  stable,
   ...
 }:
 {
@@ -18,60 +16,55 @@
     "flakes"
   ];
 
-  networking.hostName = "nixos"; # Define your hostname.
+  networking.firewall = {
+    allowedTCPPortRanges = [
+      {
+        from = 1714;
+        to = 1764;
+      }
+    ];
+    allowedUDPPortRanges = [
+      {
+        from = 1714;
+        to = 1764;
+      }
+    ];
 
-  # FUCK steam
-  steam.enable = false;
+    # Keep your existing specific ports if needed
+    allowedTCPPorts = [
+      47984
+      47985
+      47986
+      47987
+      47988
+      47989
+      47990
+      48010
+    ];
+    allowedUDPPorts = [
+      47998
+      47999
+      48000
+      48001
+      48002
+      48003
+      48004
+      48005
+      48006
+      48007
+      48008
+      48009
+      48010
+    ];
+  };
 
-  # networking.wireless.enable = true; # Enables wireless support via wpa_supplicant.
-  # networking.wireless.networks = {
-  #   "Casa de la Muerte" = {
-  #     psk = "crackerbox";
-  #   };
-  #   "Anetwork" = {
-  #     psk = "prbv7532";
-  #   };
-  # };
-  services.xserver.excludePackages = [
-    # pkgs.xterm
-    pkgs.nano
-  ];
-
-  # Enable networking
-  networking.networkmanager.enable = true;
-  networking.firewall.allowedTCPPorts = [
-    47984
-    47985
-    47986
-    47987
-    47988
-    47989
-    47990
-    48010
-  ];
-  networking.firewall.allowedUDPPorts = [
-    47998
-    47999
-    48000
-    48001
-    48002
-    48003
-    48004
-    48005
-    48006
-    48007
-    48008
-    48009
-    48010
-  ];
+  services.udev.packages = [ pkgs.android-udev-rules ];
 
   services.avahi.publish.enable = true;
   services.avahi.publish.userServices = true;
 
-  # Set your time zone.
   time.timeZone = "America/Los_Angeles";
 
-  # Select internationalisation properties.
   i18n.defaultLocale = "en_US.UTF-8";
 
   i18n.extraLocaleSettings = {
@@ -86,22 +79,16 @@
     LC_TIME = "en_US.UTF-8";
   };
 
-  # Enable the X11 windowing system.
   services.xserver.enable = true;
   services.xserver.displayManager.lightdm.enable = false;
   services.udisks2.enable = true;
   services.gvfs.enable = true;
 
-  # Configure keymap in X11
   services.xserver.xkb = {
     layout = "us";
     variant = "";
   };
 
-  # Enable CUPS to print documents.
-  services.printing.enable = true;
-
-  # Enable sound with pipewire.
   services.pulseaudio.enable = false;
   security.rtkit.enable = true;
   services.pipewire = {
@@ -123,16 +110,12 @@
     %wheel ALL=(ALL) NOPASSWD: ALL
   '';
 
-  # Allow unfree packages
   nixpkgs.config.allowUnfree = true;
 
-  # List packages installed in system profile. To search, run:
-  # $ nix search wget
   environment.systemPackages = with pkgs; [
     zulu8
     prismlauncher
     atlauncher
-    roslyn-ls
     xdg-desktop-portal-gtk
     xdg-desktop-portal-hyprland
     vulkan-tools
@@ -154,25 +137,36 @@
     skia
     gvfs
     udiskie
+    libgbm
+    egl-wayland
+    vulkan-loader
+    libglvnd
   ];
 
-  fonts.packages =
-    with pkgs;
-    [ cozette ] ++ builtins.filter lib.attrsets.isDerivation (builtins.attrValues pkgs.nerd-fonts);
+  fonts.packages = with pkgs; [
+    cozette
+    carlito
+    commit-mono
+    nerd-fonts.meslo-lg
+    fragment-mono
+    helvetica-neue-lt-std
+  ];
+
+  programs.nix-ld = {
+    enable = true;
+  };
 
   xdg.portal.enable = true;
 
   environment.sessionVariables.NIXOS_OZONE_WL = "1";
 
-  environment.sessionVariables = {
-    EDITOR = "nvim";
-    TERMINAL = "kitty";
-  };
+  virtualisation.docker.enable = true;
 
-  system.stateVersion = "25.05";
-
-  services.gnome.core-apps.enable = true;
+  services.gnome.core-apps.enable = false;
   # Enable automatic login for the user.
   services.displayManager.autoLogin.enable = true;
   services.displayManager.autoLogin.user = "gusjengis";
+
+  system.stateVersion = "25.05";
+
 }
