@@ -16,6 +16,8 @@
     "flakes"
   ];
 
+  systemd.services."NetworkManager-wait-online".enable = false;
+
   networking.firewall = {
     allowedTCPPortRanges = [
       {
