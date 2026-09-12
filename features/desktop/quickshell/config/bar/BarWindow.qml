@@ -11,6 +11,7 @@ PanelWindow {
     required property bool hugeMargins
     required property var usage
     required property var refreshUsage
+    required property var notificationService
 
     visible: shown
     implicitHeight: Theme.barHeight
@@ -38,6 +39,7 @@ PanelWindow {
             onRefreshRequested: bar.refreshUsage()
         }
         Tray { }
+        NotificationInbox { notificationService: bar.notificationService }
         Clock { }
     }
 }

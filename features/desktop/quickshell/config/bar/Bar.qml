@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "../notifications"
 
 Scope {
     id: root
@@ -9,6 +10,7 @@ Scope {
 
     UsageService { id: usageService }
     MonitorModes { id: monitorModes }
+    NotificationService { id: notifications }
 
     IpcHandler {
         target: "bar"
@@ -18,6 +20,7 @@ Scope {
         function hide(): void { root.shown = false; }
         function refreshUsage(): void { usageService.refresh(); }
         function usage(): string { return JSON.stringify(usageService.usage); }
+        function clearNotifications(): void { notifications.clear(); }
     }
 
     Variants {
@@ -31,6 +34,20 @@ Scope {
                 hugeMargins: monitorModes.enabledFor(modelData)
                 usage: usageService.usage
                 refreshUsage: () => usageService.refresh()
+                notificationService: notifications
+            }
+        }
+    }
+
+    Variants {
+        model: Quickshell.screens
+
+        delegate: Component {
+            NotificationStack {
+                required property var modelData
+                screen: modelData
+                barShown: root.shown
+                notificationService: notifications
             }
         }
     }

@@ -12,6 +12,7 @@ from pathlib import Path
 WALLPAPER_DIR = Path.home() / "Wallpapers"
 STATE_DIR = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local/state")) / "wallpaper"
 CURRENT_FILE = STATE_DIR / "current"
+ORDER_FILE = STATE_DIR / "order.json"
 EXTENSIONS = {".avif", ".gif", ".jpeg", ".jpg", ".png", ".webp"}
 
 
@@ -23,6 +24,29 @@ def wallpapers():
         for path in WALLPAPER_DIR.rglob("*")
         if path.is_file() and not path.name.startswith(".") and path.suffix.lower() in EXTENSIONS
     )
+
+
+def save_order(available):
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    temporary = ORDER_FILE.with_suffix(".tmp")
+    temporary.write_text(json.dumps([str(path) for path in available]), encoding="utf-8")
+    temporary.replace(ORDER_FILE)
+
+
+def randomized_order(available):
+    try:
+        stored = json.loads(ORDER_FILE.read_text(encoding="utf-8"))
+        ordered = [Path(path).resolve() for path in stored]
+    except (json.JSONDecodeError, OSError, RuntimeError, TypeError):
+        ordered = []
+
+    if len(ordered) == len(available) and set(ordered) == set(available):
+        return ordered
+
+    ordered = list(available)
+    random.SystemRandom().shuffle(ordered)
+    save_order(ordered)
+    return ordered
 
 
 def current():
@@ -75,14 +99,14 @@ def set_wallpaper(raw_path, immediate=False):
     return path
 
 
-def choose_random(available, active):
-    candidates = [path for path in available if path != active]
-    return random.SystemRandom().choice(candidates or available)
+def choose_next(available, active):
+    index = available.index(active) if active in available else -1
+    return available[(index + 1) % len(available)]
 
 
 def main():
     command = sys.argv[1] if len(sys.argv) > 1 else ""
-    available = wallpapers()
+    available = randomized_order(wallpapers())
     active = current()
 
     if command == "catalog":
@@ -102,18 +126,17 @@ def main():
         return
     if command == "random":
         if available:
-            print(set_wallpaper(choose_random(available, active)))
+            print(set_wallpaper(choose_next(available, active)))
         return
     if command == "next":
         if available:
-            index = available.index(active) if active in available else -1
-            print(set_wallpaper(available[(index + 1) % len(available)]))
+            print(set_wallpaper(choose_next(available, active)))
         return
     if command == "restore":
         if active:
             print(set_wallpaper(active, immediate=True))
         elif available:
-            print(set_wallpaper(choose_random(available, None), immediate=True))
+            print(set_wallpaper(choose_next(available, None), immediate=True))
         return
 
     print("usage: wallpaperctl {catalog|current|set PATH|random|next|restore}", file=sys.stderr)

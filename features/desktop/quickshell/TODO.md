@@ -12,6 +12,8 @@
   `~/.local/state/quickshell/remote-apps/`.
 - Toggleable multi-monitor status bar with workspaces, subscription usage,
   system tray, clock, and shared theme.
+- Quickshell notification server with focused-monitor toasts and a status-bar
+  inbox retaining the 50 most recent non-transient notifications.
 - Per-monitor huge-margin mode (`SUPER+F12`, active monitor only), declared in
   each host's `monitors.lua` through `monitor-modes.lua`. Monitors in that mode
   keep their window size when the bar opens; others reserve space for it.
@@ -24,7 +26,6 @@ peers; it does not guarantee that a peer has this helper installed.
 
 - Add a keybinding help menu from Hyprland's active binds and descriptions.
 - Wallpapers, possibly Quickshell or Bash.
-- Add notification UI/server in Quickshell; dunst config was removed.
 - Sunshine remote-access menu, if still wanted; its CLI helpers remain.
 - Verify remote GUI launches between physical machines after deploying both ends.
 - Handle application-specific foreground/new-instance flags where apps daemonize
