@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Shapes
 import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Io
@@ -199,9 +200,12 @@ PanelWindow {
                     }
 
                     Rectangle {
+                        id: cardSource
                         anchors.fill: parent
-                        clip: true
                         color: "#11151d"
+                        visible: false
+                        layer.enabled: true
+                        layer.smooth: true
 
                         Image {
                             x: -height * 0.16
@@ -215,7 +219,7 @@ PanelWindow {
                             asynchronous: true
                             cache: true
 
-                            // Counter-transform image pixels while parent clip keeps slanted edges.
+                            // Counter-transform image pixels while the shape keeps slanted edges.
                             transform: Matrix4x4 {
                                 matrix: Qt.matrix4x4(
                                     1, 0.16, 0, 0,
@@ -225,42 +229,58 @@ PanelWindow {
                                 )
                             }
                         }
+                    }
 
-                        MouseArea {
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            property real pressX: 0
-                            property real startIndex: 0
-                            property bool dragged: false
+                    Shape {
+                        anchors.fill: parent
+                        preferredRendererType: Shape.CurveRenderer
 
-                            onPressed: mouse => {
-                                pressX = card.mapToItem(stage, mouse.x, mouse.y).x;
-                                startIndex = picker.animatedIndex;
-                                dragged = false;
+                        ShapePath {
+                            strokeWidth: -1
+                            fillItem: cardSource
+                            pathHints: ShapePath.PathLinear | ShapePath.PathConvex | ShapePath.PathSolid
+
+                            PathRectangle {
+                                width: card.width
+                                height: card.height
                             }
-                            onPositionChanged: mouse => {
-                                if (!pressed)
-                                    return;
-                                const position = card.mapToItem(stage, mouse.x, mouse.y).x;
-                                if (Math.abs(position - pressX) > 8)
-                                    dragged = true;
-                                if (dragged)
-                                    picker.animatedIndex = startIndex - (position - pressX) / 145;
-                            }
-                            onReleased: {
-                                if (dragged)
-                                    picker.animatedIndex = Math.round(picker.animatedIndex);
-                            }
-                            onClicked: {
-                                if (dragged)
-                                    return;
-                                if (card.centered)
-                                    picker.applySelected();
-                                else
-                                    picker.animatedIndex = card.rawIndex;
-                            }
-                            onWheel: wheel => picker.select(wheel.angleDelta.y < 0 ? 1 : -1)
                         }
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        property real pressX: 0
+                        property real startIndex: 0
+                        property bool dragged: false
+
+                        onPressed: mouse => {
+                            pressX = card.mapToItem(stage, mouse.x, mouse.y).x;
+                            startIndex = picker.animatedIndex;
+                            dragged = false;
+                        }
+                        onPositionChanged: mouse => {
+                            if (!pressed)
+                                return;
+                            const position = card.mapToItem(stage, mouse.x, mouse.y).x;
+                            if (Math.abs(position - pressX) > 8)
+                                dragged = true;
+                            if (dragged)
+                                picker.animatedIndex = startIndex - (position - pressX) / 145;
+                        }
+                        onReleased: {
+                            if (dragged)
+                                picker.animatedIndex = Math.round(picker.animatedIndex);
+                        }
+                        onClicked: {
+                            if (dragged)
+                                return;
+                            if (card.centered)
+                                picker.applySelected();
+                            else
+                                picker.animatedIndex = card.rawIndex;
+                        }
+                        onWheel: wheel => picker.select(wheel.angleDelta.y < 0 ? 1 : -1)
                     }
                 }
             }
