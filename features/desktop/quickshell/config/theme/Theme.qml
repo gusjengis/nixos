@@ -23,6 +23,7 @@ QtObject {
     readonly property color border: wallpaperColors.border || "#344052"
 
     readonly property int barHeight: 40
+    readonly property int popupGap: 4
     readonly property int radius: 8
     readonly property int spacing: 8
     readonly property int fontSize: 13
@@ -35,6 +36,12 @@ QtObject {
 
     function withBackgroundOpacity(color) {
         return Qt.rgba(color.r, color.g, color.b, backgroundOpacity);
+    }
+
+    function barPopupY(anchorItem) {
+        if (!anchorItem)
+            return barHeight + popupGap;
+        return barHeight + popupGap - anchorItem.mapToItem(null, 0, 0).y;
     }
 
     function loadWallpaperColors() {
