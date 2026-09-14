@@ -111,12 +111,15 @@ def generate_colors(path):
     }
 
 
-def write_state(path, colors):
+def write_colors(colors):
     STATE_DIR.mkdir(parents=True, exist_ok=True)
-
     colors_temporary = COLORS_FILE.with_suffix(".tmp")
     colors_temporary.write_text(json.dumps(colors), encoding="utf-8")
     colors_temporary.replace(COLORS_FILE)
+
+
+def write_state(path, colors):
+    write_colors(colors)
 
     current_temporary = CURRENT_FILE.with_suffix(".tmp")
     current_temporary.write_text(f"{path}\n", encoding="utf-8")
@@ -129,7 +132,7 @@ def set_wallpaper(raw_path, immediate=False, persist=True):
     if path not in available:
         raise ValueError(f"wallpaper is not a supported image under {WALLPAPER_DIR}: {path}")
 
-    colors = generate_colors(path) if persist else None
+    colors = generate_colors(path)
     ensure_daemon()
     command = ["awww", "img", str(path), "--resize", "crop"]
     if immediate:
@@ -144,6 +147,8 @@ def set_wallpaper(raw_path, immediate=False, persist=True):
 
     if persist:
         write_state(path, colors)
+    else:
+        write_colors(colors)
     return path
 
 
