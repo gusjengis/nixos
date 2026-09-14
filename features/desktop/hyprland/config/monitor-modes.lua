@@ -24,6 +24,12 @@ local function writeState()
 	assert(os.rename(temporaryPath, statePath))
 end
 
+local function setRulesEnabled(name, enabled)
+	for _, rule in ipairs(rulesByMonitor[name]) do
+		rule:set_enabled(enabled)
+	end
+end
+
 function M.toggle()
 	local monitor = hl.get_active_monitor()
 	if not monitor or hugeMarginsByMonitor[monitor.name] == nil then
@@ -31,18 +37,33 @@ function M.toggle()
 	end
 
 	hugeMarginsByMonitor[monitor.name] = not hugeMarginsByMonitor[monitor.name]
-	rulesByMonitor[monitor.name]:set_enabled(hugeMarginsByMonitor[monitor.name])
+	setRulesEnabled(monitor.name, hugeMarginsByMonitor[monitor.name])
 	writeState()
 end
 
 function M.configure(monitors)
 	for name, mode in pairs(monitors) do
 		hugeMarginsByMonitor[name] = mode.enabled
-		rulesByMonitor[name] = hl.workspace_rule({
-			workspace = "m[" .. name .. "]",
-			gaps_out = mode.margins,
-			enabled = mode.enabled,
-		})
+		rulesByMonitor[name] = {}
+		table.insert(
+			rulesByMonitor[name],
+			hl.workspace_rule({
+				workspace = "m[" .. name .. "]",
+				gaps_out = mode.multiple_window_margins or mode.margins,
+				enabled = mode.enabled,
+			})
+		)
+
+		if mode.single_window_margins then
+			table.insert(
+				rulesByMonitor[name],
+				hl.workspace_rule({
+					workspace = "m[" .. name .. "] w[1]",
+					gaps_out = mode.single_window_margins,
+					enabled = mode.enabled,
+				})
+			)
+		end
 	end
 
 	writeState()
