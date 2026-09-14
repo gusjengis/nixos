@@ -2,9 +2,13 @@
   config,
   pkgs,
   lib,
+  inputs,
   ...
 }:
 let
+  # hyprctl has to come from the same fork as the running compositor: its
+  # `dispatch` takes Lua, which the nixpkgs build does not speak.
+  hyprlandPackages = inputs.hyprland.packages.${pkgs.stdenv.hostPlatform.system};
   configRoot = "${config.home.homeDirectory}/.home-manager/features/desktop/quickshell/config";
   wallpaperController = "${config.home.homeDirectory}/.home-manager/features/desktop/wallpaper/wallpaperctl.py";
   python = pkgs.python3.withPackages (ps: [ ps.pygobject3 ]);
@@ -24,6 +28,19 @@ let
     runtimeInputs = [ pkgs.python3 ];
     text = ''
       exec python3 "${configRoot}/../usage.py" "$@"
+    '';
+  };
+  universalSearch = pkgs.writeShellApplication {
+    name = "quickshell-search";
+    runtimeInputs = [
+      hyprlandPackages.hyprland
+      pkgs.python3
+      pkgs.tmux
+      pkgs.xdg-utils
+    ];
+    text = ''
+      export QUICKSHELL_SEARCH_CONFIG="${configRoot}/projects.json"
+      exec python3 "${configRoot}/../universal-search.py" "$@"
     '';
   };
   remoteApps = pkgs.stdenvNoCC.mkDerivation {
@@ -70,6 +87,7 @@ in
       remoteApps
       wallpaperctl
       aiUsage
+      universalSearch
       pkgs.waypipe
       pkgs.xwayland-satellite
     ];

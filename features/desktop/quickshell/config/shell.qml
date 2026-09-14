@@ -14,8 +14,6 @@ import "theme"
 // LaunchProcess.qml helpers).
 ShellRoot {
     id: root
-    property color backgroundColor: Theme.background
-    property color textColor: Theme.text
 
     Bar { }
 
@@ -69,15 +67,11 @@ ShellRoot {
     Launcher {
         id: localLauncher
         initialMode: "local"
-        backgroundColor: root.backgroundColor
-        textColor: root.textColor
     }
 
     Launcher {
         id: remoteLauncher
         initialMode: "hosts"
-        backgroundColor: root.backgroundColor
-        textColor: root.textColor
     }
 
     WallpaperPicker {

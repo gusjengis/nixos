@@ -1,7 +1,7 @@
 local vars = require("platform-variables")
 
 local workspaces = {
-	{ name = "terminal", key = "T", description = "Terminal", command = vars.terminal },
+	{ name = "terminal", key = "T", description = "Terminal", command = vars.terminal .. " --hold ta" },
 	{ name = "browser", key = "C", description = "Chromium", command = vars.browser },
 	{ name = "calendar", key = "C", description = "Calendar", command = vars.calendar, shift = true },
 	{ name = "gpt", key = "G", description = "ChatGPT", command = vars.gpt },

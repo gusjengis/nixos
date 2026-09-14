@@ -1,0 +1,37 @@
+{
+  "repoListDirectory": "../../../repo-sync/repos",
+  "roots": [
+    "~/Documents/Code",
+    "~/Documents/Code/Plinth",
+    "~/Documents/Code/Mosaic",
+    "~/Documents/Obsidian",
+    "~/wkspaces"
+  ],
+  "projects": [
+    "~/Wallpapers",
+    "~/.config/nvim",
+    "~/.config/secrets",
+    "~/.home-manager",
+    "/etc/nixos"
+  ],
+  "ignore": [
+    "~/wkspaces/Cross The Line"
+  ],
+  "defaultProfile": "tmux",
+  "profiles": {
+    "tmux": {
+      "type": "tmux",
+      "terminal": ["kitty", "tmux", "attach-session", "-t", "{session}"]
+    },
+    "cursor": {
+      "type": "command",
+      "command": ["cursor", "{path}"]
+    },
+    "codex": {
+      "type": "command",
+      "command": ["codex"]
+    }
+  },
+  "overrides": {},
+  "webSearchUrl": "https://www.google.com/search?q={query}"
+}
