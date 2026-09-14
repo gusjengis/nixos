@@ -39,10 +39,13 @@ in
   # UI preferences) is versioned and synced to other machines.
   xdg.configFile = {
     "opencode/opencode.json".source = config.lib.file.mkOutOfStoreSymlink "${configRoot}/opencode.json";
+    "opencode/tui.json".source = config.lib.file.mkOutOfStoreSymlink "${configRoot}/tui.json";
     "opencode/plugins/session-notify.js".source =
       config.lib.file.mkOutOfStoreSymlink "${configRoot}/plugins/session-notify.js";
     "opencode/plugins/tmux-status.js".source =
       config.lib.file.mkOutOfStoreSymlink "${configRoot}/plugins/tmux-status.js";
+    "opencode/tui-plugins/tmux-theme.js".source =
+      config.lib.file.mkOutOfStoreSymlink "${configRoot}/tui-plugins/tmux-theme.js";
 
     # Caveman skill suite (caveman, caveman-commit, caveman-review, ...).
     # OpenCode scans ~/.config/opencode/skills recursively for **/SKILL.md, so
