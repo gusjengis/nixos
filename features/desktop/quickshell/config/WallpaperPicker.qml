@@ -4,6 +4,7 @@ import QtQuick.Shapes
 import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Io
+import Quickshell.Wayland
 import "theme"
 
 PanelWindow {
@@ -15,6 +16,7 @@ PanelWindow {
     implicitWidth: screen.width * 0.5
     implicitHeight: screen.height / 3
     color: "transparent"
+    WlrLayershell.namespace: "quickshell-wallpaper-picker"
 
     property var wallpapers: []
     property real animatedIndex: 0
@@ -29,6 +31,16 @@ PanelWindow {
 
     function show() {
         ready = false;
+        const focusedMonitor = Hyprland.focusedMonitor;
+        if (focusedMonitor) {
+            for (let index = 0; index < Quickshell.screens.length; index++) {
+                const candidate = Quickshell.screens[index];
+                if (candidate.name === focusedMonitor.name) {
+                    screen = candidate;
+                    break;
+                }
+            }
+        }
         visible = true;
         if (!catalog.running)
             catalog.running = true;
