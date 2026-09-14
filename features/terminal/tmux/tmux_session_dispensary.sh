@@ -83,11 +83,5 @@ fi
 
 [[ -z ${selected:-} ]] && exit 0
 
-selected_name=$(basename "$selected" | tr . _)
-if ! tmux has-session -t "$selected_name" 2>/dev/null; then
-  tmux new-session -ds "$selected_name" -c "$selected" "nvim ."
-  tmux new-window -t "$selected_name" -n "opencode" -c "$selected" "opencode" 
-  tmux select-window -t "$selected_name:1"
-fi
-
+selected_name=$(create-tmux-session "$selected")
 tmux switch-client -t "$selected_name"
