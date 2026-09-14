@@ -35,6 +35,12 @@ ShellRoot {
         function remote(): void {
             remoteLauncher.open("hosts");
         }
+        function tools(): void {
+            if (toolsLauncher.visible)
+                toolsLauncher.visible = false;
+            else
+                toolsLauncher.open("tools");
+        }
         function failure(message: string): void {
             remoteLauncher.error = message;
             remoteLauncher.visible = true;
@@ -79,6 +85,11 @@ ShellRoot {
     Launcher {
         id: remoteLauncher
         initialMode: "hosts"
+    }
+
+    Launcher {
+        id: toolsLauncher
+        initialMode: "tools"
     }
 
     WallpaperPicker {

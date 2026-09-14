@@ -13,6 +13,7 @@ end
 
 bind("SUPER + SPACE", hl.dsp.exec_cmd("qs ipc call launcher toggle"), "App Launcher")
 bind("SUPER + CTRL + SPACE", hl.dsp.exec_cmd("qs ipc call launcher remote"), "Remote Launcher")
+bind("SUPER + SHIFT + T", hl.dsp.exec_cmd("qs ipc call launcher tools"), "Tools Launcher")
 bind("SUPER + Q", hl.dsp.exec_cmd(vars.terminal), "Launch Terminal")
 bind("SUPER + B", hl.dsp.exec_cmd(vars.browser), "Launch Browser")
 bind("ALT + F4", hl.dsp.window.close(), "Close Program")

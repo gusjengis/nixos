@@ -24,12 +24,24 @@ PanelWindow {
     property var projectSearch: null
     property var usage: ({"apps": {}, "projects": {}})
     property var ignoredDesktopEntryIds: ["wl-kbptr"]
+    property var tools: [{
+        "name": "Color Picker",
+        "description": "Pick a screen color and copy its RGB value",
+        "icon": "color-select-symbolic",
+        "command": ["hyprpicker", "--autocopy", "--format=rgb"]
+    }, {
+        "name": "Mirror",
+        "description": "Show a mirrored, low-latency webcam view",
+        "icon": "camera-web-symbolic",
+        "command": ["mpv", "--title=Mirror", "--profile=low-latency", "--untimed",
+                    "--vf=hflip", "av://v4l2:/dev/video0"]
+    }]
 
     readonly property bool loading: request !== null
     readonly property var apps: mode === "local"
         ? DesktopEntries.applications.values.filter(app =>
             !app.noDisplay && !ignoredDesktopEntryIds.includes(app.id.replace(/\.desktop$/, "")))
-        : entries
+        : mode === "tools" ? tools : entries
     readonly property var appResults: rankedApps()
     readonly property var webResults: mode === "local" && search.text.trim() !== "" ? [{
         "kind": "web",
@@ -107,7 +119,7 @@ PanelWindow {
             const key = appKey(app);
             const frequency = mode === "local" ? launcher.usage.apps[key] || {} : {};
             return {
-                "kind": mode === "local" ? "app" : "remote",
+                "kind": mode === "local" ? "app" : mode === "tools" ? "tool" : "remote",
                 "name": app.name,
                 "description": description,
                 "iconData": app.iconData,
@@ -209,6 +221,9 @@ PanelWindow {
             visible = false;
         } else if (result.kind === "web") {
             Quickshell.execDetached(["quickshell-search", "web", result.query]);
+            visible = false;
+        } else if (result.kind === "tool") {
+            Quickshell.execDetached(result.target.command);
             visible = false;
         }
     }
@@ -344,6 +359,7 @@ PanelWindow {
                 Layout.preferredHeight: 50
                 placeholderText: mode === "hosts" ? "Search machines"
                     : mode === "remote" ? "Search remote applications"
+                    : mode === "tools" ? "Search tools"
                     : "Search apps, projects, and the web"
                 placeholderTextColor: Theme.muted
                 color: Theme.text
@@ -444,6 +460,7 @@ PanelWindow {
                             IconImage {
                                 anchors.centerIn: parent
                                 visible: modelData.kind === "app" || modelData.kind === "remote"
+                                    || modelData.kind === "tool"
                                 source: modelData.iconData
                                     || Quickshell.iconPath(modelData.icon || "application-x-executable", true)
                                 implicitSize: 29
@@ -452,6 +469,7 @@ PanelWindow {
                             Text {
                                 anchors.centerIn: parent
                                 visible: modelData.kind !== "app" && modelData.kind !== "remote"
+                                    && modelData.kind !== "tool"
                                 text: modelData.kind === "project" ? "/" : ">"
                                 color: modelData.kind === "web" ? Theme.accent : Theme.muted
                                 font.pixelSize: 18

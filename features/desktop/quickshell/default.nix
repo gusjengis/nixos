@@ -9,6 +9,7 @@ let
   # hyprctl has to come from the same fork as the running compositor: its
   # `dispatch` takes Lua, which the nixpkgs build does not speak.
   hyprlandPackages = inputs.hyprland.packages.${pkgs.stdenv.hostPlatform.system};
+  hyprpickerPackage = inputs.hyprpicker.packages.${pkgs.stdenv.hostPlatform.system}.hyprpicker;
   configRoot = "${config.home.homeDirectory}/.home-manager/features/desktop/quickshell/config";
   wallpaperController = "${config.home.homeDirectory}/.home-manager/features/desktop/wallpaper/wallpaperctl.py";
   python = pkgs.python3.withPackages (ps: [ ps.pygobject3 ]);
@@ -111,6 +112,8 @@ in
       aiAccount
       universalSearch
       systemControls
+      hyprpickerPackage
+      pkgs.mpv
       pkgs.waypipe
       pkgs.xwayland-satellite
     ];
