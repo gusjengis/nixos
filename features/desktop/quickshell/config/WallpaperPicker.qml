@@ -4,6 +4,7 @@ import QtQuick.Shapes
 import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Io
+import "theme"
 
 PanelWindow {
     id: picker
@@ -154,7 +155,7 @@ PanelWindow {
             anchors.centerIn: parent
             visible: picker.wallpapers.length === 0
             text: catalog.running ? "Loading wallpapers..." : "No wallpapers found in ~/Wallpapers"
-            color: "#aeb7c4"
+            color: Theme.muted
             font.pixelSize: 14
         }
 
@@ -202,7 +203,7 @@ PanelWindow {
                     Rectangle {
                         id: cardSource
                         anchors.fill: parent
-                        color: "#11151d"
+                        color: Theme.background
                         visible: false
                         layer.enabled: true
                         layer.smooth: true

@@ -12,6 +12,7 @@ let
     name = "wallpaperctl";
     runtimeInputs = [
       pkgs.awww
+      pkgs.matugen
       pkgs.python3
     ];
     text = ''

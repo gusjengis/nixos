@@ -13,6 +13,7 @@ WALLPAPER_DIR = Path.home() / "Wallpapers"
 STATE_DIR = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local/state")) / "wallpaper"
 CURRENT_FILE = STATE_DIR / "current"
 ORDER_FILE = STATE_DIR / "order.json"
+COLORS_FILE = STATE_DIR / "colors.json"
 EXTENSIONS = {".avif", ".gif", ".jpeg", ".jpg", ".png", ".webp"}
 
 
@@ -74,12 +75,61 @@ def ensure_daemon():
     raise RuntimeError("awww-daemon did not become ready")
 
 
-def set_wallpaper(raw_path, immediate=False):
+def generate_colors(path):
+    result = subprocess.run(
+        [
+            "matugen",
+            "--mode", "dark",
+            "--type", "scheme-tonal-spot",
+            "--source-color-index", "0",
+            "--dry-run",
+            "--json", "hex",
+            "image", str(path),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    generated = json.loads(result.stdout)
+    colors = generated["colors"]
+    palettes = generated["palettes"]
+
+    def color(name):
+        return colors[name]["dark"]["color"]
+
+    return {
+        "background": color("background"),
+        "surface": color("surface_container"),
+        "surfaceHover": color("surface_container_high"),
+        "text": color("on_surface"),
+        "muted": color("on_surface_variant"),
+        "accent": color("primary"),
+        "accentStrong": palettes["primary"]["70"]["color"],
+        "warning": color("tertiary"),
+        "danger": color("error"),
+        "border": color("outline_variant"),
+    }
+
+
+def write_state(path, colors):
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+
+    colors_temporary = COLORS_FILE.with_suffix(".tmp")
+    colors_temporary.write_text(json.dumps(colors), encoding="utf-8")
+    colors_temporary.replace(COLORS_FILE)
+
+    current_temporary = CURRENT_FILE.with_suffix(".tmp")
+    current_temporary.write_text(f"{path}\n", encoding="utf-8")
+    current_temporary.replace(CURRENT_FILE)
+
+
+def set_wallpaper(raw_path, immediate=False, persist=True):
     path = Path(raw_path).expanduser().resolve()
     available = wallpapers()
     if path not in available:
         raise ValueError(f"wallpaper is not a supported image under {WALLPAPER_DIR}: {path}")
 
+    colors = generate_colors(path) if persist else None
     ensure_daemon()
     command = ["awww", "img", str(path), "--resize", "crop"]
     if immediate:
@@ -92,10 +142,8 @@ def set_wallpaper(raw_path, immediate=False):
         ])
     subprocess.run(command, check=True)
 
-    STATE_DIR.mkdir(parents=True, exist_ok=True)
-    temporary = CURRENT_FILE.with_suffix(".tmp")
-    temporary.write_text(f"{path}\n", encoding="utf-8")
-    temporary.replace(CURRENT_FILE)
+    if persist:
+        write_state(path, colors)
     return path
 
 
@@ -146,6 +194,6 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except (OSError, subprocess.CalledProcessError, RuntimeError, ValueError) as error:
+    except (json.JSONDecodeError, KeyError, OSError, subprocess.CalledProcessError, RuntimeError, ValueError) as error:
         print(f"wallpaperctl: {error}", file=sys.stderr)
         raise SystemExit(1)

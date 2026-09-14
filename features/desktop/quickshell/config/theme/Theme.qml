@@ -1,19 +1,26 @@
 pragma Singleton
 
 import QtQuick
+import Quickshell
 import Quickshell.Io
 
 QtObject {
-    readonly property color background: "#151922"
-    readonly property color surface: "#202633"
-    readonly property color surfaceHover: "#2a3242"
-    readonly property color text: "#e8edf5"
-    readonly property color muted: "#8d99aa"
-    readonly property color accent: "#8ec5ff"
-    readonly property color accentStrong: "#5aa7f7"
-    readonly property color warning: "#f2c879"
-    readonly property color danger: "#ef8d8d"
-    readonly property color border: "#344052"
+    property var wallpaperColors: ({})
+    // 0 is fully transparent; 1 is fully opaque.
+    readonly property real backgroundOpacity: 0.6
+    readonly property color backgroundBase: wallpaperColors.background || "#151922"
+    readonly property color surfaceBase: wallpaperColors.surface || "#202633"
+    readonly property color surfaceHoverBase: wallpaperColors.surfaceHover || "#2a3242"
+    readonly property color background: withBackgroundOpacity(backgroundBase)
+    readonly property color surface: withBackgroundOpacity(surfaceBase)
+    readonly property color surfaceHover: withBackgroundOpacity(surfaceHoverBase)
+    readonly property color text: wallpaperColors.text || "#e8edf5"
+    readonly property color muted: wallpaperColors.muted || "#8d99aa"
+    readonly property color accent: wallpaperColors.accent || "#8ec5ff"
+    readonly property color accentStrong: wallpaperColors.accentStrong || "#5aa7f7"
+    readonly property color warning: wallpaperColors.warning || "#f2c879"
+    readonly property color danger: wallpaperColors.danger || "#ef8d8d"
+    readonly property color border: wallpaperColors.border || "#344052"
 
     readonly property int barHeight: 40
     readonly property int radius: 8
@@ -24,6 +31,29 @@ QtObject {
     property int windowBorderWidth: 2
     property int windowRadius: 16
     property color windowBorder: "#aa595959"
+
+    function withBackgroundOpacity(color) {
+        return Qt.rgba(color.r, color.g, color.b, backgroundOpacity);
+    }
+
+    function loadWallpaperColors() {
+        try {
+            wallpaperColors = JSON.parse(colorsFile.text());
+        } catch (error) {
+            console.warn("Cannot load wallpaper colors:", error);
+        }
+    }
+
+    property var colorsFile: FileView {
+        id: colorsFile
+        path: (Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state")
+            + "/wallpaper/colors.json"
+        preload: true
+        watchChanges: true
+        printErrors: false
+        onFileChanged: reload()
+        onLoaded: loadWallpaperColors()
+    }
 
     function refreshHyprland() {
         if (!borderWidthRequest.running)
