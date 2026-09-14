@@ -12,12 +12,19 @@ let
       exec bash "${configRoot}/create_tmux_session.sh" "$@"
     '';
   };
-
+  taCmd = pkgs.writeShellApplication {
+    name = "ta";
+    runtimeInputs = [ pkgs.tmux ];
+    text = ''
+      tmux attach || tmux
+    '';
+  };
 in
 {
   home.packages = [
     pkgs.tmux
     createTmuxSession
+    taCmd
   ];
 
   xdg.configFile = {
