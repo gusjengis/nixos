@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process"
 
 const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
-const SPINNER_INTERVAL_MS = 200
+const SPINNER_INTERVAL_MS = 80
 
 export const TmuxStatusPlugin = async () => {
   const pane = process.env.TMUX_PANE
