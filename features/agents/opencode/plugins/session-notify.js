@@ -204,8 +204,67 @@ async function processStartTime() {
   }
 }
 
-function sendDesktopNotification(title, body, urgency, context) {
-  const notifier = spawn("opencode-session-notify", [
+async function processHasAncestor(pid, wantedPID) {
+  while (pid > 1) {
+    if (pid === wantedPID) {
+      return true
+    }
+
+    try {
+      const stat = await readFile(`/proc/${pid}/stat`, "utf8")
+      pid = Number(stat.slice(stat.lastIndexOf(")") + 2).split(" ")[1])
+    } catch {
+      return false
+    }
+  }
+
+  return false
+}
+
+async function isTmuxPaneFocused(tmux) {
+  if (!tmux.pane) {
+    return false
+  }
+
+  try {
+    const activeWindow = JSON.parse(await execFileText("hyprctl", ["activewindow", "-j"]))
+    const activeWindowPID = Number(activeWindow.pid)
+    const clients = await execFileText("tmux", [
+      "list-clients",
+      "-F",
+      "#{pane_id}\t#{client_pid}",
+    ])
+
+    for (const line of clients.split("\n")) {
+      const [pane, clientPIDText] = line.split("\t")
+      if (pane === tmux.pane && await processHasAncestor(Number(clientPIDText), activeWindowPID)) {
+        return true
+      }
+    }
+  } catch {
+    // If focus cannot be established, keep notification behavior as fallback.
+  }
+
+  return false
+}
+
+function runNotifier(args) {
+  const notifier = spawn("opencode-session-notify", args, {
+    detached: true,
+    stdio: "ignore",
+  })
+  notifier.on("error", () => {})
+  notifier.unref()
+}
+
+function closeDesktopNotifications(scope, value) {
+  if (value) {
+    runNotifier([`--close-${scope}`, value])
+  }
+}
+
+function sendDesktopNotification(title, body, urgency, context, requestID = "") {
+  runNotifier([
     title,
     body,
     urgency,
@@ -217,12 +276,8 @@ function sendDesktopNotification(title, body, urgency, context) {
     context.tmux.client,
     String(process.pid),
     context.processStartTime,
-  ], {
-    detached: true,
-    stdio: "ignore",
-  })
-  notifier.on("error", () => {})
-  notifier.unref()
+    requestID,
+  ])
 }
 
 function questionSummary(questions) {
@@ -269,6 +324,7 @@ export const SessionNotifyPlugin = async ({ $, directory }) => {
       }
 
       if (event.type === "session.deleted") {
+        closeDesktopNotifications("session", event.properties.info.id)
         childSessions.delete(event.properties.info.id)
         interruptedSessions.delete(event.properties.info.id)
         sessionTitles.delete(event.properties.info.id)
@@ -285,6 +341,7 @@ export const SessionNotifyPlugin = async ({ $, directory }) => {
       }
 
       if (event.type === "question.replied" || event.type === "question.rejected") {
+        closeDesktopNotifications("request", event.properties.requestID)
         pendingQuestions.delete(event.properties.requestID)
         return
       }
@@ -297,11 +354,12 @@ export const SessionNotifyPlugin = async ({ $, directory }) => {
         pendingQuestions.set(requestID, Date.now())
         lastNotificationAt = Date.now()
 
-        await sendDesktopNotification(
+        sendDesktopNotification(
           "OpenCode needs input",
           `${notificationContext(event.properties.sessionID)}: ${questionSummary(event.properties.questions)}`,
           "critical",
           { directory, sessionID: event.properties.sessionID, tmux, processStartTime: startedAt },
+          requestID,
         )
         await playChime($, directory, "ask")
         return
@@ -346,22 +404,26 @@ export const SessionNotifyPlugin = async ({ $, directory }) => {
       lastNotificationAt = now
 
       if (event.type === "session.error") {
-        await sendDesktopNotification(
-          "OpenCode error",
-          `${notificationContext(event.properties.sessionID)}: session failed`,
-          "critical",
-          { directory, sessionID: event.properties.sessionID, tmux, processStartTime: startedAt },
-        )
+        if (!(await isTmuxPaneFocused(tmux))) {
+          sendDesktopNotification(
+            "OpenCode error",
+            `${notificationContext(event.properties.sessionID)}: session failed`,
+            "critical",
+            { directory, sessionID: event.properties.sessionID, tmux, processStartTime: startedAt },
+          )
+        }
         await playChime($, directory, "error")
         return
       }
 
-      await sendDesktopNotification(
-        "OpenCode finished",
-        notificationContext(event.properties.sessionID),
-        "normal",
-        { directory, sessionID: event.properties.sessionID, tmux, processStartTime: startedAt },
-      )
+      if (!(await isTmuxPaneFocused(tmux))) {
+        sendDesktopNotification(
+          "OpenCode finished",
+          notificationContext(event.properties.sessionID),
+          "normal",
+          { directory, sessionID: event.properties.sessionID, tmux, processStartTime: startedAt },
+        )
+      }
       await playChime($, directory, "done")
     },
   }

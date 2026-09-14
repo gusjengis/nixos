@@ -13,6 +13,7 @@ let
     runtimeInputs = [
       hyprlandPackages.hyprland
       inputs.opencode.packages.${pkgs.stdenv.hostPlatform.system}.default
+      pkgs.glib
       pkgs.jq
       pkgs.kitty
       pkgs.libnotify

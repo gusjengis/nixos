@@ -2,14 +2,70 @@
 
 set -uo pipefail
 
+state_dir="${XDG_RUNTIME_DIR:-/tmp}/opencode-session-notify-$UID"
+umask 077
+mkdir -p "$state_dir"
+
+close_notification() {
+  local id=$1
+  [[ $id =~ ^[0-9]+$ ]] || return 0
+  gdbus call --session \
+    --dest org.freedesktop.Notifications \
+    --object-path /org/freedesktop/Notifications \
+    --method org.freedesktop.Notifications.CloseNotification \
+    "$id" >/dev/null 2>&1 || true
+}
+
+close_matching() {
+  local field=$1
+  local wanted=$2
+  local completion_only=${3:-0}
+  local meta base id
+  local -a values
+  local matched=1
+
+  shopt -s nullglob
+  for meta in "$state_dir"/*.meta; do
+    mapfile -t values < "$meta"
+    [[ ${values[$field]:-} == "$wanted" ]] || continue
+    if (( completion_only )) && [[ -n ${values[2]:-} ]]; then
+      continue
+    fi
+    matched=0
+    base=${meta%.meta}
+    : > "$base.close"
+    if [[ -s $base.id ]]; then
+      IFS= read -r id < "$base.id"
+      close_notification "$id"
+    fi
+  done
+  return "$matched"
+}
+
+if [[ ${1:-} == --close-pane || ${1:-} == --close-session || ${1:-} == --close-request ]]; then
+  [[ $# -eq 2 ]] || exit 2
+  case $1 in
+    --close-pane) field=0; completion_only=1 ;;
+    --close-session) field=1 ;;
+    --close-request) field=2 ;;
+  esac
+  # Spawn and close helpers start independently. Brief retry covers a reply
+  # arriving before the notification helper has published its metadata.
+  for _attempt in {1..50}; do
+    close_matching "$field" "$2" "${completion_only:-0}" && exit 0
+    sleep 0.01
+  done
+  exit 0
+fi
+
 activate_only=0
 if [[ ${1:-} == --activate ]]; then
   activate_only=1
   shift
 fi
 
-if [[ $# -ne 11 ]]; then
-  printf 'usage: opencode-session-notify [--activate] TITLE BODY URGENCY DIRECTORY OPENCODE_SESSION TMUX_PANE TMUX_SESSION_ID TMUX_SESSION_NAME TMUX_CLIENT OPENCODE_PID OPENCODE_START_TIME\n' >&2
+if [[ $# -ne 12 ]]; then
+  printf 'usage: opencode-session-notify [--activate] TITLE BODY URGENCY DIRECTORY OPENCODE_SESSION TMUX_PANE TMUX_SESSION_ID TMUX_SESSION_NAME TMUX_CLIENT OPENCODE_PID OPENCODE_START_TIME REQUEST_ID\n' >&2
   exit 2
 fi
 
@@ -24,9 +80,33 @@ origin_session_name=$8
 origin_client=$9
 opencode_pid=${10}
 opencode_start_time=${11}
+request_id=${12}
 
 if (( ! activate_only )); then
-  action=$(notify-send -u "$urgency" --action=default=Focus "$title" "$body" 2>/dev/null) || exit 0
+  notification_state="$state_dir/notification-$$"
+  cleanup_notification_state() {
+    rm -f "$notification_state.meta" "$notification_state.id" \
+      "$notification_state.action" "$notification_state.close"
+  }
+  trap cleanup_notification_state EXIT
+  printf '%s\n%s\n%s\n' "$origin_pane" "$opencode_session" "$request_id" > "$notification_state.meta"
+  notify-send -u "$urgency" --action=default=Focus \
+    --id-fd=3 --selected-action-fd=4 "$title" "$body" \
+    3> "$notification_state.id" 4> "$notification_state.action" 2>/dev/null &
+  notify_pid=$!
+
+  while kill -0 "$notify_pid" 2>/dev/null && [[ ! -s $notification_state.id ]]; do
+    sleep 0.01
+  done
+  if [[ -e $notification_state.close && -s $notification_state.id ]]; then
+    IFS= read -r notification_id < "$notification_state.id"
+    close_notification "$notification_id"
+  fi
+
+  wait "$notify_pid" || exit 0
+  IFS= read -r action < "$notification_state.action" || action=
+  cleanup_notification_state
+  trap - EXIT
   [[ $action == default ]] || exit 0
 fi
 
