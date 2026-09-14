@@ -17,39 +17,16 @@ Rectangle {
     radius: Theme.radius
     color: mouse.containsMouse || popup.visible ? Theme.surfaceHover : "transparent"
 
-    function iconText(signal) {
-        if (!state.enabled)
-            return "󰤭";
-        if (!state.connected)
-            return "󰤯";
-        if (signal >= 75)
-            return "󰤨";
-        if (signal >= 50)
-            return "󰤥";
-        if (signal >= 25)
-            return "󰤢";
-        return "󰤟";
-    }
-
-    function signalIcon(signal) {
-        if (signal >= 75)
-            return "󰤨";
-        if (signal >= 50)
-            return "󰤥";
-        if (signal >= 25)
-            return "󰤢";
-        return "󰤟";
-    }
-
     function alpha(source, amount) {
         return Qt.rgba(source.r, source.g, source.b, amount);
     }
 
-    Text {
+    WifiIcon {
         anchors.centerIn: parent
-        text: root.iconText(root.state.connected ? root.state.connected.signal : 0)
-        color: root.state.enabled ? Theme.text : Theme.muted
-        font { family: Theme.iconFontFamily; pixelSize: 18 }
+        signal: root.state.connected ? root.state.connected.signal : 0
+        enabled: root.state.enabled
+        connected: !!root.state.connected
+        iconColor: root.state.enabled ? Theme.text : Theme.muted
     }
 
     MouseArea {
@@ -106,11 +83,12 @@ Rectangle {
                     color: root.state.enabled ? root.alpha(Theme.accentStrong, 0.18) : Theme.surface
                     border { width: 1; color: root.state.enabled ? root.alpha(Theme.accentStrong, 0.5) : "transparent" }
 
-                    Text {
+                    WifiIcon {
                         anchors.centerIn: parent
-                        text: root.iconText(root.state.connected ? root.state.connected.signal : 0)
-                        color: root.state.enabled ? Theme.accent : Theme.muted
-                        font { family: Theme.iconFontFamily; pixelSize: 18 }
+                        signal: root.state.connected ? root.state.connected.signal : 0
+                        enabled: root.state.enabled
+                        connected: !!root.state.connected
+                        iconColor: root.state.enabled ? Theme.accent : Theme.muted
                     }
                 }
 
@@ -313,10 +291,9 @@ Rectangle {
                         anchors { fill: parent; leftMargin: 11; rightMargin: 11 }
                         spacing: 10
 
-                        Text {
-                            text: root.signalIcon(networkRow.modelData.signal)
-                            color: networkRow.modelData.connected ? Theme.accent : Theme.text
-                            font { family: Theme.iconFontFamily; pixelSize: 18 }
+                        WifiIcon {
+                            signal: networkRow.modelData.signal
+                            iconColor: networkRow.modelData.connected ? Theme.accent : Theme.text
                         }
 
                         ColumnLayout {
