@@ -51,6 +51,10 @@ let
       if [ ! -d "$HOME/.local/share/nvim/lazy/mason.nvim" ]; then
         rm -rf "$HOME/.local/share/nvim/mason"
       fi
+
+      # Interrupted installs leave <plugin>.cloning directories behind, which
+      # `Lazy! clean` does not consider its own.
+      rm -rf "$HOME"/.local/share/nvim/lazy/*.cloning
     '';
   };
 in
