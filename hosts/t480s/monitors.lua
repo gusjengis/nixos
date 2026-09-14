@@ -10,5 +10,6 @@ require("monitor-modes").configure({
 		enabled = true,
 		single_window_margins = { top = 134, right = 352, bottom = 135, left = 352 },
 		multiple_window_margins = 10,
+		bar_margins = { top = 50, right = 10, bottom = 10, left = 10 },
 	},
 })

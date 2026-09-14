@@ -2,6 +2,8 @@ local M = {}
 
 local hugeMarginsByMonitor = {}
 local rulesByMonitor = {}
+local barRulesByMonitor = {}
+local barVisible = false
 local statePath = (os.getenv("XDG_RUNTIME_DIR") or "/tmp") .. "/hyprland-monitor-modes.json"
 
 local function writeState()
@@ -28,6 +30,20 @@ local function setRulesEnabled(name, enabled)
 	for _, rule in ipairs(rulesByMonitor[name]) do
 		rule:set_enabled(enabled)
 	end
+	if barRulesByMonitor[name] then
+		for _, rule in ipairs(barRulesByMonitor[name]) do
+			rule:set_enabled(enabled and barVisible)
+		end
+	end
+end
+
+function M.set_bar_visible(visible)
+	barVisible = visible
+	for name, rules in pairs(barRulesByMonitor) do
+		for _, rule in ipairs(rules) do
+			rule:set_enabled(hugeMarginsByMonitor[name] and barVisible)
+		end
+	end
 end
 
 function M.toggle()
@@ -53,6 +69,20 @@ function M.configure(monitors)
 				enabled = mode.enabled,
 			})
 		)
+
+		if mode.bar_margins then
+			barRulesByMonitor[name] = {}
+			for _, special in ipairs({ false, true }) do
+				table.insert(
+					barRulesByMonitor[name],
+					hl.workspace_rule({
+						workspace = "m[" .. name .. "] s[" .. tostring(special) .. "]",
+						gaps_out = mode.bar_margins,
+						enabled = mode.enabled and barVisible,
+					})
+				)
+			end
+		end
 
 		if mode.single_window_margins then
 			table.insert(

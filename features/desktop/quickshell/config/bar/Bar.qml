@@ -8,10 +8,24 @@ Scope {
 
     property bool shown: false
 
+    function syncHyprlandBarState(): void {
+        Quickshell.execDetached([
+            "hyprctl",
+            "eval",
+            "require('monitor-modes').set_bar_visible(" + (root.shown ? "true" : "false") + ")"
+        ]);
+    }
+
+    onShownChanged: syncHyprlandBarState()
+    Component.onCompleted: syncHyprlandBarState()
+
     UsageService { id: usageService }
     BatteryService { id: batteryService }
     SystemControlsService { id: systemControlsService }
-    MonitorModes { id: monitorModes }
+    MonitorModes {
+        id: monitorModes
+        onHugeMarginsChanged: root.syncHyprlandBarState()
+    }
     NotificationService { id: notifications }
 
     IpcHandler {
