@@ -9,6 +9,7 @@ Scope {
     property bool shown: false
 
     UsageService { id: usageService }
+    BatteryService { id: batteryService }
     MonitorModes { id: monitorModes }
     NotificationService { id: notifications }
 
@@ -20,6 +21,17 @@ Scope {
         function hide(): void { root.shown = false; }
         function refreshUsage(): void { usageService.refresh(); }
         function usage(): string { return JSON.stringify(usageService.usage); }
+        function battery(): string {
+            return JSON.stringify({
+                "enabled": batteryService.enabled,
+                "ready": batteryService.device.ready,
+                "present": batteryService.device.isPresent,
+                "laptopBattery": batteryService.device.isLaptopBattery,
+                "available": batteryService.available,
+                "percentage": batteryService.percentage,
+                "charging": batteryService.charging
+            });
+        }
         function clearNotifications(): void { notifications.clear(); }
     }
 
@@ -34,6 +46,7 @@ Scope {
                 hugeMargins: monitorModes.enabledFor(modelData)
                 usage: usageService.usage
                 refreshUsage: () => usageService.refresh()
+                battery: batteryService
                 notificationService: notifications
             }
         }

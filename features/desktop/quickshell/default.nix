@@ -81,6 +81,8 @@ let
 in
 {
   config = lib.mkIf config.desktopEnv.enable {
+    xdg.dataFile."quickshell/laptop".text = if config.laptop.enable then "1" else "0";
+
     # Waypipe starts its remote server before the metadata helper's wrapper runs.
     home.packages = [
       pkgs.quickshell

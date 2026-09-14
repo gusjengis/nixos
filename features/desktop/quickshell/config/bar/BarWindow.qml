@@ -11,6 +11,7 @@ PanelWindow {
     required property bool hugeMargins
     required property var usage
     required property var refreshUsage
+    required property var battery
     required property var notificationService
 
     visible: shown
@@ -39,6 +40,7 @@ PanelWindow {
             onRefreshRequested: bar.refreshUsage()
         }
         Tray { }
+        Battery { batteryService: bar.battery }
         NotificationInbox { notificationService: bar.notificationService }
         Clock { }
     }
