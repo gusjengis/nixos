@@ -10,9 +10,14 @@ RowLayout {
     readonly property var monitor: Hyprland.monitorFor(barScreen)
     spacing: 4
 
+    function workspaceName(number) {
+        return root.monitor ? root.monitor.name + ":" + number : "";
+    }
+
     function occupied(number) {
         return Hyprland.workspaces.values.some(workspace =>
-            workspace.id === number && workspace.monitor === root.monitor);
+            (workspace.name === root.workspaceName(number) || workspace.id === number)
+                && workspace.monitor === root.monitor);
     }
 
     Repeater {
@@ -22,7 +27,8 @@ RowLayout {
             required property int index
             readonly property int number: index + 1
             readonly property bool active: root.monitor && root.monitor.activeWorkspace
-                && root.monitor.activeWorkspace.id === number
+                && (root.monitor.activeWorkspace.name === root.workspaceName(number)
+                    || root.monitor.activeWorkspace.id === number)
             readonly property bool occupied: root.occupied(number)
 
             implicitWidth: number === 10 ? 28 : 24
@@ -48,7 +54,8 @@ RowLayout {
                 onClicked: {
                     if (root.monitor)
                         Hyprland.dispatch("hl.dsp.focus({ monitor = '" + root.monitor.name + "' })");
-                    Hyprland.dispatch("hl.dsp.focus({ workspace = " + parent.number
+                    Hyprland.dispatch("hl.dsp.focus({ workspace = 'name:"
+                        + root.workspaceName(parent.number) + "'"
                         + ", on_current_monitor = true })");
                 }
             }

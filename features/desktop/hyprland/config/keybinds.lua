@@ -63,14 +63,26 @@ end
 
 hl.bind("SUPER + SHIFT + P", hl.dsp.window.pin({ action = "enable" }))
 
+local function monitor_workspace(workspace)
+	local monitor = hl.get_active_monitor()
+	local name = monitor.name .. ":" .. workspace
+	local legacy = hl.get_workspace(workspace)
+
+	if legacy and legacy.monitor == monitor then
+		hl.dispatch(hl.dsp.workspace.rename({ workspace = legacy, name = name }))
+	end
+
+	return "name:" .. name
+end
+
 for workspace = 1, 10 do
 	local key = workspace % 10
-	bind(
-		"SUPER + " .. key,
-		hl.dsp.focus({ workspace = workspace, on_current_monitor = true }),
-		"Workspace " .. workspace
-	)
-	bind("SUPER + SHIFT + " .. key, hl.dsp.window.move({ workspace = workspace }), "Move to Workspace " .. workspace)
+	bind("SUPER + " .. key, function()
+		hl.dispatch(hl.dsp.focus({ workspace = monitor_workspace(workspace), on_current_monitor = true }))
+	end, "Workspace " .. workspace)
+	bind("SUPER + SHIFT + " .. key, function()
+		hl.dispatch(hl.dsp.window.move({ workspace = monitor_workspace(workspace) }))
+	end, "Move to Workspace " .. workspace)
 end
 
 bind("SUPER + CTRL + ALT + SHIFT + E", hl.dsp.exit(), "Exit Hyprland")
