@@ -26,7 +26,9 @@ clone_repo() {
     repo_name=$(basename -s .git "$repo_url")
 
     if [ ! -d "$repo_name" ]; then
-        git clone "$repo_url" 2>/dev/null || { echo "clone failed: $repo_url"; return 1; }
+        # --recurse-submodules: .home-manager carries the Neovim config as a
+        # submodule, and a clone without it deploys an empty config directory.
+        git clone --recurse-submodules "$repo_url" 2>/dev/null || { echo "clone failed: $repo_url"; return 1; }
     else
         if ! git -C "$repo_name" rev-parse --git-dir >/dev/null 2>&1; then
             echo "$repo_name: not a valid git repository - removing and re-cloning"
@@ -40,7 +42,11 @@ clone_repo() {
             set +e
             cd "$repo_name" 2>/dev/null || { echo "cd failed: $repo_name"; return 0; }
 
-            if [ -n "$(git status --porcelain)" ]; then
+            # --ignore-submodules=all: the Neovim config submodule sits on its
+            # own branch and is routinely a commit or two away from the pin.
+            # Counting that as "uncommitted changes" would stop .home-manager
+            # from ever pulling again.
+            if [ -n "$(git status --porcelain --ignore-submodules=all)" ]; then
                 echo "$repo_name: uncommitted changes"
                 return 0
             fi

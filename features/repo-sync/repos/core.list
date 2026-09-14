@@ -1,3 +1,5 @@
+# The Neovim config is not listed here: it is a submodule of .home-manager, so
+# pulling it independently would drag it off the commit this repository pins.
+# `nvim-config-sync` (features/development/nvim) keeps it in step instead.
 $HOME/;https://github.com/gusjengis/.home-manager.git
-$HOME/.config/;https://github.com/gusjengis/nvim.git
 $HOME/.config/;https://github.com/gusjengis/secrets.git

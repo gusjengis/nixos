@@ -88,6 +88,30 @@
           ];
         };
 
+      systems = lib.unique (lib.mapAttrsToList (_: host: host.system) hosts);
+
+      # Editor tooling for this repository. Neovim reads it through direnv
+      # (.envrc), so language servers and formatters come from the flake that
+      # owns the project instead of from a global, unpinned install.
+      devShellFor =
+        system:
+        let
+          pkgs = pkgsFor system;
+        in
+        pkgs.mkShell {
+          packages = with pkgs; [
+            nil # Nix
+            nixfmt
+            lua-language-server # Neovim config, Hyprland config
+            stylua
+            qt6.qtdeclarative # qmlls, for quickshell
+            python3
+            ruff # quickshell helper scripts
+            bash-language-server
+            shellcheck
+          ];
+        };
+
       nixosConfigurationFor =
         hostName: host:
         nixpkgs-system.lib.nixosSystem {
@@ -106,5 +130,8 @@
     {
       homeConfigurations = lib.mapAttrs homeConfigurationFor hosts;
       nixosConfigurations = lib.mapAttrs nixosConfigurationFor systemHosts;
+      devShells = lib.genAttrs systems (system: {
+        default = devShellFor system;
+      });
     };
 }
