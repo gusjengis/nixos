@@ -6,6 +6,10 @@ project=${1:?usage: create-tmux-session PROJECT}
 project=$(realpath "$project")
 session=$(basename "$project" | tr . _)
 
+if [[ -f "$project/flake.nix" && -f "$project/.envrc" ]]; then
+  direnv allow "$project"
+fi
+
 if ! tmux has-session -t "$session" 2>/dev/null; then
   tmux new-session -ds "$session" -c "$project" "nvim ."
   tmux new-window -t "$session" -n "opencode" -c "$project" "opencode"

@@ -5,6 +5,7 @@ let
     name = "create-tmux-session";
     runtimeInputs = [
       pkgs.coreutils
+      pkgs.direnv
       pkgs.tmux
     ];
     text = ''
