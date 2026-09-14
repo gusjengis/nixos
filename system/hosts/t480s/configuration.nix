@@ -18,6 +18,7 @@
             capslock = overload(control, esc)
             rightmouse = backspace
             middlemouse = leftmeta
+            sysrq = f24
 
         '';
       };
