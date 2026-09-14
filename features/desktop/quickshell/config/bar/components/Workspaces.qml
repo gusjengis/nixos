@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Effects
 import QtQuick.Layouts
 import Quickshell.Hyprland
 import "../../theme"
@@ -8,6 +9,26 @@ RowLayout {
 
     required property var barScreen
     readonly property var monitor: Hyprland.monitorFor(barScreen)
+    readonly property var specialWorkspaces: [
+        { "name": "terminal", "glyph": "\uf120" },
+        { "name": "browser", "glyph": "\uf268" },
+        { "name": "calendar", "glyph": "\uf073" },
+        { "name": "gpt", "logo": "icons/chatgpt.svg" },
+        { "name": "gis", "glyph": "\uf279" },
+        { "name": "db", "glyph": "\uf1c0" },
+        { "name": "slack", "logo": "icons/slack.svg" },
+        { "name": "discord", "logo": "icons/discord.svg" },
+        { "name": "notes", "logo": "icons/obsidian.svg" },
+        { "name": "music", "logo": "icons/qobuz.svg" },
+        { "name": "musicassistant", "glyph": "\uf001" },
+        { "name": "email", "glyph": "\uf0e0" },
+        { "name": "home", "logo": "icons/home-assistant.svg" }
+    ]
+    readonly property var occupiedSpecialWorkspaces: specialWorkspaces.filter(entry => {
+        const workspace = root.specialWorkspace(entry.name);
+        return workspace && workspace.monitor === root.monitor
+            && workspace.toplevels.values.length > 0;
+    })
     spacing: 4
 
     function workspaceName(number) {
@@ -18,6 +39,25 @@ RowLayout {
         return Hyprland.workspaces.values.some(workspace =>
             (workspace.name === root.workspaceName(number) || workspace.id === number)
                 && workspace.monitor === root.monitor);
+    }
+
+    function specialWorkspace(name) {
+        return Hyprland.workspaces.values.find(workspace =>
+            workspace.name === "special:" + name);
+    }
+
+    function specialWorkspaceActive(name) {
+        const special = root.monitor && root.monitor.lastIpcObject
+            ? root.monitor.lastIpcObject.specialWorkspace : null;
+        return special && special.name === "special:" + name;
+    }
+
+    Connections {
+        target: Hyprland
+        function onRawEvent(event) {
+            if (event.name === "activespecial")
+                Hyprland.refreshMonitors();
+        }
     }
 
     Repeater {
@@ -57,6 +97,64 @@ RowLayout {
                     Hyprland.dispatch("hl.dsp.focus({ workspace = 'name:"
                         + root.workspaceName(parent.number) + "'"
                         + ", on_current_monitor = true })");
+                }
+            }
+        }
+    }
+
+    RowLayout {
+        visible: root.occupiedSpecialWorkspaces.length > 0
+        Layout.leftMargin: 4
+        spacing: 4
+
+        Repeater {
+            model: root.occupiedSpecialWorkspaces
+
+            delegate: Rectangle {
+                required property var modelData
+                readonly property var workspace: root.specialWorkspace(modelData.name)
+                readonly property bool active: root.specialWorkspaceActive(modelData.name)
+
+                implicitWidth: 28
+                implicitHeight: 26
+                radius: Theme.radius
+                color: active ? Theme.accentStrong
+                    : specialMouse.containsMouse ? Theme.surfaceHover : Theme.surface
+                border.color: !active ? Theme.border : "transparent"
+
+                Text {
+                    anchors.centerIn: parent
+                    text: typeof parent.modelData.glyph === "string"
+                        ? parent.modelData.glyph : ""
+                    visible: text !== ""
+                    color: parent.active ? Theme.background : Theme.text
+                    font { family: Theme.iconFontFamily; pixelSize: 16 }
+                }
+
+                Image {
+                    id: brandIcon
+                    anchors.centerIn: parent
+                    width: 17
+                    height: 17
+                    visible: source.toString() !== ""
+                    source: typeof parent.modelData.logo === "string"
+                        ? parent.modelData.logo : ""
+                    cache: false
+                    fillMode: Image.PreserveAspectFit
+                    layer.enabled: true
+                    layer.effect: MultiEffect {
+                        colorization: 1
+                        colorizationColor: brandIcon.parent.active
+                            ? Theme.background : Theme.text
+                    }
+                }
+
+                MouseArea {
+                    id: specialMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    onClicked: Hyprland.dispatch("hl.dsp.workspace.toggle_special('"
+                        + parent.modelData.name + "')")
                 }
             }
         }
