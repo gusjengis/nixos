@@ -172,6 +172,9 @@ def main():
     if command == "set" and len(sys.argv) == 3:
         print(set_wallpaper(sys.argv[2]))
         return
+    if command == "preview" and len(sys.argv) == 3:
+        print(set_wallpaper(sys.argv[2], persist=False))
+        return
     if command == "random":
         if available:
             print(set_wallpaper(choose_next(available, active)))
@@ -187,7 +190,7 @@ def main():
             print(set_wallpaper(choose_next(available, None), immediate=True))
         return
 
-    print("usage: wallpaperctl {catalog|current|set PATH|random|next|restore}", file=sys.stderr)
+    print("usage: wallpaperctl {catalog|current|set PATH|preview PATH|random|next|restore}", file=sys.stderr)
     raise SystemExit(2)
 
 

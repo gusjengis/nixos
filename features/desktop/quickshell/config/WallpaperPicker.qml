@@ -119,7 +119,7 @@ PanelWindow {
         interval: 120
         onTriggered: {
             if (picker.visible && path !== "")
-                Quickshell.execDetached(["wallpaperctl", "set", path]);
+                Quickshell.execDetached(["wallpaperctl", "preview", path]);
         }
     }
 
