@@ -32,6 +32,10 @@ PanelWindow {
         barScreen: bar.screen
     }
 
+    Clock {
+        anchors { horizontalCenter: parent.horizontalCenter; verticalCenter: parent.verticalCenter }
+    }
+
     RowLayout {
         anchors { right: parent.right; rightMargin: 10; verticalCenter: parent.verticalCenter }
         spacing: Theme.spacing
@@ -46,6 +50,5 @@ PanelWindow {
         Volume { controls: bar.systemControls }
         Battery { batteryService: bar.battery }
         NotificationInbox { notificationService: bar.notificationService }
-        Clock { }
     }
 }
