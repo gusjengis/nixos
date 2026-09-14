@@ -11,8 +11,8 @@ Rectangle {
         return (hours % 12 || 12) + ":" + minutes + (hours < 12 ? "a" : "p");
     }
 
-    implicitWidth: label.implicitWidth + 18
-    implicitHeight: 28
+    width: label.implicitWidth + 18
+    height: 28
     radius: Theme.radius
     color: mouse.containsMouse || popup.visible ? Theme.surfaceHover : "transparent"
 
