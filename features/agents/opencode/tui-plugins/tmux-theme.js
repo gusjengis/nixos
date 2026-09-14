@@ -23,7 +23,9 @@ export default {
       const build = toHex(api.theme.current.secondary)
       const plan = toHex(api.theme.current.warning)
       const errorColor = api.theme.current.error ? toHex(api.theme.current.error) : "red"
-      const next = `${build}:${plan}:${errorColor}`
+      const success = toHex(api.theme.current.success)
+      const question = toHex(api.theme.current.info)
+      const next = `${build}:${plan}:${errorColor}:${success}:${question}`
       if (next === applied) return
 
       writing = true
@@ -33,6 +35,8 @@ export default {
           "set-option", "-p", "-t", pane, "@opencode_build_color", build,
           ";", "set-option", "-p", "-t", pane, "@opencode_plan_color", plan,
           ";", "set-option", "-p", "-t", pane, "@opencode_error_color", errorColor,
+          ";", "set-option", "-p", "-t", pane, "@opencode_success_color", success,
+          ";", "set-option", "-p", "-t", pane, "@opencode_question_color", question,
         ],
         (error) => {
           writing = false
