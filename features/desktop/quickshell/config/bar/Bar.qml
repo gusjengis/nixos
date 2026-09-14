@@ -10,6 +10,7 @@ Scope {
 
     UsageService { id: usageService }
     BatteryService { id: batteryService }
+    SystemControlsService { id: systemControlsService }
     MonitorModes { id: monitorModes }
     NotificationService { id: notifications }
 
@@ -47,6 +48,7 @@ Scope {
                 usage: usageService.usage
                 refreshUsage: () => usageService.refresh()
                 battery: batteryService
+                systemControls: systemControlsService
                 notificationService: notifications
             }
         }

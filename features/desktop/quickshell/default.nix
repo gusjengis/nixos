@@ -43,6 +43,18 @@ let
       exec python3 "${configRoot}/../universal-search.py" "$@"
     '';
   };
+  systemControls = pkgs.writeShellApplication {
+    name = "quickshell-system-controls";
+    runtimeInputs = [
+      pkgs.networkmanager
+      pkgs.bluez
+      pkgs.brightnessctl
+      pkgs.python3
+    ];
+    text = ''
+      exec python3 "${configRoot}/../system-controls.py" "$@"
+    '';
+  };
   remoteApps = pkgs.stdenvNoCC.mkDerivation {
     pname = "quickshell-remote-apps";
     version = "1";
@@ -90,6 +102,7 @@ in
       wallpaperctl
       aiUsage
       universalSearch
+      systemControls
       pkgs.waypipe
       pkgs.xwayland-satellite
     ];

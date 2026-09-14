@@ -12,6 +12,7 @@ PanelWindow {
     required property var usage
     required property var refreshUsage
     required property var battery
+    required property var systemControls
     required property var notificationService
 
     visible: shown
@@ -40,6 +41,9 @@ PanelWindow {
             onRefreshRequested: bar.refreshUsage()
         }
         Tray { }
+        Wifi { controls: bar.systemControls }
+        Bluetooth { controls: bar.systemControls }
+        Volume { controls: bar.systemControls }
         Battery { batteryService: bar.battery }
         NotificationInbox { notificationService: bar.notificationService }
         Clock { }
