@@ -68,7 +68,7 @@ let
       # are caches, not working repositories; if one is still at the wrong
       # commit after restore, replace that cache and let Lazy reinstall it.
       while IFS=$'\t' read -r plugin _actual _expected; do
-        [[ -n "$plugin" ]] && rm -rf "$lazy_dir/$plugin"
+        [[ -n "$plugin" ]] && rm -rf "''${lazy_dir:?}/$plugin"
       done < <(mismatched)
 
       restore || true
