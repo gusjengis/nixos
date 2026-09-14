@@ -179,13 +179,6 @@ GuardedPopupWindow {
             }
         }
 
-        Text {
-            width: grid.width
-            horizontalAlignment: Text.AlignHCenter
-            text: Qt.formatDate(popup.today, "dddd d MMMM yyyy")
-            color: Theme.muted
-            font { family: Theme.fontFamily; pixelSize: Theme.fontSize - 1 }
-        }
     }
 
     Shortcut {
