@@ -6,7 +6,7 @@ import "../notifications"
 Scope {
     id: root
 
-    property bool shown: false
+    property bool shown: true
 
     function syncHyprlandBarState(): void {
         Quickshell.execDetached([
