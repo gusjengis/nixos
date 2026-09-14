@@ -16,11 +16,41 @@ Rectangle {
         : current.urgency === NotificationUrgency.Low ? Theme.muted : Theme.accentStrong
     readonly property string iconSource: current.image || (current.appIcon
         ? Quickshell.iconPath(current.appIcon, true) : "")
+    readonly property bool hasDefaultAction: {
+        for (const action of current.actions || []) {
+            if (action.identifier === "default")
+                return true;
+        }
+        return false;
+    }
+
+    function shortTime(date) {
+        const hours = date.getHours();
+        const minutes = ("0" + date.getMinutes()).slice(-2);
+        return (hours % 12 || 12) + ":" + minutes + (hours < 12 ? "a" : "p");
+    }
+
+    function activate() {
+        const actions = current.actions || [];
+        for (const action of actions) {
+            if (action.identifier === "default") {
+                action.invoke();
+                return;
+            }
+        }
+    }
 
     implicitHeight: content.implicitHeight + 24
     radius: Theme.windowRadius
     color: Theme.background
     border { width: Theme.windowBorderWidth; color: root.urgencyColor }
+
+    MouseArea {
+        anchors.fill: parent
+        enabled: root.hasDefaultAction
+        cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+        onClicked: root.activate()
+    }
 
     Row {
         id: content
@@ -71,7 +101,7 @@ Rectangle {
                 Text {
                     id: timeLabel
                     visible: root.showTime
-                    text: Qt.formatTime(new Date(root.entry.receivedAt), "HH:mm")
+                    text: root.shortTime(new Date(root.entry.receivedAt))
                     color: Theme.muted
                     font { family: Theme.fontFamily; pixelSize: Theme.fontSize - 2 }
                 }
@@ -95,6 +125,39 @@ Rectangle {
                 maximumLineCount: 4
                 elide: Text.ElideRight
                 font { family: Theme.fontFamily; pixelSize: Theme.fontSize - 1 }
+            }
+
+            Flow {
+                width: parent.width
+                spacing: 5
+
+                Repeater {
+                    model: root.current.actions || []
+
+                    delegate: Rectangle {
+                        required property var modelData
+                        visible: modelData.identifier !== "default"
+                        width: visible ? actionLabel.implicitWidth + 16 : 0
+                        height: visible ? 25 : 0
+                        radius: Theme.radius
+                        color: actionMouse.containsMouse ? Theme.surfaceHover : Theme.surface
+
+                        Text {
+                            id: actionLabel
+                            anchors.centerIn: parent
+                            text: modelData.text
+                            color: Theme.accent
+                            font { family: Theme.fontFamily; pixelSize: Theme.fontSize - 1; bold: true }
+                        }
+
+                        MouseArea {
+                            id: actionMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            onClicked: modelData.invoke()
+                        }
+                    }
+                }
             }
         }
 

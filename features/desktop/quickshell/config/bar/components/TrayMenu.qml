@@ -29,9 +29,8 @@ PopupWindow {
         history = history.slice(0, -1);
     }
 
-    anchor.edges: Edges.Bottom | Edges.Right
-    anchor.gravity: Edges.Bottom | Edges.Left
-    anchor.margins.top: 6
+    anchor.rect.x: (anchor.item ? anchor.item.width : 0) - width
+    anchor.rect.y: Theme.barPopupY(anchor.item)
     implicitWidth: 230
     implicitHeight: Math.min(360, header.height + menuList.contentHeight + 10)
     color: "transparent"
@@ -115,6 +114,7 @@ PopupWindow {
 
     Shortcut {
         sequence: "Escape"
+        enabled: popup.visible
         onActivated: {
             if (popup.history.length > 0)
                 popup.back();

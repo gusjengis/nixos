@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Layouts
 import Quickshell
 import "../../notifications"
 import "../../theme"
@@ -9,17 +10,27 @@ Rectangle {
     required property var notificationService
     readonly property var history: notificationService ? notificationService.history : []
 
-    implicitWidth: label.implicitWidth + 20
+    implicitWidth: content.implicitWidth + 14
     implicitHeight: 28
     radius: Theme.radius
     color: mouse.containsMouse || popup.visible ? Theme.surfaceHover : "transparent"
 
-    Text {
-        id: label
+    RowLayout {
+        id: content
         anchors.centerIn: parent
-        text: root.history.length > 0 ? "Inbox " + root.history.length : "Inbox"
-        color: root.history.length > 0 ? Theme.accent : Theme.muted
-        font { family: Theme.fontFamily; pixelSize: Theme.fontSize - 1; bold: true }
+        spacing: 4
+
+        Text {
+            text: ""
+            color: root.history.length > 0 ? Theme.accent : Theme.muted
+            font { family: Theme.iconFontFamily; pixelSize: 16 }
+        }
+
+        Text {
+            text: root.history.length.toString()
+            color: root.history.length > 0 ? Theme.accent : Theme.muted
+            font { family: Theme.fontFamily; pixelSize: Theme.fontSize - 1; bold: true }
+        }
     }
 
     MouseArea {
@@ -41,9 +52,8 @@ Rectangle {
             visible = true;
         }
 
-        anchor.edges: Edges.Bottom | Edges.Right
-        anchor.gravity: Edges.Bottom | Edges.Left
-        anchor.margins.top: 6
+        anchor.rect.x: (anchor.item ? anchor.item.width : 0) - width
+        anchor.rect.y: Theme.barPopupY(anchor.item)
         implicitWidth: 420
         implicitHeight: 520
         color: "transparent"
@@ -117,6 +127,10 @@ Rectangle {
             }
         }
 
-        Shortcut { sequence: "Escape"; onActivated: popup.visible = false }
+        Shortcut {
+            sequence: "Escape"
+            enabled: popup.visible
+            onActivated: popup.visible = false
+        }
     }
 }

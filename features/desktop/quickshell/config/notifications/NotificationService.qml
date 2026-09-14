@@ -99,6 +99,7 @@ Scope {
     NotificationServer {
         id: server
         bodySupported: true
+        actionsSupported: true
         imageSupported: true
         persistenceSupported: true
         keepOnReload: true
