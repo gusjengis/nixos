@@ -38,13 +38,47 @@ let
     runtimeInputs = with pkgs; [
       coreutils
       git
+      jq
     ];
     text = ''
       nvim_bin="$(command -v nvim || echo /run/current-system/sw/bin/nvim)"
       [ -x "$nvim_bin" ] || { echo "nvim-plugin-sync: no nvim on PATH" >&2; exit 0; }
 
-      "$nvim_bin" --headless "+Lazy! restore" "+Lazy! clean" +qa >/dev/null 2>&1 \
-        || echo "nvim-plugin-sync: lazy restore did not finish cleanly" >&2
+      lock="$HOME/.config/nvim/lazy-lock.json"
+      lazy_dir="$HOME/.local/share/nvim/lazy"
+
+      restore() {
+        "$nvim_bin" --headless "+Lazy! restore" "+Lazy! clean" +qa >/dev/null 2>&1
+      }
+
+      mismatched() {
+        ${pkgs.jq}/bin/jq -r 'to_entries[] | [.key, .value.commit] | @tsv' "$lock" \
+          | while IFS=$'\t' read -r plugin expected; do
+              path="$lazy_dir/$plugin"
+              actual="$(${pkgs.git}/bin/git -C "$path" rev-parse HEAD 2>/dev/null || true)"
+              if [[ "$actual" != "$expected" ]]; then
+                printf '%s\t%s\t%s\n' "$plugin" "''${actual:-missing}" "$expected"
+              fi
+            done
+      }
+
+      restore || true
+
+      # Lazy refuses to update a clone with local changes. Plugin directories
+      # are caches, not working repositories; if one is still at the wrong
+      # commit after restore, replace that cache and let Lazy reinstall it.
+      while IFS=$'\t' read -r plugin _actual _expected; do
+        [[ -n "$plugin" ]] && rm -rf "$lazy_dir/$plugin"
+      done < <(mismatched)
+
+      restore || true
+
+      remaining="$(mismatched)"
+      if [[ -n "$remaining" ]]; then
+        echo "nvim-plugin-sync: plugins still differ from lazy-lock.json:" >&2
+        echo "$remaining" >&2
+        exit 1
+      fi
 
       # Mason's downloads are unpinned, machine-local binaries; the config no
       # longer uses it, so its data directory is stale cache.
@@ -94,7 +128,7 @@ in
   # After the config is linked, so the restore reads the deployed lockfile.
   home.activation.nvimPluginSync = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     if [[ -z "''${HM_SKIP_NVIM_SYNC:-}" ]]; then
-      ${lib.getExe syncPlugins} || true
+      ${lib.getExe syncPlugins}
     fi
   '';
 }
