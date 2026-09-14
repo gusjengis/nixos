@@ -27,6 +27,7 @@ QtObject {
     readonly property int spacing: 8
     readonly property int fontSize: 13
     readonly property string fontFamily: "sans-serif"
+    readonly property string iconFontFamily: "Symbols Nerd Font Mono"
 
     property int windowBorderWidth: 2
     property int windowRadius: 16
