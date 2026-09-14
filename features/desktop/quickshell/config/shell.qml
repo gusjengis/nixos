@@ -6,6 +6,7 @@ import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
 import "bar"
+import "state"
 import "theme"
 
 // QuickShell launcher shell. Two dedicated popups: a local application launcher
@@ -16,6 +17,12 @@ ShellRoot {
     id: root
 
     Bar { }
+
+    IpcHandler {
+        target: "focusGuard"
+        function suspend(): void { FocusGuard.suspended = true; }
+        function resume(): void { FocusGuard.suspended = false; }
+    }
 
     IpcHandler {
         target: "launcher"

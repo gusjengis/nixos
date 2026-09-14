@@ -2,7 +2,7 @@ import QtQuick
 import Quickshell
 import "../../theme"
 
-PopupWindow {
+GuardedPopupWindow {
     id: popup
 
     property var currentMenu: null
@@ -34,7 +34,6 @@ PopupWindow {
     implicitWidth: 230
     implicitHeight: Math.min(360, header.height + menuList.contentHeight + 10)
     color: "transparent"
-    grabFocus: true
 
     QsMenuOpener {
         id: opener

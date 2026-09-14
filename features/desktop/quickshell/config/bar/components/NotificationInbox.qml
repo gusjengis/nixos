@@ -40,7 +40,7 @@ Rectangle {
         onClicked: popup.toggle(root)
     }
 
-    PopupWindow {
+    GuardedPopupWindow {
         id: popup
 
         function toggle(anchorItem) {
@@ -57,7 +57,6 @@ Rectangle {
         implicitWidth: 420
         implicitHeight: 520
         color: "transparent"
-        grabFocus: true
 
         Rectangle {
             anchors.fill: parent

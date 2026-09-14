@@ -1,0 +1,2 @@
+module State
+singleton FocusGuard 1.0 FocusGuard.qml

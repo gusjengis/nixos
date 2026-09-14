@@ -2,7 +2,7 @@ import QtQuick
 import Quickshell
 import "../../theme"
 
-PopupWindow {
+GuardedPopupWindow {
     id: popup
 
     required property var usage
@@ -30,7 +30,6 @@ PopupWindow {
     implicitWidth: 390
     implicitHeight: 481
     color: "transparent"
-    grabFocus: true
 
     Rectangle {
         anchors.fill: parent

@@ -5,6 +5,7 @@ import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Io
 import Quickshell.Wayland
+import "state"
 import "theme"
 
 PanelWindow {
@@ -94,7 +95,6 @@ PanelWindow {
     }
 
     onVisibleChanged: {
-        focusGrab.active = visible;
         if (visible)
             keyHandler.forceActiveFocus();
     }
@@ -102,7 +102,16 @@ PanelWindow {
     HyprlandFocusGrab {
         id: focusGrab
         windows: [picker]
-        onCleared: picker.dismiss()
+        onCleared: {
+            if (!FocusGuard.suspended)
+                picker.dismiss();
+        }
+    }
+
+    Binding {
+        target: focusGrab
+        property: "active"
+        value: picker.visible && !FocusGuard.suspended
     }
 
     Process {

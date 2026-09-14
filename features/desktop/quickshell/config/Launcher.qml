@@ -5,6 +5,7 @@ import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Io
 import Quickshell.Widgets
+import "state"
 import "theme"
 
 PanelWindow {
@@ -263,11 +264,13 @@ PanelWindow {
     HyprlandFocusGrab {
         id: focusGrab
         windows: [launcher]
-        onCleared: launcher.visible = false
+        onCleared: {
+            if (!FocusGuard.suspended)
+                launcher.visible = false;
+        }
     }
 
     onVisibleChanged: {
-        focusGrab.active = visible;
         if (visible)
             search.forceActiveFocus();
         else {
@@ -277,6 +280,12 @@ PanelWindow {
             cancelRequest();
             cancelSearch();
         }
+    }
+
+    Binding {
+        target: focusGrab
+        property: "active"
+        value: launcher.visible && !FocusGuard.suspended
     }
 
     Component {

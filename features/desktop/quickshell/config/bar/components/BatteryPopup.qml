@@ -3,7 +3,7 @@ import Quickshell
 import Quickshell.Services.UPower
 import "../../theme"
 
-PopupWindow {
+GuardedPopupWindow {
     id: popup
 
     property var batteryService: null
@@ -46,7 +46,6 @@ PopupWindow {
     implicitWidth: 370
     implicitHeight: 230
     color: "transparent"
-    grabFocus: true
 
     Rectangle {
         anchors.fill: parent

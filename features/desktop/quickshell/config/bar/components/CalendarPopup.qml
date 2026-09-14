@@ -2,7 +2,7 @@ import QtQuick
 import Quickshell
 import "../../theme"
 
-PopupWindow {
+GuardedPopupWindow {
     id: popup
 
     required property date today
@@ -47,7 +47,6 @@ PopupWindow {
     implicitWidth: content.implicitWidth + 28
     implicitHeight: content.implicitHeight + 28
     color: "transparent"
-    grabFocus: true
 
     Rectangle {
         anchors.fill: parent

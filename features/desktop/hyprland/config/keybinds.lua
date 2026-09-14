@@ -7,6 +7,10 @@ local function bind(keys, dispatcher, description, flags)
 	hl.bind(keys, dispatcher, flags)
 end
 
+local function preserve_quickshell_focus(command)
+	return "qs ipc call focusGuard suspend; " .. command .. "; qs ipc call focusGuard resume"
+end
+
 bind("SUPER + SPACE", hl.dsp.exec_cmd("qs ipc call launcher toggle"), "App Launcher")
 bind("SUPER + CTRL + SPACE", hl.dsp.exec_cmd("qs ipc call launcher remote"), "Remote Launcher")
 bind("SUPER + Q", hl.dsp.exec_cmd(vars.terminal), "Launch Terminal")
@@ -31,17 +35,17 @@ hl.bind("XF86AudioMicMute", hl.dsp.exec_cmd("handy --toggle-transcription"), { r
 
 bind(
 	"SUPER + SHIFT + S",
-	hl.dsp.exec_cmd("take-screenshot output " .. home .. "/Pictures/Screenshots"),
+	hl.dsp.exec_cmd(preserve_quickshell_focus("take-screenshot output " .. home .. "/Pictures/Screenshots")),
 	"Screenshot"
 )
 bind(
 	"SUPER + SHIFT + A",
-	hl.dsp.exec_cmd("take-screenshot region " .. home .. "/Pictures/Screenshots"),
+	hl.dsp.exec_cmd(preserve_quickshell_focus("take-screenshot region " .. home .. "/Pictures/Screenshots")),
 	"Screenshot Area"
 )
 bind(
 	"SUPER + SHIFT + W",
-	hl.dsp.exec_cmd("take-screenshot window " .. home .. "/Pictures/Screenshots"),
+	hl.dsp.exec_cmd(preserve_quickshell_focus("take-screenshot window " .. home .. "/Pictures/Screenshots")),
 	"Screenshot Window"
 )
 
@@ -118,7 +122,11 @@ bind("XF86AudioPrev", hl.dsp.exec_cmd("playerctl previous"), "Hidden", { locked 
 bind(
 	"SUPER + H",
 	hl.dsp.exec_cmd(
-		"pkill wl-kbptr || wl-kbptr -c " .. home .. "/.home-manager/features/desktop/cursor/wl-kbptr.conf"
+		"pkill wl-kbptr || ("
+			.. preserve_quickshell_focus(
+				"wl-kbptr -c " .. home .. "/.home-manager/features/desktop/cursor/wl-kbptr.conf"
+			)
+			.. ")"
 	),
 	"Hop"
 )

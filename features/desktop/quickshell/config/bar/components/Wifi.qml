@@ -37,7 +37,7 @@ Rectangle {
         onClicked: popup.toggle(root)
     }
 
-    PopupWindow {
+    GuardedPopupWindow {
         id: popup
         property string selectedSsid: ""
 
@@ -57,7 +57,6 @@ Rectangle {
         implicitWidth: 380
         implicitHeight: Math.min(480, content.implicitHeight + 32)
         color: "transparent"
-        grabFocus: true
 
         Rectangle {
             anchors.fill: parent
