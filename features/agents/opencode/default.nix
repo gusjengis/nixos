@@ -7,11 +7,30 @@
 }:
 let
   configRoot = "${config.home.homeDirectory}/.home-manager/features/agents/opencode";
+  hyprlandPackages = inputs.hyprland.packages.${pkgs.stdenv.hostPlatform.system};
+  sessionNotify = pkgs.writeShellApplication {
+    name = "opencode-session-notify";
+    runtimeInputs = [
+      hyprlandPackages.hyprland
+      inputs.opencode.packages.${pkgs.stdenv.hostPlatform.system}.default
+      pkgs.jq
+      pkgs.kitty
+      pkgs.libnotify
+      pkgs.tmux
+      pkgs.util-linux
+    ];
+    text = ''
+      exec bash "${configRoot}/plugins/session-notify-handler.sh" "$@"
+    '';
+  };
 in
 {
   # Pinned to the upstream flake rather than pkgs.opencode, which trails behind.
   # The tag lives in flake.nix; bump it there.
-  home.packages = [ inputs.opencode.packages.${pkgs.stdenv.hostPlatform.system}.default ];
+  home.packages = [
+    inputs.opencode.packages.${pkgs.stdenv.hostPlatform.system}.default
+    sessionNotify
+  ];
 
   programs.bash.shellAliases.oc = "opencode";
 
@@ -20,7 +39,6 @@ in
   # UI preferences) is versioned and synced to other machines.
   xdg.configFile = {
     "opencode/opencode.json".source = config.lib.file.mkOutOfStoreSymlink "${configRoot}/opencode.json";
-
     "opencode/plugins/session-notify.js".source =
       config.lib.file.mkOutOfStoreSymlink "${configRoot}/plugins/session-notify.js";
 
