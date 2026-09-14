@@ -41,6 +41,8 @@ in
     "opencode/opencode.json".source = config.lib.file.mkOutOfStoreSymlink "${configRoot}/opencode.json";
     "opencode/plugins/session-notify.js".source =
       config.lib.file.mkOutOfStoreSymlink "${configRoot}/plugins/session-notify.js";
+    "opencode/plugins/tmux-status.js".source =
+      config.lib.file.mkOutOfStoreSymlink "${configRoot}/plugins/tmux-status.js";
 
     # Caveman skill suite (caveman, caveman-commit, caveman-review, ...).
     # OpenCode scans ~/.config/opencode/skills recursively for **/SKILL.md, so
