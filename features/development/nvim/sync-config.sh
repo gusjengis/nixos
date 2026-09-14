@@ -41,11 +41,16 @@ current="$(git -C "$path" rev-parse HEAD)"
 
 git -C "$path" fetch --quiet origin || warn "could not fetch origin for $sub"
 
+# lazy-lock.json is generated state and deployment owns its value. Lazy may
+# have rewritten a restore/install result into the working tree; never let that
+# stale edit block moving the config repository onto the pinned commit.
+git -C "$path" checkout -- lazy-lock.json
+
 if git -C "$path" merge-base --is-ancestor "$current" "$pin"; then
   # This machine is behind the pin: fast-forward onto it.
   if [ -n "$(git -C "$path" status --porcelain)" ]; then
     warn "config has uncommitted changes, not moving it to $pin"
-    exit 0
+    exit 1
   fi
   git -C "$path" merge --ff-only --quiet "$pin"
   exit 0
@@ -57,7 +62,7 @@ if git -C "$path" merge-base --is-ancestor "$pin" "$current"; then
   # commit no other machine can fetch.
   if [ -z "$(git -C "$path" branch --remotes --contains "$current" 2>/dev/null)" ]; then
     warn "config commit $current is not pushed yet, leaving the pin alone"
-    exit 0
+    exit 1
   fi
 
   git -C "$repo" add -- "$sub"
@@ -67,3 +72,4 @@ if git -C "$path" merge-base --is-ancestor "$pin" "$current"; then
 fi
 
 warn "config at $current has diverged from the pinned $pin, resolve it by hand"
+exit 1

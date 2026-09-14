@@ -117,7 +117,7 @@ in
   # A fresh clone of this repository has an empty submodule directory, and a
   # pulled pointer change needs checking out, both before the link is made.
   home.activation.nvimConfigSync = lib.hm.dag.entryBefore [ "checkLinkTargets" ] ''
-    ${lib.getExe syncConfig} || true
+    ${lib.getExe syncConfig}
   '';
 
   # Home Manager's `force` cannot replace a real directory with a symlink, and
