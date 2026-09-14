@@ -33,9 +33,15 @@
     # platform-variables selection.
     ++ lib.optionals (pkgs.stdenv.hostPlatform.isx86_64 && config.desktopEnv.enable) [
       zoom-us
-      discord-canary
       slack
     ];
+
+  programs.discord = lib.mkIf (pkgs.stdenv.hostPlatform.isx86_64 && config.desktopEnv.enable) {
+    enable = true;
+    package = pkgs.discord-canary;
+    configName = "discordcanary";
+    settings.SKIP_HOST_UPDATE = true;
+  };
 
   # KDE Connect needs one-time pairing after first installation.
 }
