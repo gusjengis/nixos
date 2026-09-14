@@ -46,13 +46,22 @@ let
 
       lock="$HOME/.config/nvim/lazy-lock.json"
       lazy_dir="$HOME/.local/share/nvim/lazy"
+      expected_lock="$(mktemp)"
+      trap 'rm -f "$expected_lock"' EXIT
+
+      # Never trust the writable runtime copy as the source of truth. Lazy can
+      # rewrite it during restore to match a dirty clone; that is what let one
+      # machine declare itself consistent while LuaSnip was still off-lock.
+      ${pkgs.git}/bin/git -C "$HOME/.config/nvim" show HEAD:lazy-lock.json > "$expected_lock"
 
       restore() {
+        cp "$expected_lock" "$lock"
         "$nvim_bin" --headless "+Lazy! restore" "+Lazy! clean" +qa >/dev/null 2>&1
+        cp "$expected_lock" "$lock"
       }
 
       mismatched() {
-        ${pkgs.jq}/bin/jq -r 'to_entries[] | [.key, .value.commit] | @tsv' "$lock" \
+        ${pkgs.jq}/bin/jq -r 'to_entries[] | [.key, .value.commit] | @tsv' "$expected_lock" \
           | while IFS=$'\t' read -r plugin expected; do
               path="$lazy_dir/$plugin"
               actual="$(${pkgs.git}/bin/git -C "$path" rev-parse HEAD 2>/dev/null || true)"
