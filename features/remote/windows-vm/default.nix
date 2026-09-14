@@ -7,6 +7,9 @@
 
 let
   cfg = config.windowsVm;
+  windowsIcon = pkgs.runCommand "windows-logo.png" { nativeBuildInputs = [ pkgs.imagemagick ]; } ''
+    magick ${./windows-logo.webp} -resize 256x256 $out
+  '';
 
   rdpArgs =
     {
@@ -236,7 +239,7 @@ in
   config = lib.mkIf (cfg.enable && config.desktopEnv.enable) {
     home.packages = [ pkgs.freerdp ] ++ launchers;
 
-    xdg.dataFile."icons/windows-logo.webp".source = ./windows-logo.webp;
+    xdg.dataFile."icons/hicolor/256x256/apps/windows-logo.png".source = windowsIcon;
 
     xdg.dataFile."applications/windows-vm.desktop".text = ''
       [Desktop Entry]
@@ -244,7 +247,7 @@ in
       Name=Windows 11
       Comment=Connect to TrevorNomad over RDP
       Exec=${lib.getExe windowsRdp}
-      Icon=${config.xdg.dataHome}/icons/windows-logo.webp
+      Icon=windows-logo
       Terminal=false
       Categories=Network;RemoteAccess;
     '';
@@ -256,7 +259,7 @@ in
         Name=OG
         Comment=Start the OG Windows VM and connect over RDP
         Exec=${lib.getExe ogRdp}
-        Icon=${config.xdg.dataHome}/icons/windows-logo.webp
+        Icon=windows-logo
         Terminal=false
         Categories=Network;RemoteAccess;
       '';

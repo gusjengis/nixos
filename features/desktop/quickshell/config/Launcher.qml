@@ -22,10 +22,13 @@ PanelWindow {
     property var pendingProjectResults: []
     property var projectSearch: null
     property var usage: ({"apps": {}, "projects": {}})
+    property var ignoredDesktopEntryIds: ["wl-kbptr"]
 
     readonly property bool loading: request !== null
     readonly property var apps: mode === "local"
-        ? DesktopEntries.applications.values.filter(app => !app.noDisplay) : entries
+        ? DesktopEntries.applications.values.filter(app =>
+            !app.noDisplay && !ignoredDesktopEntryIds.includes(app.id.replace(/\.desktop$/, "")))
+        : entries
     readonly property var appResults: rankedApps()
     readonly property var webResults: mode === "local" && search.text.trim() !== "" ? [{
         "kind": "web",
