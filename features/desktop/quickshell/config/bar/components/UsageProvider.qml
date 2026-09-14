@@ -6,6 +6,8 @@ Rectangle {
 
     required property var provider
     required property color accentColor
+    property bool actionable: false
+    signal activated()
 
     // Render whatever numbers exist, including cached ones from a failed
     // refresh. Showing 0% for a failed fetch reads as "no usage", which is a
@@ -19,6 +21,12 @@ Rectangle {
     }
 
     function status() {
+        if (provider.saved === false)
+            return (provider.error || "not saved") + " · click to save";
+        if (provider.active)
+            return provider.error ? "active · stale" : "active";
+        if (provider.profile)
+            return provider.error ? "stale · click to switch" : "click to switch";
         if (!provider.error)
             return "";
         return root.hasData ? "stale · " + provider.error : provider.error;
@@ -26,8 +34,17 @@ Rectangle {
 
     implicitHeight: 125
     radius: Theme.radius
-    color: Theme.surface
-    border { width: 1; color: Theme.border }
+    color: accountMouse.containsMouse ? Theme.surfaceHover : Theme.surface
+    border { width: provider.active ? 2 : 1; color: provider.active ? root.accentColor : Theme.border }
+
+    MouseArea {
+        id: accountMouse
+        anchors.fill: parent
+        enabled: root.actionable
+        hoverEnabled: enabled
+        cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+        onClicked: root.activated()
+    }
 
     Text {
         id: providerName

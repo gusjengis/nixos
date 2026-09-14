@@ -47,6 +47,9 @@ Scope {
                 hugeMargins: monitorModes.enabledFor(modelData)
                 usage: usageService.usage
                 refreshUsage: () => usageService.refresh()
+                accountAction: (profile, saved) => usageService.account(profile, saved)
+                accountBusy: usageService.accountBusy
+                accountError: usageService.accountError
                 battery: batteryService
                 systemControls: systemControlsService
                 notificationService: notifications

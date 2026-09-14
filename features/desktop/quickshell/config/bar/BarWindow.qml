@@ -11,6 +11,9 @@ PanelWindow {
     required property bool hugeMargins
     required property var usage
     required property var refreshUsage
+    required property var accountAction
+    required property bool accountBusy
+    required property string accountError
     required property var battery
     required property var systemControls
     required property var notificationService
@@ -42,7 +45,10 @@ PanelWindow {
 
         Usage {
             usage: bar.usage
+            accountBusy: bar.accountBusy
+            accountError: bar.accountError
             onRefreshRequested: bar.refreshUsage()
+            onAccountRequested: (profile, saved) => bar.accountAction(profile, saved)
         }
         Tray { }
         Wifi { controls: bar.systemControls }

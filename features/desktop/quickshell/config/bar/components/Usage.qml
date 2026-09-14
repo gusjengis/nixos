@@ -7,7 +7,10 @@ Rectangle {
     // Not named "data": that is Item's default property, and shadowing it
     // stops declared children from becoming visual children.
     required property var usage
+    required property bool accountBusy
+    required property string accountError
     signal refreshRequested()
+    signal accountRequested(string profile, bool saved)
 
     implicitWidth: 28
     implicitHeight: 28
@@ -34,5 +37,8 @@ Rectangle {
     UsagePopup {
         id: popup
         usage: root.usage
+        accountBusy: root.accountBusy
+        accountError: root.accountError
+        onAccountRequested: (profile, saved) => root.accountRequested(profile, saved)
     }
 }

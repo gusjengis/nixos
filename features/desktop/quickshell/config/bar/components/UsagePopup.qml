@@ -6,11 +6,14 @@ PopupWindow {
     id: popup
 
     required property var usage
+    required property bool accountBusy
+    required property string accountError
+    signal accountRequested(string profile, bool saved)
 
-    function provider(name) {
+    function provider(id, name) {
         const providers = usage.providers || [];
-        return providers.find(item => item.name === name)
-            || { "name": name, "available": false, "error": "loading", "windows": [] };
+        return providers.find(item => item.id === id)
+            || { "id": id, "name": name, "available": false, "error": "loading", "windows": [] };
     }
 
     function toggle(anchorItem) {
@@ -22,11 +25,10 @@ PopupWindow {
         visible = true;
     }
 
-    anchor.edges: Edges.Bottom | Edges.Right
-    anchor.gravity: Edges.Bottom | Edges.Left
-    anchor.margins.top: 6
+    anchor.rect.x: (anchor.item ? anchor.item.width : 0) - width
+    anchor.rect.y: Theme.barPopupY(anchor.item)
     implicitWidth: 390
-    implicitHeight: 346
+    implicitHeight: 481
     color: "transparent"
     grabFocus: true
 
@@ -48,23 +50,39 @@ PopupWindow {
         }
 
         Text {
-            text: "Subscription limits"
-            color: Theme.muted
+            text: popup.accountError || "Subscription limits"
+            color: popup.accountError ? Theme.danger : Theme.muted
             font { family: Theme.fontFamily; pixelSize: Theme.fontSize - 1 }
         }
 
         UsageProvider {
             width: parent.width
-            provider: popup.provider("Claude")
+            provider: popup.provider("anthropic", "Anthropic")
             accentColor: Theme.warning
         }
 
         UsageProvider {
+            id: personalCard
             width: parent.width
-            provider: popup.provider("OpenAI")
+            provider: popup.provider("openai-personal", "OpenAI · Personal")
             accentColor: Theme.accentStrong
+            actionable: !popup.accountBusy
+            onActivated: popup.accountRequested("personal", personalCard.provider.saved === true)
+        }
+
+        UsageProvider {
+            id: businessCard
+            width: parent.width
+            provider: popup.provider("openai-business", "OpenAI · Business")
+            accentColor: Theme.accentStrong
+            actionable: !popup.accountBusy
+            onActivated: popup.accountRequested("business", businessCard.provider.saved === true)
         }
     }
 
-    Shortcut { sequence: "Escape"; onActivated: popup.visible = false }
+    Shortcut {
+        sequence: "Escape"
+        enabled: popup.visible
+        onActivated: popup.visible = false
+    }
 }

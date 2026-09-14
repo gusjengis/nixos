@@ -30,6 +30,13 @@ let
       exec python3 "${configRoot}/../usage.py" "$@"
     '';
   };
+  aiAccount = pkgs.writeShellApplication {
+    name = "quickshell-ai-account";
+    runtimeInputs = [ pkgs.python3 ];
+    text = ''
+      exec python3 "${configRoot}/../usage.py" account "$@"
+    '';
+  };
   universalSearch = pkgs.writeShellApplication {
     name = "quickshell-search";
     runtimeInputs = [
@@ -101,6 +108,7 @@ in
       remoteApps
       wallpaperctl
       aiUsage
+      aiAccount
       universalSearch
       systemControls
       pkgs.waypipe

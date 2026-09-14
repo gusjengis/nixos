@@ -17,7 +17,10 @@ Item {
         if (!value)
             return "Reset time unavailable";
         const date = typeof value === "number" ? new Date(value * 1000) : new Date(value);
-        return "Resets " + Qt.formatDateTime(date, "ddd d MMM, HH:mm");
+        const hours = date.getHours();
+        const minutes = ("0" + date.getMinutes()).slice(-2);
+        const time = (hours % 12 || 12) + ":" + minutes + (hours < 12 ? "a" : "p");
+        return "Resets " + Qt.formatDateTime(date, "ddd d MMM, ") + time;
     }
 
     implicitHeight: 34
