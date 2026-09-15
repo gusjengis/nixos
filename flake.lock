@@ -417,15 +417,16 @@
         "systems": "systems_4"
       },
       "locked": {
-        "lastModified": 1789422924,
-        "narHash": "sha256-okgR8l0J/6W1lwABXAPh/dQpYRmIzqlyivrl6HUXrkU=",
+        "lastModified": 1789423644,
+        "narHash": "sha256-vwJCZyq+O4O8uRQM9x5lw/4uAXir7iCBhWOX65sfRtA=",
         "owner": "gusjengis",
         "repo": "hyprpicker",
-        "rev": "170258c82e8cc73dc3b311ef090cda76624c9e1b",
+        "rev": "47a47a8ca6f876e6c31c69e6a5c5b26a69c943af",
         "type": "github"
       },
       "original": {
         "owner": "gusjengis",
+        "ref": "feature/format-cycling",
         "repo": "hyprpicker",
         "type": "github"
       }

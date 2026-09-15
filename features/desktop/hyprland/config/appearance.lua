@@ -79,3 +79,10 @@ hl.layer_rule({
 	match = { namespace = "^quickshell-wallpaper-picker$" },
 	animation = "fade",
 })
+
+colorPickerNoAnimationRule = hl.layer_rule({
+	name = "tools-launcher-no-animation",
+	enabled = false,
+	match = { namespace = "^quickshell-tools-launcher$" },
+	no_anim = true,
+})

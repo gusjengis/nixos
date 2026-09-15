@@ -32,7 +32,7 @@
     hyprland = {
       url = "github:gusjengis/Hyprland/personal";
     };
-    hyprpicker.url = "github:gusjengis/hyprpicker";
+    hyprpicker.url = "github:gusjengis/hyprpicker/feature/format-cycling";
     # Caveman skill suite for OpenCode (output-token compression).
     # Update to latest: nix flake update caveman && rehome
     caveman = {
