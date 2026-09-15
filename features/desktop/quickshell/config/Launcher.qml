@@ -189,7 +189,7 @@ PanelWindow {
     }
 
     function load(args) {
-        request = RequestProcess.createObject(launcher, {
+        request = requestProcessComponent.createObject(launcher, {
             command: ["quickshell-remote-apps"].concat(args),
             launcher: launcher
         });
@@ -204,7 +204,7 @@ PanelWindow {
             host = result.target;
             open("remote");
         } else if (mode === "remote") {
-            const process = LaunchProcess.createObject(launcher, {
+            const process = launchProcessComponent.createObject(launcher, {
                 command: ["quickshell-remote-apps", "start", host.id, result.target.id],
                 appName: result.name,
                 hostName: host.name,
@@ -309,6 +309,16 @@ PanelWindow {
         target: focusGrab
         property: "active"
         value: launcher.visible && !FocusGuard.suspended
+    }
+
+    Component {
+        id: requestProcessComponent
+        RequestProcess {}
+    }
+
+    Component {
+        id: launchProcessComponent
+        LaunchProcess {}
     }
 
     Component {
