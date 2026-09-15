@@ -21,7 +21,7 @@ let
       pkgs.util-linux
     ];
     text = ''
-      exec bash "${configRoot}/plugins/session-notify-handler.sh" "$@"
+      exec bash "${configRoot}/session-notify/session-notify-handler.sh" "$@"
     '';
   };
 in
@@ -42,7 +42,7 @@ in
     "opencode/opencode.json".source = config.lib.file.mkOutOfStoreSymlink "${configRoot}/opencode.json";
     "opencode/tui.json".source = config.lib.file.mkOutOfStoreSymlink "${configRoot}/tui.json";
     "opencode/plugins/session-notify.js".source =
-      config.lib.file.mkOutOfStoreSymlink "${configRoot}/plugins/session-notify.js";
+      config.lib.file.mkOutOfStoreSymlink "${configRoot}/session-notify/session-notify.js";
     "opencode/plugins/tmux-status.js".source =
       config.lib.file.mkOutOfStoreSymlink "${configRoot}/plugins/tmux-status.js";
     "opencode/tui-plugins/tmux-theme.js".source =
