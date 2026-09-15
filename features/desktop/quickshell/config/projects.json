@@ -12,6 +12,7 @@
     "~/.config/nvim",
     "~/.config/secrets",
     "~/.home-manager",
+    "~/.home-manager/features/agents/opencode/session-notify",
     "/etc/nixos"
   ],
   "ignore": [
