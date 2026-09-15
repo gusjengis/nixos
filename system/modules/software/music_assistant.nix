@@ -66,6 +66,14 @@ let
   });
 
   sitePackages = "/app/venv/lib/python3.14/site-packages";
+  serverPackage = "${sitePackages}/music_assistant";
+  serverMounts = [
+    "-v ${musicAssistantFork}/music_assistant/controllers/music/controller.py:${serverPackage}/controllers/music/controller.py:ro"
+    "-v ${musicAssistantFork}/music_assistant/controllers/player_queues/controller.py:${serverPackage}/controllers/player_queues/controller.py:ro"
+    "-v ${musicAssistantFork}/music_assistant/controllers/player_queues/queue_loader.py:${serverPackage}/controllers/player_queues/queue_loader.py:ro"
+    "-v ${musicAssistantFork}/music_assistant/helpers/uri.py:${serverPackage}/helpers/uri.py:ro"
+    "-v ${musicAssistantFork}/music_assistant/providers/ytmusic_free:${serverPackage}/providers/ytmusic_free:ro"
+  ];
 in
 {
   options = {
@@ -94,7 +102,7 @@ in
         Restart = "always";
         RestartSec = 10;
         ExecStartPre = "-${lib.getExe pkgs.docker} rm -f musicassistant";
-        ExecStart = "${lib.getExe pkgs.docker} run --name=musicassistant --rm --pull=missing --network=host --privileged -v music-assistant:/data -v ${resolvConf}:/etc/resolv.conf:ro -v ${musicAssistantFork}/music_assistant:${sitePackages}/music_assistant:ro -v ${musicAssistantFrontend}:${sitePackages}/music_assistant_frontend:ro -e TZ=America/Los_Angeles ${musicAssistantImage}";
+        ExecStart = "${lib.getExe pkgs.docker} run --name=musicassistant --rm --pull=missing --network=host --privileged -v music-assistant:/data -v ${resolvConf}:/etc/resolv.conf:ro ${lib.concatStringsSep " " serverMounts} -v ${musicAssistantFrontend}:${sitePackages}/music_assistant_frontend:ro -e TZ=America/Los_Angeles ${musicAssistantImage}";
         ExecStop = "${lib.getExe pkgs.docker} stop musicassistant";
         ExecStopPost = "-${lib.getExe pkgs.docker} rm -f musicassistant";
       };
