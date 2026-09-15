@@ -5,7 +5,7 @@ import "../../state"
 PopupWindow {
     id: popup
 
-    grabFocus: false
+    grabFocus: true
 
     HyprlandFocusGrab {
         active: popup.visible && !FocusGuard.suspended
