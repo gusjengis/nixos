@@ -29,6 +29,7 @@ in
       # plaintext copy is written to ~/.git-credentials.
       credential."https://github.com".helper = "!gh auth git-credential";
       credential."https://gist.github.com".helper = "!gh auth git-credential";
+      submodule.recurse = true;
     };
   };
 
