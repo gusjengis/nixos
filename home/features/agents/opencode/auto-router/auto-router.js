@@ -26,6 +26,7 @@ import {
   keywordTier,
   score,
   stripReminders,
+  TIERS,
   tierAt,
   tierIndex,
   wantsWork,
@@ -81,6 +82,36 @@ const DEFAULTS = {
   },
 
   fallback: "anthropic/claude-sonnet-4-5",
+
+  // Models never to route to, whatever the catalog advertises. For models that
+  // are listed but permanently unusable on this machine's credentials.
+  blocked: [],
+
+  // A model that answers a routed turn with a fatal error is taken out of the
+  // pools for a while, so the same dead model is not picked again on the next
+  // prompt.
+  //
+  // This matters more than it looks. OpenCode decides whether to retry by
+  // pattern-matching the error text, and Zen reports an upstream 404 as
+  // "Provider returned error" - which matches its retryable patterns. A
+  // permanently dead model therefore burns the full five-attempt backoff on
+  // every turn instead of failing once. See packages/opencode/src/session/retry.ts.
+  quarantine: {
+    enabled: true,
+    // First strike. Doubled per repeat strike, capped, so a model having a bad
+    // ten minutes comes back quickly while a decommissioned one stays gone.
+    minutes: 60,
+    maxMinutes: 10080,
+    // Forget a strike record that has been clean for this long, so an old
+    // outage does not keep doubling the penalty months later.
+    forgetAfterMinutes: 20160,
+  },
+
+  // Within a tier, prefer a model that has actually answered before. Quarantine
+  // alone would let a dead model back in the moment its sentence expires, and
+  // rediscovering that costs a full retry backoff; this keeps the pool on the
+  // member that works and only reaches for the other one when it has to.
+  preferProven: true,
 
   // Escalation is immediate; de-escalation drops at most one tier per turn.
   // Bouncing between models mid-session throws away the prompt cache, and a
@@ -230,6 +261,50 @@ function hashString(value) {
   return h >>> 0
 }
 
+// Status codes that mean "this model will not answer", as opposed to "it is
+// busy". 401/403 are deliberately absent: those are the credential's problem,
+// not the model's, and taking a model out over them would empty a pool while
+// the account is being re-authorised.
+const FATAL_STATUS = new Set([400, 404, 405, 410, 501])
+
+// Checked before the status code. Providers routinely report a transient
+// upstream failure with a 4xx of their own, and a busy model must not be
+// mistaken for a dead one.
+const TRANSIENT_ERROR =
+  /rate limit|rate_limit|too many requests|overloaded|capacity|try again|timed? ?out|timeout|connection|network|socket|econn|etimedout|resource exhausted|quota|billing|credit|insufficient|unauthori[sz]ed|forbidden|expired|invalid[_ ]api[_ ]key/i
+
+// Fatal regardless of status, since some providers answer "no such model" with
+// a 200-shaped error envelope.
+const FATAL_ERROR =
+  /not supported|unsupported|not found|does not exist|no endpoints|unknown model|no such model|decommissioned|\[40[45]\]|\b40[45]\b/i
+
+/**
+ * Decide whether an error means the model this turn was routed to is unusable.
+ *
+ * A false positive costs one hour of the other pool member; a false negative
+ * costs every subsequent turn, because OpenCode will keep retrying a model that
+ * is never going to answer. The bias is therefore towards quarantining.
+ */
+function fatalModelError(error) {
+  if (!error) return undefined
+
+  // Overflowing the context window or aborting says nothing about the model.
+  const name = String(error.name ?? "")
+  if (name && !/^(APIError|ProviderError|UnknownError)$/.test(name)) return undefined
+
+  const data = error.data ?? {}
+  const text = `${data.message ?? ""} ${data.responseBody ?? ""}`
+  if (!text.trim()) return undefined
+  if (TRANSIENT_ERROR.test(text)) return undefined
+
+  const status = typeof data.statusCode === "number" ? data.statusCode : undefined
+  if (FATAL_ERROR.test(text)) return { status, message: data.message ?? text.trim().slice(0, 200) }
+  if (status !== undefined && FATAL_STATUS.has(status)) {
+    return { status, message: data.message ?? text.trim().slice(0, 200) }
+  }
+  return undefined
+}
+
 function parseModelID(value) {
   const index = String(value).indexOf("/")
   if (index === -1) return undefined
@@ -307,13 +382,63 @@ export const AutoRouterPlugin = async ({ client }) => {
     return catalog
   }
 
-  const resolveTarget = async (tier, sessionID, forcedEffort) => {
-    const { models } = await loadCatalog()
+  // Called when a session settles without having quarantined the model it was
+  // routed to, which is the only evidence available that the model answered.
+  const proved = (id) => {
+    if (!config.preferProven || !id || quarantined(id)) return
+    const now = Date.now()
+    if (now - (health[id]?.ok ?? 0) < 60_000) return
+    health[id] = { ok: now }
+    mutate((data) => {
+      data.health ??= {}
+      data.health[id] = { ok: now }
+      health = data.health
+    })
+  }
+
+  // Lower sorts first. A model that has answered before beats one that is
+  // merely untried, which beats one carrying a spent quarantine record.
+  const trust = (id) => {
+    if (!config.preferProven) return 0
+    if (quarantine[id]) return 2
+    return health[id]?.ok ? 0 : 1
+  }
+
+  const poolFor = (tier, models) => {
     const raw = config.tiers?.[tier]
     const pool = (Array.isArray(raw) ? raw : [raw]).filter(Boolean)
+    // An unknown id is one the catalog does not advertise at all; a quarantined
+    // one is advertised but has proved it will not answer.
+    return (models.size ? pool.filter((id) => models.has(id)) : pool).filter((id) => !quarantined(id))
+  }
 
-    const known = models.size ? pool.filter((id) => models.has(id)) : pool
-    let candidates = known.length ? known : [config.fallback].filter(Boolean)
+  const resolveTarget = async (requested, sessionID, forcedEffort) => {
+    const { models } = await loadCatalog()
+    refresh()
+
+    // Walk up from the requested tier until a tier has a usable member. Routing
+    // a turn to a stronger model than it needs is the correct failure here -
+    // the alternative is refusing to answer because the cheap pool is down.
+    let tier = requested
+    let candidates = []
+    for (let index = tierIndex(requested); index < TIERS.length; index++) {
+      const members = poolFor(TIERS[index], models)
+      if (!members.length) continue
+      tier = TIERS[index]
+      candidates = members
+      break
+    }
+
+    let escalated
+    if (tier !== requested) escalated = { from: requested, to: tier }
+
+    if (!candidates.length) {
+      const fallback = [config.fallback].filter(Boolean)
+      candidates = fallback.filter((id) => !quarantined(id))
+      // Everything is quarantined. A model that might fail beats no model at
+      // all, so the last resort ignores the quarantine entirely.
+      if (!candidates.length) candidates = fallback
+    }
     if (!candidates.length) return undefined
 
     // Drop providers that have nothing left, unless that empties the pool.
@@ -336,8 +461,11 @@ export const AutoRouterPlugin = async ({ client }) => {
     let picked = sticky && candidates.includes(sticky) ? sticky : undefined
 
     if (!picked) {
-      // Most headroom first; hash as a stable tie-break.
+      // Proven models first, then most headroom, then a stable hash so two
+      // sessions with nothing to choose between still spread out.
       const ranked = [...candidates].sort((a, b) => {
+        const trusted = trust(a) - trust(b)
+        if (trusted !== 0) return trusted
         const left = usage?.headroom(a.slice(0, a.indexOf("/"))) ?? 100
         const right = usage?.headroom(b.slice(0, b.indexOf("/"))) ?? 100
         if (right !== left) return right - left
@@ -365,6 +493,8 @@ export const AutoRouterPlugin = async ({ client }) => {
 
     return {
       id: picked,
+      tier,
+      escalated,
       providerID: parsed.providerID,
       modelID: parsed.modelID,
       variant,
@@ -375,12 +505,44 @@ export const AutoRouterPlugin = async ({ client }) => {
     }
   }
 
-  const readStatus = () => {
+  const readFile = () => {
     try {
       const data = JSON.parse(fs.readFileSync(status, "utf8"))
-      return data?.sessions ?? {}
+      if (data && typeof data === "object") return data
     } catch {
-      return {}
+      // Missing or corrupt: start from an empty document rather than refusing
+      // to route.
+    }
+    return {}
+  }
+
+  const readStatus = () => readFile().sessions ?? {}
+
+  // Read-modify-write of the whole status document. Sessions, the quarantine
+  // and the TUI all share one small file, so it is rewritten atomically.
+  const mutate = (fn) => {
+    try {
+      const data = readFile()
+      data.sessions ??= {}
+      data.quarantine ??= {}
+      fn(data)
+
+      // Keep the file small; the TUI only ever reads the session in front of it.
+      const entries = Object.entries(data.sessions)
+      if (entries.length > 64) {
+        entries.sort((a, b) => (b[1]?.time ?? 0) - (a[1]?.time ?? 0))
+        data.sessions = Object.fromEntries(entries.slice(0, 64))
+      }
+      data.updated = Date.now()
+
+      fs.mkdirSync(path.dirname(status), { recursive: true })
+      const tmp = `${status}.${process.pid}.tmp`
+      fs.writeFileSync(tmp, JSON.stringify(data))
+      fs.renameSync(tmp, status)
+      return data
+    } catch (error) {
+      log("warn", "failed to write status file", { error: String(error) })
+      return undefined
     }
   }
 
@@ -399,33 +561,82 @@ export const AutoRouterPlugin = async ({ client }) => {
   }
 
   const writeStatus = (sessionID, entry) => {
-    try {
-      fs.mkdirSync(path.dirname(status), { recursive: true })
-      let data
-      try {
-        data = JSON.parse(fs.readFileSync(status, "utf8"))
-      } catch {
-        data = undefined
-      }
-      if (!data || typeof data !== "object" || !data.sessions) data = { sessions: {} }
-
+    mutate((data) => {
       if (entry) data.sessions[sessionID] = entry
       else delete data.sessions[sessionID]
+    })
+  }
 
-      // Keep the file small; the TUI only ever reads the session in front of it.
-      const entries = Object.entries(data.sessions)
-      if (entries.length > 64) {
-        entries.sort((a, b) => (b[1]?.time ?? 0) - (a[1]?.time ?? 0))
-        data.sessions = Object.fromEntries(entries.slice(0, 64))
-      }
-      data.updated = Date.now()
+  // The quarantine is process-wide and outlives a restart: a model that is gone
+  // is gone for every session, and the whole point is not to rediscover that on
+  // the next prompt.
+  const blocked = new Set(config.blocked ?? [])
+  const initial = readFile()
+  let quarantine = initial.quarantine ?? {}
+  let health = initial.health ?? {}
+  let quarantineMtime = 0
 
-      const tmp = `${status}.${process.pid}.tmp`
-      fs.writeFileSync(tmp, JSON.stringify(data))
-      fs.renameSync(tmp, status)
-    } catch (error) {
-      log("warn", "failed to write status file", { error: String(error) })
+  // Several OpenCode processes run at once, one per pane. A model one of them
+  // found to be dead should not have to be rediscovered by each of the others,
+  // so the shared file is re-read whenever it changes.
+  const refresh = () => {
+    try {
+      const stat = fs.statSync(status)
+      if (stat.mtimeMs === quarantineMtime) return
+      quarantineMtime = stat.mtimeMs
+      const data = readFile()
+      quarantine = data.quarantine ?? {}
+      health = data.health ?? {}
+    } catch {
+      // No status file yet: nothing is quarantined.
     }
+  }
+
+  const quarantined = (id) => {
+    if (blocked.has(id)) return { blocked: true }
+    const entry = quarantine[id]
+    if (!entry) return undefined
+    if ((entry.until ?? 0) <= Date.now()) return undefined
+    return entry
+  }
+
+  const punish = (id, reason) => {
+    if (!config.quarantine?.enabled) return undefined
+
+    refresh()
+    const now = Date.now()
+    const previous = quarantine[id]
+    const forget = (config.quarantine.forgetAfterMinutes ?? 0) * 60_000
+    // A strike only compounds while the model has a recent record. One outage a
+    // month ago should not cost a week today.
+    const strikes = previous && forget && now - (previous.time ?? 0) < forget ? (previous.strikes ?? 1) + 1 : 1
+
+    const minutes = Math.min(
+      (config.quarantine.minutes ?? 60) * Math.pow(2, strikes - 1),
+      config.quarantine.maxMinutes ?? 10080,
+    )
+    const entry = { until: now + minutes * 60_000, time: now, strikes, minutes, reason }
+
+    quarantine[id] = entry
+    mutate((data) => {
+      // Drop expired records while writing, so the file cannot grow forever.
+      for (const [key, value] of Object.entries(data.quarantine)) {
+        const stale = forget && now - (value?.time ?? 0) > forget
+        if (stale && (value?.until ?? 0) <= now) delete data.quarantine[key]
+      }
+      data.quarantine[id] = entry
+      quarantine = data.quarantine
+    })
+
+    // Anything holding this model as its sticky pick must let go, or the
+    // session would keep asking for it until the pick changed on its own.
+    for (const state of sessions.values()) {
+      for (const [tier, pick] of Object.entries(state.picks ?? {})) {
+        if (pick === id) delete state.picks[tier]
+      }
+    }
+
+    return entry
   }
 
   const decide = (sessionID, ask, parts, previous) => {
@@ -594,7 +805,7 @@ export const AutoRouterPlugin = async ({ client }) => {
         }
       }
 
-      const picks = { ...(state?.picks ?? {}), [decision.tier]: target.id }
+      const picks = { ...(state?.picks ?? {}), [target.tier]: target.id }
       const delegations = state?.delegations ?? {}
       // Per-turn budgets reset when a new user turn starts.
       for (const counts of Object.values(delegations)) counts.turn = 0
@@ -605,7 +816,10 @@ export const AutoRouterPlugin = async ({ client }) => {
       sessions.set(sessionID, { tier, picks, delegations, last: target.id })
 
       const entry = {
-        tier: decision.tier,
+        tier: target.tier,
+        // Only set when the tier the classifier asked for had no usable model
+        // left and the request was routed up to find one.
+        requestedTier: target.escalated ? decision.tier : undefined,
         sessionTier: tier,
         cause: decision.cause,
         score: decision.score,
@@ -675,7 +889,45 @@ export const AutoRouterPlugin = async ({ client }) => {
           sessions.delete(sessionID)
           writeStatus(sessionID, undefined)
         }
+        return
       }
+
+      // A session that settles is the only evidence a plugin gets that the
+      // model it routed to actually answered. `session.error` is delivered
+      // before this, so a failed turn has already been quarantined and `proved`
+      // will refuse to mark it healthy.
+      if (event?.type === "session.idle") {
+        const sessionID = event.properties?.sessionID
+        if (sessionID) proved(sessions.get(sessionID)?.last)
+        return
+      }
+
+      if (event?.type !== "session.error") return
+
+      const sessionID = event.properties?.sessionID
+      if (!sessionID) return
+
+      // Only models this plugin chose are quarantined. A model the user picked
+      // by hand failing is their business, and the error carries no model of its
+      // own to attribute it to.
+      const state = sessions.get(sessionID)
+      const id = state?.last
+      if (!id) return
+
+      const fatal = fatalModelError(event.properties?.error)
+      if (!fatal) return
+
+      const entry = punish(id, fatal.message)
+      if (!entry) return
+
+      log("warn", "quarantined a model after a fatal error", {
+        model: id,
+        status: fatal.status ?? null,
+        strikes: entry.strikes,
+        minutes: entry.minutes,
+        until: new Date(entry.until).toISOString(),
+        message: fatal.message,
+      })
     },
   }
 }

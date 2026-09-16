@@ -37,6 +37,14 @@
     "reasoning": "high"
   },
   "fallback": "anthropic/claude-sonnet-4-5",
+  "blocked": [],
+  "quarantine": {
+    "enabled": true,
+    "minutes": 60,
+    "maxMinutes": 10080,
+    "forgetAfterMinutes": 20160
+  },
+  "preferProven": true,
   "boundaries": {
     "trivial_simple": -0.11,
     "simple_medium": 0.02,
