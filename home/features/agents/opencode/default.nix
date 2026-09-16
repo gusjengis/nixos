@@ -11,8 +11,7 @@ let
   hyprlandPackages = inputs.hyprland.packages.${pkgs.stdenv.hostPlatform.system};
   sessionNotify = pkgs.writeShellApplication {
     name = "opencode-session-notify";
-    runtimeInputs = [
-      hyprlandPackages.hyprland
+    runtimeInputs = lib.optional config.desktopEnv.enable hyprlandPackages.hyprland ++ [
       inputs.opencode.packages.${pkgs.stdenv.hostPlatform.system}.default
       pkgs.glib
       pkgs.jq
