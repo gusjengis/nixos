@@ -48,6 +48,16 @@ in
     "opencode/tui-plugins/tmux-theme.js".source =
       config.lib.file.mkOutOfStoreSymlink "${configRoot}/tui-plugins/tmux-theme.js";
 
+    # Auto model router. The server plugin rewrites the model of every prompt
+    # sent while the "Auto" entry is selected; the TUI plugin shows which model
+    # and effort it picked. Only the entrypoint is linked: module resolution
+    # follows the symlink to the repository, so the plugin's sibling modules and
+    # its auto-router.json are read from here.
+    "opencode/plugins/auto-router.js".source =
+      config.lib.file.mkOutOfStoreSymlink "${configRoot}/auto-router/auto-router.js";
+    "opencode/tui-plugins/auto-router-status.tsx".source =
+      config.lib.file.mkOutOfStoreSymlink "${configRoot}/tui-plugins/auto-router-status.tsx";
+
     # Caveman skill suite (caveman, caveman-commit, caveman-review, ...).
     # OpenCode scans ~/.config/opencode/skills recursively for **/SKILL.md, so
     # linking the whole skills dir picks up every sub-skill.

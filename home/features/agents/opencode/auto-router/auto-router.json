@@ -1,0 +1,77 @@
+{
+  "enabled": true,
+  "tiers": {
+    "trivial": [
+      "opencode/nemotron-3-ultra-free",
+      "opencode/nemotron-3.5-lightning-free"
+    ],
+    "simple": [
+      "anthropic/claude-haiku-4-5",
+      "openai/gpt-5.6-luna-fast"
+    ],
+    "medium": [
+      "anthropic/claude-sonnet-4-5",
+      "openai/gpt-5.6-sol-fast"
+    ],
+    "complex": [
+      "anthropic/claude-sonnet-5",
+      "openai/gpt-5.6-terra"
+    ],
+    "reasoning": [
+      "anthropic/claude-opus-5",
+      "openai/gpt-5.6-sol"
+    ]
+  },
+  "effort": {
+    "trivial": "none",
+    "simple": "none",
+    "medium": "low",
+    "complex": null,
+    "reasoning": null
+  },
+  "nonAdaptiveEffort": {
+    "trivial": "none",
+    "simple": "none",
+    "medium": "low",
+    "complex": "medium",
+    "reasoning": "high"
+  },
+  "fallback": "anthropic/claude-sonnet-4-5",
+  "boundaries": {
+    "trivial_simple": -0.11,
+    "simple_medium": 0.02,
+    "medium_complex": 0.14,
+    "complex_reasoning": 0.34
+  },
+  "usage": {
+    "enabled": true,
+    "maxAgeSeconds": 900,
+    "avoidBelowHeadroom": 8,
+    "switchOpenAIAbove": 90,
+    "switchOpenAIMinGain": 20
+  },
+  "escalation": {
+    "enabled": true,
+    "agent": "deep",
+    "maxPerTurn": 2,
+    "maxPerSession": 6
+  },
+  "offload": {
+    "enabled": true,
+    "agent": "quick",
+    "maxPerTurn": 8,
+    "maxPerSession": 40
+  },
+  "technicalKeywords": [],
+  "log": true,
+  "weights": {
+    "tokenCount": 0.08,
+    "codePresence": 0.18,
+    "reasoningMarkers": 0.22,
+    "technicalTerms": 0.22,
+    "simpleIndicators": 0.18,
+    "buildIntent": 0.2,
+    "multiStepPatterns": 0.06,
+    "questionComplexity": 0.03
+  }
+}
