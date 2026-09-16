@@ -12,12 +12,9 @@
   };
 
   imports = [
-    ./hardware/asahi.nix
     ./hardware/gpu_drivers.nix
     ./hardware/grub.nix
     ./desktop_env/hyprland.nix
-    ./desktop_env/gnome.nix
-    ./desktop_env/login.nix
     ./desktop_env/bedtime_lockout.nix
     ./software/nvim.nix
     ./software/git.nix
@@ -25,43 +22,20 @@
     ./software/tailscale.nix
     ./software/office_network_drives.nix
     ./software/vms.nix
-    ./software/home_assistant.nix
-    ./software/zone_configurator.nix
-    ./software/ble_scale_sync.nix
-    ./software/music_assistant.nix
-    ./software/parakeet_asr.nix
-    ./software/data_drive.nix
-    ./software/nextcloud.nix
-    ./software/immich.nix
-    ./software/ultrabridge.nix
-    (./software + "/josh's_mass.nix")
+    ./software/data_drive_client.nix
     ./users.nix
   ];
 
   config = {
     grub.enable = lib.mkDefault true;
     nvidia.enable = lib.mkDefault false;
-    login.gnome.enable = lib.mkDefault false;
-    gnome.enable = lib.mkDefault false;
     hyprland.enable = lib.mkDefault true;
-    bedtimeLockout.enable = lib.mkDefault (config.hyprland.enable || config.gnome.enable);
+    bedtimeLockout.enable = lib.mkDefault config.hyprland.enable;
     nvim.enable = lib.mkDefault true;
     git.enable = lib.mkDefault true;
     vial.enable = lib.mkDefault true;
     tailscale.enable = lib.mkDefault true;
-    homeAssistant.enable = lib.mkDefault false;
-    zoneConfigurator.enable = lib.mkDefault config.homeAssistant.enable;
-    bleScaleSync.enable = lib.mkDefault false;
-    musicAssistant.enable = lib.mkDefault false;
-    parakeetAsr.enable = lib.mkDefault false;
-    dataDrive.server.enable = lib.mkDefault false;
-    dataDrive.client.enable = lib.mkDefault (!config.dataDrive.server.enable);
-    nextcloud.enable = lib.mkDefault false;
-    immich.enable = lib.mkDefault false;
-    immich.funnel.enable = lib.mkDefault false;
-    ultrabridge.enable = lib.mkDefault false;
-    ultrabridge.funnel.enable = lib.mkDefault false;
-    joshsMass.enable = lib.mkDefault false;
+    dataDrive.client.enable = lib.mkDefault true;
     virtual-machines.enable = lib.mkDefault false;
 
     nix.settings.experimental-features = [

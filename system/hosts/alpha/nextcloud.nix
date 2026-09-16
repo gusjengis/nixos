@@ -60,8 +60,7 @@ in
     };
 
     # database on the mirror too
-    services.postgresql.dataDir =
-      "/data/.services/postgres/${config.services.postgresql.package.psqlSchema}";
+    services.postgresql.dataDir = "/data/.services/postgres/${config.services.postgresql.package.psqlSchema}";
 
     systemd.tmpfiles.rules = [
       "d /data/.services 0751 root root -"

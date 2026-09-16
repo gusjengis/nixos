@@ -9,7 +9,8 @@
 {
   imports = [
     ./hardware-configuration.nix
-    ./local.nix
+    ./asahi.nix
+    ./office_network_gateway.nix
   ];
 
   nix.settings.experimental-features = [

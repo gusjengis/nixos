@@ -11,13 +11,18 @@ in
 {
   imports = [
     ./hardware-configuration.nix
+    ./data_drive_server.nix
+    ./immich.nix
+    ./nextcloud.nix
+    ./parakeet_asr.nix
+    ./ultrabridge.nix
   ];
 
   hyprland.enable = false;
   vial.enable = false;
 
   # this machine hosts the shared /data drive for the tailnet
-  dataDrive.server.enable = true;
+  dataDrive.client.enable = false;
   nextcloud.enable = true;
   nextcloud.funnel.enable = true;
   immich.enable = true;

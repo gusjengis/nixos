@@ -20,13 +20,6 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    assertions = [
-      {
-        assertion = config.dataDrive.server.enable;
-        message = "Immich must run on the dataDrive server; PostgreSQL must not use the NFS mount.";
-      }
-    ];
-
     services.immich = {
       enable = true;
       host = "127.0.0.1";

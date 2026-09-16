@@ -7,16 +7,19 @@
 }:
 
 let
-  hacs = pkgs.runCommand "hacs-2.0.5" {
-    src = pkgs.fetchurl {
-      url = "https://github.com/hacs/integration/releases/download/2.0.5/hacs.zip";
-      hash = "sha256-l75rgkpPOOaDcozG3XI2f2uLrQpDQosbO5h6MIet9BM=";
-    };
-    nativeBuildInputs = [ pkgs.unzip ];
-  } ''
-    mkdir -p "$out"
-    unzip "$src" -d "$out"
-  '';
+  hacs =
+    pkgs.runCommand "hacs-2.0.5"
+      {
+        src = pkgs.fetchurl {
+          url = "https://github.com/hacs/integration/releases/download/2.0.5/hacs.zip";
+          hash = "sha256-l75rgkpPOOaDcozG3XI2f2uLrQpDQosbO5h6MIet9BM=";
+        };
+        nativeBuildInputs = [ pkgs.unzip ];
+      }
+      ''
+        mkdir -p "$out"
+        unzip "$src" -d "$out"
+      '';
 in
 {
   options = {

@@ -30,8 +30,6 @@ in
     enable = lib.mkEnableOption "Azure Green office network drives" // {
       default = true;
     };
-
-    gateway.enable = lib.mkEnableOption "office SMB Tailscale subnet router";
   };
 
   config = lib.mkIf cfg.enable {
@@ -76,10 +74,5 @@ in
       fsType = "cifs";
       options = mountOptions;
     };
-
-    tailscale.advertiseRoutes = lib.mkIf cfg.gateway.enable [
-      "10.145.0.15/32"
-      "10.145.0.18/32"
-    ];
   };
 }

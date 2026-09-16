@@ -3,18 +3,22 @@
 {
   imports = [
     ./hardware-configuration.nix
+    ./ble_scale_sync.nix
+    ./home_assistant.nix
+    ./joshs_mass.nix
+    ./music_assistant.nix
+    ./zone_configurator.nix
   ];
 
   system.stateVersion = "25.11";
   git.enable = true;
-  gnome.enable = false;
   grub.enable = true;
   hyprland.enable = false;
-  login.gnome.enable = false;
   nvidia.enable = false;
   nvim.enable = true;
   tailscale.enable = true;
   homeAssistant.enable = true;
+  zoneConfigurator.enable = true;
   musicAssistant.enable = true;
   joshsMass.enable = true;
 

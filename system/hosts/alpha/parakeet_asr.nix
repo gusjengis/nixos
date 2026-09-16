@@ -146,11 +146,13 @@ in
       after = [
         "docker.service"
         "network-online.target"
-      ] ++ lib.optionals config.tailscale.enable [ "tailscaled.service" ];
+      ]
+      ++ lib.optionals config.tailscale.enable [ "tailscaled.service" ];
       wants = [
         "docker.service"
         "network-online.target"
-      ] ++ lib.optionals config.tailscale.enable [ "tailscaled.service" ];
+      ]
+      ++ lib.optionals config.tailscale.enable [ "tailscaled.service" ];
       wantedBy = [ "multi-user.target" ];
 
       serviceConfig = {

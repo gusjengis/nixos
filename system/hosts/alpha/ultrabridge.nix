@@ -71,13 +71,6 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    assertions = [
-      {
-        assertion = config.dataDrive.server.enable;
-        message = "UltraBridge must run on the dataDrive server.";
-      }
-    ];
-
     systemd.tmpfiles.rules = [
       "d /data/.services 0751 root root -"
       "d ${stateDir} 0750 gusjengis users -"

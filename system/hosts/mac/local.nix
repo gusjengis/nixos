@@ -1,5 +1,0 @@
-{ ... }:
-
-{
-  officeNetworkDrives.gateway.enable = true;
-}
