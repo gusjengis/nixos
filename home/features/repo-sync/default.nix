@@ -129,7 +129,8 @@ in
     };
 
     Service = {
-      Type = "oneshot";
+      # Do not make default.target wait for a rebuild that reloads this manager.
+      Type = "exec";
       ExecStart = lib.getExe updateOnReady;
       Environment = [ "SYNC_REPO_GROUPS=${repoGroups}" ];
       Restart = "on-failure";
