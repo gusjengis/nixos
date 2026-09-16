@@ -1,9 +1,0 @@
-{
-    "theme": "default",
-    "position": "top",
-    "hoverRegionHeight": 16,
-    "keepHidden": false,
-    "noMediaDisplay": "compositor",
-    "customText": "Daily LLM Greeting",
-    "disableHoverExpansion": false
-}

@@ -15,10 +15,6 @@
       url = "github:sadjow/claude-code-nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    ambxst = {
-      url = "github:gusjengis/Ambxst?ref=fix-special-workspaces";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
     # Hyprland, built from a personal fork rather than nixpkgs.
     #
     # Tracks a branch, so `nix flake update hyprland && rehome` moves every
@@ -71,8 +67,6 @@
           overlays = [
             # Make the flake inputs reachable from any module through `pkgs`.
             (final: prev: { inputs = inputs; })
-            # Packages built from this repository.
-            (import ./home/packages)
           ];
           config.allowUnfree = true;
         };

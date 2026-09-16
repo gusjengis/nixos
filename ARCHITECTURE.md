@@ -19,7 +19,6 @@ home/
   features/               user features, including config, scripts, and units
   packages/               repository-built Home Manager packages
   policy/                 Home Manager package policy
-  legacy/                 isolated legacy Ambxst shell
 ```
 
 System and Home Manager package sets remain independently pinned. `nixpkgs`

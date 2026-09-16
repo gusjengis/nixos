@@ -22,28 +22,6 @@
         "type": "github"
       }
     },
-    "ambxst": {
-      "inputs": {
-        "nixpkgs": [
-          "nixpkgs"
-        ],
-        "quickshell": "quickshell"
-      },
-      "locked": {
-        "lastModified": 1779915034,
-        "narHash": "sha256-8+ujdjcxwBqyYTsELaU90R+YJv6ky+OtfYm18nCEbaI=",
-        "owner": "gusjengis",
-        "repo": "Ambxst",
-        "rev": "b993279cf993214a31adabe50e9a6425e7d74e5f",
-        "type": "github"
-      },
-      "original": {
-        "owner": "gusjengis",
-        "ref": "fix-special-workspaces",
-        "repo": "Ambxst",
-        "type": "github"
-      }
-    },
     "apple-silicon": {
       "inputs": {
         "flake-compat": "flake-compat",
@@ -830,27 +808,6 @@
         "type": "github"
       }
     },
-    "quickshell": {
-      "inputs": {
-        "nixpkgs": [
-          "ambxst",
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1766725085,
-        "narHash": "sha256-O2aMFdDUYJazFrlwL7aSIHbUSEm3ADVZjmf41uBJfHs=",
-        "ref": "refs/heads/master",
-        "rev": "41828c4180fb921df7992a5405f5ff05d2ac2fff",
-        "revCount": 715,
-        "type": "git",
-        "url": "https://git.outfoxxed.me/outfoxxed/quickshell"
-      },
-      "original": {
-        "type": "git",
-        "url": "https://git.outfoxxed.me/outfoxxed/quickshell"
-      }
-    },
     "rmatrix": {
       "inputs": {
         "flake-utils": "flake-utils_2",
@@ -873,7 +830,6 @@
     "root": {
       "inputs": {
         "alga": "alga",
-        "ambxst": "ambxst",
         "apple-silicon": "apple-silicon",
         "caveman": "caveman",
         "claude-code-nix": "claude-code-nix",

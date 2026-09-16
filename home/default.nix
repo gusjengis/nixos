@@ -12,7 +12,6 @@
 {
   imports = [
     ./features
-    ./legacy/ambxst
     ./policy/insecure-packages.nix
     ./hosts/${hostName}
   ];
