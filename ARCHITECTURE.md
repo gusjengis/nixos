@@ -63,9 +63,9 @@ produce a remote system without authorized access.
 | `rehome` | Activate this machine's Home Manager output from `/etc/nixos` |
 | `rebuild` | Activate this machine's NixOS output from `/etc/nixos` |
 | `sync-repos` | Sync repositories selected by this machine's feature roles |
-| `update-home` | Fast-forward `/etc/nixos`, sync repositories, rebuild, then rehome |
+| `update` | Fast-forward `/etc/nixos`, sync repositories, rebuild, then rehome |
 
-`update-home` uses a deployment revision marker so failed deployments retry.
+`update` uses a deployment revision marker so failed deployments retry.
 It also shares a lock with Home Manager activation, preventing activation from
 starting another activation through the user update service.
 

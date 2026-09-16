@@ -7,7 +7,7 @@
 }:
 let
   deployStateDir = "${config.xdg.stateHome}/home-manager";
-  # Held for the whole activation, and taken non-blocking by `update-home`.
+  # Held for the whole activation, and taken non-blocking by `update`.
   # Activation starts the update service, so without this the service would
   # rebuild and re-activate from inside the activation it was started by.
   deployLockFile = "${deployStateDir}/update.lock";
@@ -35,7 +35,7 @@ let
   };
 
   updateHome = pkgs.writeShellApplication {
-    name = "update-home";
+    name = "update";
     runtimeInputs = [
       pkgs.coreutils
       pkgs.git
@@ -103,7 +103,7 @@ in
   home.sessionVariables.SYNC_REPO_GROUPS = repoGroups;
 
   # Take the deployment lock for the rest of this activation. The file
-  # descriptor stays open until activation exits, so `update-home` started by
+  # descriptor stays open until activation exits, so `update` started by
   # reloadSystemd below sees the lock and skips instead of rebuilding and
   # re-activating underneath us. Non-blocking on purpose: a manual switch
   # during an automatic update must not wait, Home Manager's own profile lock
@@ -116,7 +116,6 @@ in
 
   programs.bash.shellAliases = {
     sync = "sync-repos";
-    update = "update-home";
   };
 
   systemd.user.services.home-update-on-first-network = {
