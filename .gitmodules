@@ -1,6 +1,6 @@
 [submodule "features/development/nvim/config"]
-	path = features/development/nvim/config
+	path = home/features/development/nvim/config
 	url = https://github.com/gusjengis/nvim.git
 [submodule "features/agents/opencode/session-notify"]
-	path = features/agents/opencode/session-notify
+	path = home/features/agents/opencode/session-notify
 	url = https://github.com/gusjengis/opencode-session-notify.git

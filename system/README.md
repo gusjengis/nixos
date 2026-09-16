@@ -1,24 +1,17 @@
-# System configuration migration
+# System Configuration
 
-This directory holds NixOS configuration in the same repository as Home
-Manager. Existing `/etc/nix-modules` and `/etc/nixos` checkouts remain untouched
-as rollback copies, but `rebuild` and automatic updates use this unified flake.
+`system/hosts/default.nix` is the fleet roster. Each `system/hosts/<host>`
+directory contains that machine's NixOS and hardware configuration, while
+`system/modules` contains shared modules.
 
 `flake.nix` exposes `nixosConfigurations.<host>` for every roster entry whose
-`systemManaged` value is not false.
-
-System evaluation currently needs `--impure` because `modules/users.nix` reads
-the existing public SSH key from the private secrets checkout. This preserves
-remote access and produces the same top-level derivations as the legacy flake:
+`systemManaged` value is not false. Evaluation currently needs `--impure`
+because `modules/users.nix` reads the existing public SSH key from the private
+secrets checkout:
 
 ```bash
 nix eval --impure --raw ".#nixosConfigurations.pc.config.system.build.toplevel.drvPath"
 ```
 
-Every tracked host has built and switched its named output. Rollback remains:
-
-```bash
-sudo nixos-rebuild switch --impure --flake /etc/nix-modules
-home-manager generations
-/nix/store/<previous-home-manager-generation>/activate
-```
+Use `rebuild` for normal activation. Roll back through an older NixOS generation
+from the boot menu or with `nixos-rebuild switch --rollback`.

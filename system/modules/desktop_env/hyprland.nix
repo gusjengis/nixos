@@ -12,9 +12,9 @@
 
   config = lib.mkIf config.hyprland.enable {
     # Hyprland itself is NOT installed here. It is built from a personal fork
-    # pinned in ~/.home-manager/flake.nix and installed by Home Manager, so
+    # pinned in /etc/nixos/flake.nix and installed by Home Manager, so
     # that every machine tracks the same branch without anyone building it by
-    # hand. See features/desktop/hyprland there.
+    # hand. See home/features/desktop/hyprland there.
     #
     # programs.hyprland used to live here. It was removed because it installed
     # a second Hyprland from nixpkgs, and its capability wrapper at

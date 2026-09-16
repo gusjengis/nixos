@@ -91,10 +91,9 @@ pick up where we left off.
 ## Conventions / how to work on this repo
 
 - one module per service in `software/`, `<name>.enable = lib.mkEnableOption`,
-  import + `lib.mkDefault` default in `default.nix`, enable per host in that
-  machine's `/etc/nixos/configuration.nix` (alpha's is NOT in this repo)
-- rebuild with `rebuild` (wraps `nixos-rebuild switch --impure --flake /etc/nix-modules/`);
-  home-manager side uses `rehome`
+  import + `lib.mkDefault` default in `default.nix`, enable per host under
+  `system/hosts/<host>/configuration.nix`
+- rebuild with `rebuild`; activate Home Manager with `rehome`
 - declarative only; secrets live outside the repo (e.g. `/data/.services/secrets`,
   generated on first run by oneshot units)
 - anything stateful that matters goes under `/data/.services` with

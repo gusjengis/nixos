@@ -11,7 +11,6 @@ in
 {
   imports = [
     ./hardware-configuration.nix
-    ../../users/trevogre.nix
   ];
 
   hyprland.enable = false;

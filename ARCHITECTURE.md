@@ -1,213 +1,132 @@
 # Architecture
 
-How this repository is put together, at a high level. For the ongoing cleanup
-notes and the list of loose ends, see `REORGANIZATION.md`. For the system half
-specifically, see `system/README.md`.
+This repository is the complete NixOS and Home Manager configuration for eight
+machines. Its canonical checkout is `/etc/nixos`, owned and updated by
+`gusjengis`. Machines should be reproducible from this repository plus the
+private secrets repository; manually installed software is considered a bug.
 
-## What this repository is
+## Layout
 
-One Git repository that describes **eight machines completely**: the NixOS
-system configuration and the Home Manager user configuration for every one of
-them. A machine is expected to be reproducible from this repository plus the
-private `secrets` repository, and nothing else. Anything installed by hand is
-treated as a bug.
-
-```
-flake.nix          both sets of outputs, all inputs, all pins
-hosts/             the machine roster, and per-machine user settings
-  default.nix        name -> { system, machineId, description }
-  <host>/            user-side toggles, monitor layout, host oddities
-system/            the NixOS half
-  hosts/<host>/      configuration.nix + hardware-configuration.nix per machine
-  modules/          shared system modules (hardware, desktop_env, software)
-  users/            system-level user definitions beyond the main account
-features/          the Home Manager half, one directory per feature
-packages/          packages built from this repository
-policy/            cross-cutting policy (currently insecure-package allowances)
-legacy/            not yet reorganized, currently the Ambxst shell
+```text
+flake.nix                 inputs, pins, and all flake outputs
+system/
+  hosts/default.nix       machine roster and machine-id mapping
+  hosts/<host>/           NixOS and hardware configuration per machine
+  modules/                shared NixOS modules
+home/
+  default.nix             shared Home Manager configuration
+  hosts/<host>/           per-machine Home Manager settings
+  features/               user features, including config, scripts, and units
+  packages/               repository-built Home Manager packages
+  policy/                 Home Manager package policy
+  legacy/                 isolated legacy Ambxst shell
 ```
 
-`home.nix` is the shared user configuration; it imports `features/`, the policy
-files, and `hosts/<host>`. `features/default.nix` imports every feature family
-(`agents`, `desktop`, `terminal`, `remote`, `ssh`, `repo-sync`, …). A feature
-directory holds everything about that feature together: its Nix declaration,
-its config files, its scripts, its units, its assets.
+System and Home Manager package sets remain independently pinned. `nixpkgs`
+drives Home Manager; `nixpkgs-system` drives NixOS. This prevents structural
+work from implicitly upgrading the operating system.
 
-## How a machine knows which machine it is
+## Machine Identity
 
-Every one of these machines reports the hostname `nixos`, and Tailscale's local
-hostname is `nixos` too, so neither can select a configuration. Identity comes
-from `/etc/machine-id`, mapped back to a name in `hosts/default.nix`.
+Every machine reports hostname `nixos`, so `/etc/machine-id` selects its flake
+output. `system/hosts/default.nix` maps each ID to a host name, architecture,
+and description. `rehome` and `rebuild` perform this lookup and also accept an
+explicit host name for fresh installations:
 
-`rehome` and `rebuild` both do that lookup, and both accept an explicit name
-(`rehome t480s`) which is what a fresh install needs before its new machine-id
-has been recorded.
-
-| Host   | Arch    | Role                                                    |
-| ------ | ------- | ------------------------------------------------------- |
-| pc     | x86_64  | Main desktop: gaming, game dev, Bambu, Windows VM host   |
-| alpha  | x86_64  | Headless server: `/data`, Nextcloud, Immich, UltraBridge |
-| omega  | x86_64  | Headless server                                          |
-| legion | x86_64  | Laptop, full desktop                                     |
-| mac    | aarch64 | Apple Silicon laptop on Asahi, full desktop              |
-| t480s  | x86_64  | ThinkPad, full desktop                                   |
-| t470   | x86_64  | ThinkPad, headless                                       |
-| zombie | x86_64  | Headless laptop                                          |
-
-Roles are expressed as feature switches rather than as separate trees:
-`desktopEnv.enable`, `dev.enable`, `laptop.enable`, `gaming.enable`,
-`gameDev.enable`, `bambu.enable`, `windowsVm.enable`. Headless machines keep
-the GTK/Qt theming on purpose, because they run GUI programs displayed
-elsewhere over Waypipe.
-
-## Flake outputs
-
-```
-homeConfigurations.<host>    all eight machines
-nixosConfigurations.<host>   every host whose `systemManaged` is not false
+```bash
+rehome t480s
+rebuild t480s
 ```
 
-Two package sets are pinned separately and deliberately:
+A reinstall changes machine-id. Use an explicit host until the roster is
+updated.
 
-- `nixpkgs` drives Home Manager.
-- `nixpkgs-system` drives NixOS, still on the revision the fleet was running
-  when the two repositories were merged.
+## Outputs
 
-Keeping them apart means a structural change never smuggles in a system-wide
-package upgrade. Converging them is a separate, testable change.
+```text
+homeConfigurations.<host>    Home Manager for gusjengis on all eight machines
+nixosConfigurations.<host>   NixOS for each system-managed machine
+```
 
-`apple-silicon` supplies mac's Asahi support. `hyprland` tracks a personal
-fork (see below). Other inputs are ordinary upstreams.
+Home Manager imports `home/features`, then `home/hosts/<host>`. Host files set
+role switches such as `desktopEnv.enable`, `dev.enable`, `laptop.enable`,
+`gaming.enable`, `gameDev.enable`, `bambu.enable`, and `windowsVm.enable`.
 
-System evaluation currently needs `--impure`, because `system/modules/users.nix`
-reads the fleet's public SSH key from `~/.config/secrets` at evaluation time. A
-pure evaluation silently produces a system with no authorized keys, which would
-lock the headless machines out, so `rebuild` always passes `--impure`.
+System evaluation uses `--impure` because `system/modules/users.nix` reads the
+fleet's public SSH key from `~/.config/secrets`. A missing key must not silently
+produce a remote system without authorized access.
 
-## Everyday commands
+## Commands
 
-| Command      | What it does                                                       |
-| ------------ | ------------------------------------------------------------------ |
-| `rehome`     | `home-manager switch` for this machine's host                        |
-| `rebuild`    | `sudo nixos-rebuild switch --impure` for this machine's host         |
-| `sync-repos` | Clone/pull every repository in `features/repo-sync/repos/*.list`     |
-| `update-home`| Sync, then rebuild the system, then rehome, if the revision changed  |
+| Command | Action |
+| --- | --- |
+| `rehome` | Activate this machine's Home Manager output from `/etc/nixos` |
+| `rebuild` | Activate this machine's NixOS output from `/etc/nixos` |
+| `sync-repos` | Sync repositories selected by this machine's feature roles |
+| `update-home` | Fast-forward `/etc/nixos`, sync repositories, rebuild, then rehome |
 
-`sync` and `update` are aliases for the last two. Which repository lists are
-used depends on the machine: `core` always, `dev` when `dev.enable`, `desktop`
-when `desktopEnv.enable`, plus an untracked `local.list`.
+`update-home` uses a deployment revision marker so failed deployments retry.
+It also shares a lock with Home Manager activation, preventing activation from
+starting another activation through the user update service.
 
-## Automatic updates
+The updater never pulls a dirty `/etc/nixos` checkout. Application-written
+configuration therefore remains visible for review instead of being overwritten.
 
-`home-update-on-first-network.service` (a user unit) runs once per boot, after
-the network is up and, on desktops, after Hyprland is reachable. It runs
-`update-home`, which:
+## Editable Configuration
 
-1. Takes a non-blocking lock at `~/.local/state/home-manager/update.lock`.
-2. Syncs the repositories.
-3. Compares `HEAD` against `deployed-revision` in the same directory.
-4. If they differ: `rebuild` first, and only if that succeeds, `rehome`.
-5. Records the revision only after both succeed.
+Editable application configuration uses
+`config.lib.file.mkOutOfStoreSymlink`. Links under the user's home resolve into
+`/etc/nixos/home/features`, allowing edits and application-written settings to
+land directly in the repository without rebuilding. Applications that replace
+files atomically receive a directory link instead of individual file links.
 
-Two failure modes drove that design and are worth preserving:
+Store-backed files are reserved for configuration intended to be immutable.
+Scripts required by systemd units are packaged with `writeShellApplication` and
+explicit runtime dependencies.
 
-- **The marker, not "did HEAD move".** Comparing before/after `HEAD` made a
-  failed rebuild non-retryable: the next run saw an unchanged `HEAD`, skipped
-  activation, and reported success. The marker means a failed deploy is retried
-  until it works.
-- **The lock.** Activation is what starts this service, so without the lock the
-  service rebuilt the system and re-activated Home Manager from inside the
-  activation that launched it. That deadlocks against the user systemd manager.
-  A Home Manager activation now holds the lock for its whole run (see
-  `features/repo-sync/default.nix`), and the service skips while it is held.
+The checkout remains Gus-owned. Granting another user write access would also
+let that user modify Nix later evaluated by root.
 
-## How configuration reaches the machine
-
-Editable config is deployed with `config.lib.file.mkOutOfStoreSymlink`, so
-`~/.config/<thing>` points back into this checkout at
-`~/.home-manager/features/<feature>/…`. Edits take effect on the program's next
-start with no rebuild, programs can write their own settings back, and those
-writes are already in the repository for the next `sync`.
-
-Store-backed `source = ./file` is used only where immutability is the point.
-A whole directory is linked when the application replaces files rather than
-writing in place.
-
-Consequences worth remembering:
-
-- The checkout path is part of the contract. Moving `~/.home-manager` breaks
-  every one of those links.
-- Flakes ignore untracked files: `git add` a new file or the build cannot see
-  it. Staging is enough, committing is not required.
-- Home Manager refuses to clobber a real file or a dangling link that sits
-  where a link should go. Several features carry small activation migrations
-  for exactly that reason.
+Flakes omit untracked files. Stage new modules and assets before evaluating or
+activating them. Home Manager also refuses to replace unmanaged real files or
+dangling links at managed destinations.
 
 ## Secrets
 
-Secrets live in a separate private repository checked out at
-`~/.config/secrets`, and are read **at runtime by shell code only**. Nothing
-under that path is read by Nix, because anything Nix reads is copied into the
-world-readable `/nix/store`.
+Secrets live in the private repository at `~/.config/secrets`. Runtime shell
+code reads them directly; Nix must not read secret values because evaluated
+inputs become world-readable store objects. The fleet public SSH key is the
+only deliberate evaluation-time exception.
 
-The one deliberate exception is the fleet's *public* SSH key, which the system
-module reads at evaluation time; that is what forces `--impure`. The fleet's
-authorized key itself is tracked at `features/ssh/authorized_keys`.
+## Updates And Rollback
 
-## Hyprland
+Automatic updates rebuild NixOS first and activate Home Manager only after the
+system succeeds. Deployment revision advances only after both succeed.
 
-Hyprland is built from a personal fork, pinned in `flake.nix` to a branch of
-`github:gusjengis/Hyprland`. Its nixpkgs deliberately does **not** follow ours,
-because the fork pins the nixpkgs it is tested against.
-
-To move the fleet: push to the branch, then
+Previous NixOS generations remain available from the boot menu. Previous Home
+Manager generations can be activated with:
 
 ```bash
-nix flake update hyprland && rehome
+home-manager generations
+/nix/store/<previous-home-manager-generation>/activate
 ```
 
-The system side no longer sets `programs.hyprland`; it keeps only the
-integration pieces (XWayland, portals, polkit, PAM for swaylock).
+## Adding Configuration
 
-Two hardware notes that cost real debugging time:
+Add a machine to `system/hosts/default.nix`, create its NixOS files under
+`system/hosts/<host>`, and create its Home Manager settings under
+`home/hosts/<host>`.
 
-- On pc's NVIDIA card the DRM planes advertise `XB30`/`AB30` but not
-  `XR30`/`AR30`. Hyprland tries `XR30` first, logs a failed GBM allocation, and
-  falls back to `XB30`. That logged failure is expected and is not a crash.
-- A crash at startup that names `deferStateCommit` means the fork lost
-  `m_commitCoordinator = makeUnique<COutputCommitCoordinator>(this)` from the
-  `CMonitor` constructor during a rebase. Every monitor commit then dereferences
-  null. Restoring that line is the fix.
+Add Home Manager features under `home/features/<family>/<name>` and import them
+from the family module. Keep each feature's declarations, scripts, units,
+configuration, and assets together.
 
-## Rollback
+Add shared NixOS modules under `system/modules/<area>` and import them from
+`system/modules/default.nix`. New enable options should default to behavior that
+preserves existing hosts.
 
-The pre-merge repositories are still present and untouched on each machine:
-`/etc/nix-modules` (shared system modules) and `/etc/nixos` (that machine's
-system configuration). If a unified system generation misbehaves:
+## Pending Fleet Work
 
-```bash
-sudo nixos-rebuild switch --impure --flake /etc/nix-modules
-home-manager generations                     # pick the previous one
-/nix/store/<previous-generation>/activate
-```
-
-Both are also reachable from the boot menu and from
-`home-manager generations`. They are kept only as a rollback path and should be
-retired once the unified layout has run for a while.
-
-## Adding things
-
-**A machine.** Add it to `hosts/default.nix` with its arch and machine-id, add
-`hosts/<name>/default.nix` with its feature switches, add
-`system/hosts/<name>/` with that machine's `configuration.nix` and
-`hardware-configuration.nix`, `git add` all of it, then `rehome <name>` and
-`rebuild <name>` on the machine itself.
-
-**A feature.** Create `features/<family>/<name>/default.nix`, import it from
-the family's `default.nix`, and keep its config files, scripts and units in the
-same directory. Gate it on `desktopEnv.enable`, `dev.enable` or `laptop.enable`
-if it does not belong everywhere.
-
-**A system module.** Put it in `system/modules/<area>/`, import it from
-`system/modules/default.nix`, and give it an `enable` option with a default
-that preserves current behaviour on every machine.
+Dragonflylane remains in its separate `nixos-dragonflylane` repository. It is
+already on the tailnet, but SSH access must be established before its NixOS and
+Home Manager configuration can be folded into this repository as a ninth host.

@@ -1,0 +1,3 @@
+# /etc/nixos updates separately because this list manages repositories below
+# user-writable parent directories. Its Neovim config remains a pinned submodule.
+$HOME/.config/;https://github.com/gusjengis/secrets.git

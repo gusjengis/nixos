@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Neovim
+GenericName=Text Editor
+Comment=Edit text files
+Exec=/etc/nixos/home/features/desktop/webapps/launch-in-kitty.sh nvim %F
+Terminal=false
+Type=Application
+Icon=nvim
+Categories=Utility;TextEditor;
+StartupNotify=false
+MimeType=text/plain;text/english;text/x-makefile;text/x-c;text/x-c++;text/x-csrc;text/x-chdr;text/x-c++src;text/x-c++hdr;text/x-java;application/x-shellscript;

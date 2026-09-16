@@ -56,10 +56,11 @@
     }@inputs:
     let
       lib = nixpkgs.lib;
+      repoRoot = "/etc/nixos";
 
       # Every machine this configuration is deployed to, with the machine-id
       # `rehome` uses to pick one automatically.
-      hosts = import ./hosts;
+      hosts = import ./system/hosts;
 
       systemHosts = lib.filterAttrs (_: host: host.systemManaged or true) hosts;
 
@@ -71,7 +72,7 @@
             # Make the flake inputs reachable from any module through `pkgs`.
             (final: prev: { inputs = inputs; })
             # Packages built from this repository.
-            (import ./packages)
+            (import ./home/packages)
           ];
           config.allowUnfree = true;
         };
@@ -81,11 +82,16 @@
         home-manager.lib.homeManagerConfiguration {
           pkgs = pkgsFor host.system;
           extraSpecialArgs = {
-            inherit inputs hosts hostName;
+            inherit
+              inputs
+              hosts
+              hostName
+              repoRoot
+              ;
           };
           modules = [
             inputs.nix-flatpak.homeManagerModules.nix-flatpak
-            ./home.nix
+            ./home
           ];
         };
 

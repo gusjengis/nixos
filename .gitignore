@@ -1,9 +1,9 @@
 # Per-host symlinks written during activation. Their targets are tracked:
 # platform-variables.lua points at a variables.*.lua beside it, and
 # monitors.lua points at hosts/<name>/monitors.lua.
-features/desktop/hyprland/config/monitors.lua
-features/desktop/hyprland/config/platform-variables.lua
+home/features/desktop/hyprland/config/monitors.lua
+home/features/desktop/hyprland/config/platform-variables.lua
 
 result
-features/repo-sync/repos/local.list
+home/features/repo-sync/repos/local.list
 .direnv/
