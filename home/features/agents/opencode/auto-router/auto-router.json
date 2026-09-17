@@ -2,8 +2,8 @@
   "enabled": true,
   "tiers": {
     "trivial": [
-      "opencode/nemotron-3-ultra-free",
-      "opencode/nemotron-3.5-lightning-free"
+      "anthropic/claude-haiku-4-5",
+      "openai/gpt-5.6-luna-fast"
     ],
     "simple": [
       "openai/gpt-5.6-luna-fast",
@@ -58,18 +58,7 @@
     "switchOpenAIAbove": 90,
     "switchOpenAIMinGain": 20
   },
-  "escalation": {
-    "enabled": true,
-    "agent": "deep",
-    "maxPerTurn": 2,
-    "maxPerSession": 6
-  },
-  "offload": {
-    "enabled": true,
-    "agent": "quick",
-    "maxPerTurn": 8,
-    "maxPerSession": 40
-  },
+
   "technicalKeywords": [],
   "log": true,
   "weights": {

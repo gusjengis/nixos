@@ -49,11 +49,10 @@ const DEFAULTS = {
   // Intelligence scores are from Artificial Analysis Intelligence Index v4.3 (Sept 2026).
   // Models are ordered by intelligence descending within each tier.
   //
-  // `trivial` is free (OpenCode Zen). It only ever sees turns that are short,
-  // attachment-free and carry no code, so a weaker model there costs nothing
-  // worse than a re-ask.
-  tiers: {
-    trivial: ["opencode/nemotron-3-ultra-free", "opencode/nemotron-3.5-lightning-free"],
+   // `trivial` is for turns that are short, attachment-free, and carry no work,
+   // where a lightweight model is cost-effective.
+   tiers: {
+     trivial: ["anthropic/claude-haiku-4-5", "openai/gpt-5.6-luna-fast"],
     simple: ["openai/gpt-5.6-luna-fast", "anthropic/claude-haiku-4-5"],
     medium: ["openai/gpt-5.6-sol-fast", "anthropic/claude-sonnet-5"],
     complex: ["openai/gpt-5.6-sol", "anthropic/claude-sonnet-5"],
@@ -184,34 +183,7 @@ const DEFAULTS = {
     switchOpenAIMinGain: 20,
   },
 
-  // Delegation. Two directions, for opposite reasons.
-  //
-  // `deep` buys reasoning the current model does not have, and costs real
-  // subscription usage, so it is hard-capped.
-  //
-  // `quick` is free. Handing file reading, searching and summarising to it is
-  // token-positive for the caller: a subagent's own context is spent on the
-  // free model, and the caller only pays for the task call and the summary that
-  // comes back, instead of paying for every file it would otherwise read into
-  // its own window.
-  escalation: {
-    enabled: true,
-    agent: "deep",
-    maxPerTurn: 2,
-    maxPerSession: 6,
-    // At `reasoning` the main model already is the strong one, so advertising
-    // `deep` there would only buy a second opinion at double the price.
-    advertiseBelowTier: "reasoning",
-  },
 
-  offload: {
-    enabled: true,
-    agent: "quick",
-    // Free, but not unbounded: each call still costs the caller a tool call and
-    // a summary, and a model that fires fifty of them is not saving anything.
-    maxPerTurn: 8,
-    maxPerSession: 40,
-  },
 
   statusFile: null,
   log: true,
@@ -221,10 +193,10 @@ const DEFAULTS = {
 // each tier's configured effort where a directly comparable result exists.
 // Tier-aware scores matter because one model can run at different effort levels.
 const MODEL_INTELLIGENCE = {
-  trivial: {
-    "opencode/nemotron-3-ultra-free": 23,
-    "opencode/nemotron-3.5-lightning-free": 14,
-  },
+   trivial: {
+     "anthropic/claude-haiku-4-5": 15,
+     "openai/gpt-5.6-luna-fast": 16,
+   },
   simple: {
     "openai/gpt-5.6-luna-fast": 16, // non-reasoning
     "anthropic/claude-haiku-4-5": 15, // non-reasoning
@@ -613,7 +585,7 @@ export const AutoRouterPlugin = async ({ client }) => {
     if (!tier) return undefined
     const last = entry.providerID && entry.modelID ? `${entry.providerID}/${entry.modelID}` : undefined
     const picks = last && entry.tier === tier ? { [tier]: last } : {}
-    const state = { tier, picks, delegations: {}, last }
+    const state = { tier, picks, last }
     sessions.set(sessionID, state)
     return state
   }
@@ -756,11 +728,10 @@ export const AutoRouterPlugin = async ({ client }) => {
       signals.push(`keyword "${keyword.keyword}"`)
     }
 
-    // The free tier exists for turns that ask for nothing: greetings,
-    // acknowledgements, "thanks". Those are not cheap turns - they carry the
-    // whole accumulated context - but they are ones a weak model cannot get
-    // meaningfully wrong. Anything that asks for work on the repository needs a
-    // model that can be trusted with tools.
+     // The trivial tier is for turns that ask for nothing: greetings,
+     // acknowledgements, "thanks". Those are not cheap turns - they carry the
+     // whole accumulated context - but they are lightweight. Anything that asks
+     // for work on the repository needs a model that can be trusted with tools.
     const attachments = attachmentCount(parts)
     if (
       tier === "trivial" &&
@@ -786,25 +757,7 @@ export const AutoRouterPlugin = async ({ client }) => {
     return { tier, cause, signals, score: scored.score }
   }
 
-  const budget = (input, output, rule) => {
-    if (!rule?.enabled) return
-    if (input.tool !== "task") return
-    if (output?.args?.subagent_type !== rule.agent) return
 
-    const state = sessions.get(input.sessionID)
-    if (!state) return
-
-    const counts = (state.delegations[rule.agent] ??= { turn: 0, session: 0 })
-    if (counts.turn >= rule.maxPerTurn || counts.session >= rule.maxPerSession) {
-      throw new Error(
-        `Delegation budget for @${rule.agent} is exhausted ` +
-          `(${counts.turn}/${rule.maxPerTurn} this turn, ${counts.session}/${rule.maxPerSession} this session). ` +
-          `Do this part yourself.`,
-      )
-    }
-    counts.turn++
-    counts.session++
-  }
 
   return {
     "chat.message": async (_input, output) => {
@@ -864,14 +817,11 @@ export const AutoRouterPlugin = async ({ client }) => {
       }
 
       const picks = { ...(state?.picks ?? {}), [target.tier]: target.id }
-      const delegations = state?.delegations ?? {}
-      // Per-turn budgets reset when a new user turn starts.
-      for (const counts of Object.values(delegations)) counts.turn = 0
 
       // A non-sticky decision routes this one turn without moving the session's
       // working tier.
       const tier = decision.sticky === false ? (state?.tier ?? decision.tier) : decision.tier
-      sessions.set(sessionID, { tier, picks, delegations, last: target.id })
+      sessions.set(sessionID, { tier, picks, last: target.id })
 
       const entry = {
         tier: target.tier,
@@ -898,48 +848,9 @@ export const AutoRouterPlugin = async ({ client }) => {
       log("info", "routing decision", entry)
     },
 
-    // Guidance text is constant so it does not churn the cached system prompt.
-    "experimental.chat.system.transform": async (input, output) => {
-      const state = input?.sessionID ? sessions.get(input.sessionID) : undefined
-      if (!state) return
 
-      const lines = ["## Auto model routing", "", "This turn was routed to the cheapest model judged able to handle it."]
 
-      if (config.offload?.enabled) {
-        lines.push(
-          "",
-          `Push grunt work to the \`${config.offload.agent}\` subagent (task tool). It runs on a free model, so anything it reads costs nothing:`,
-          "- finding files, searching for symbols, tracing call sites",
-          "- reading and summarising files you only need the gist of",
-          "- answering narrow factual questions about the codebase",
-          "",
-          `Run several \`${config.offload.agent}\` calls in one message when the lookups are independent; they execute in parallel.`,
-          `It cannot edit files and it is not smart. Give it one narrow, verifiable question each and check what it returns.`,
-          `Limit: ${config.offload.maxPerTurn} per turn.`,
-        )
-      }
 
-      if (config.escalation?.enabled && tierIndex(state.tier) < tierIndex(config.escalation.advertiseBelowTier)) {
-        lines.push(
-          "",
-          `If part of the task genuinely needs harder reasoning than you can give it, hand that part to the \`${config.escalation.agent}\` subagent:`,
-          "- non-obvious root-cause debugging",
-          "- design or architecture decisions with real trade-offs",
-          "- tricky algorithms, concurrency, or security-sensitive logic",
-          "",
-          `That one is expensive. Limit: ${config.escalation.maxPerTurn} per turn. When in doubt, do it yourself.`,
-        )
-      }
-
-      if (lines.length > 3) output.system.push(lines.join("\n"))
-    },
-
-    // Budgets are enforced here rather than trusted to the prompt, because an
-    // unbounded delegation path costs more than not routing down at all.
-    "tool.execute.before": async (input, output) => {
-      budget(input, output, config.escalation)
-      budget(input, output, config.offload)
-    },
 
     event: async ({ event }) => {
       if (event?.type === "session.deleted") {
