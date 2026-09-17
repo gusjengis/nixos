@@ -43,31 +43,93 @@ import { TIERS } from "./classify.js"
 // Deliberately not ordered or numbered. An ordinal id ("L1".."L5") invites the
 // model to infer the tier boundary from the id itself and then grade to match
 // it, which turns the number back into a label.
+// Each rule carries the difficulty band it usually lands in.
+//
+// Without the bands the model answers almost entirely in 3s and 7s: it snaps to
+// whichever rule it picked and grades from the rule's own wording, leaving the
+// middle of the scale empty and half of the routine work misfiled as either
+// mechanical or hard. Naming the band turns the digit into a small adjustment
+// on a decision that has already been made, which is the part a 4B model is
+// actually reliable at.
+//
+// The bands are ordered, and that ordering is the real classifier. Measured
+// against the graded set, the rule alone predicts the tier better than the
+// digit does.
 export const RULES = [
-  { id: "no_work", text: "Asks for nothing: a greeting, thanks, an acknowledgement, or a remark." },
+  { id: "no_work", band: "1", text: "Asks for nothing: a greeting, thanks, an acknowledgement, or a remark." },
   {
     id: "continuation",
+    band: "grade the work it authorises",
     text: "Cannot be understood on its own. It approves, corrects, or adds information to work already under discussion: \"hit it\", \"still doing it\", \"my bad, go ahead\", \"let's try option B\", \"new info: <output>\".",
   },
-  { id: "direct_answer", text: "A question answerable in a line or two from a named file, a stated error, or general knowledge." },
-  { id: "mechanical_edit", text: "One obvious edit with no judgement in it: a typo, a rename, a comment, a formatting change, a version bump." },
+  {
+    id: "direct_answer",
+    band: "2",
+    text: "A question answerable in a line or two from a named file, a stated error, or general knowledge.",
+  },
+  {
+    id: "mechanical_edit",
+    band: "2-3",
+    text: "One obvious edit with no judgement in it: a typo, a rename, a comment, a formatting change, a version bump.",
+  },
+  {
+    id: "run_command",
+    band: "3",
+    text: "Run, check or inspect something and report what it says. No design, no edit.",
+  },
   {
     id: "stated_fix",
+    band: "3",
     text: "A defect where the turn already points at the cause: an error message, compiler diagnostic, stack trace or log that names a file, line, symbol or missing value.",
   },
-  { id: "run_command", text: "Run, check or inspect something and report what it says. No design, no edit." },
-  { id: "pattern_feature", text: "A small feature or change that copies a pattern already present in the codebase." },
-  { id: "explain_code", text: "Explain, summarise or review existing code or configuration." },
-  { id: "research_gather", text: "Go out and find, compare, or collect things. Each step is easy; there are many of them." },
-  { id: "multi_file_change", text: "A coordinated change across several files where the approach is clear." },
-  { id: "new_component", text: "A new module, service, screen or subsystem that does not exist yet." },
-  { id: "unknown_cause", text: "Something misbehaves and the cause is not stated. It has to be found first." },
-  { id: "unfamiliar_integration", text: "Work against an API, protocol or platform whose behaviour has to be discovered." },
-  { id: "ambiguous_requirements", text: "The turn can be read more than one reasonable way and nothing in it decides which." },
-  { id: "open_ended_design", text: "The shape of the answer is not given. An architecture or a policy has to be invented." },
-  { id: "correctness_critical", text: "Concurrency, security, authentication, data migration, deletion, or measured performance work. A plausible wrong answer is expensive." },
-  { id: "intermittent_defect", text: "A failure that is timing dependent, environment dependent, or cannot be reproduced on demand." },
-  { id: "other", text: "None of the above fits." },
+  { id: "explain_code", band: "4-5", text: "Explain, summarise or review existing code or configuration." },
+  {
+    id: "pattern_feature",
+    band: "4-5",
+    text: "A small feature or change that copies a pattern already present in the codebase.",
+  },
+  {
+    id: "research_gather",
+    band: "4-5",
+    text: "Go out and find, compare, or collect things. Each step is easy; there are many of them.",
+  },
+  {
+    id: "multi_file_change",
+    band: "5",
+    text: "A coordinated change across several files where the approach is clear.",
+  },
+  { id: "new_component", band: "6", text: "A new module, service, screen or subsystem that does not exist yet." },
+  {
+    id: "unfamiliar_integration",
+    band: "7",
+    text: "Work against an API, protocol or platform whose behaviour has to be discovered.",
+  },
+  {
+    id: "unknown_cause",
+    band: "6-7",
+    text: "Something misbehaves and nothing in the turn points at where. There is no error text, or the error does not name the thing at fault.",
+  },
+  {
+    id: "ambiguous_requirements",
+    band: "6-7",
+    text: "The turn can be read more than one reasonable way and nothing in it decides which.",
+  },
+  {
+    id: "open_ended_design",
+    band: "7-8",
+    text: "The shape of the answer is not given. An architecture or a policy has to be invented.",
+  },
+  {
+    id: "intermittent_defect",
+    band: "8-9",
+    text: "A failure that is timing dependent, environment dependent, or cannot be reproduced on demand.",
+  },
+  {
+    id: "correctness_critical",
+    band: "8-9",
+    text: "Concurrency, security, authentication, data migration, deletion, or measured performance work. A plausible wrong answer is expensive.",
+  },
+  { id: "other", band: "5", text: "None of the above fits." },
 ]
 
 export const DIFFICULTY_DIGITS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"]
@@ -90,8 +152,18 @@ const SHOTS = [
   { ask: "hit it", rule: "continuation", difficulty: "5" },
   { ask: "please clean up the warnings", rule: "mechanical_edit", difficulty: "3" },
   {
+    ask: "rehome\nerror: … while evaluating a branch condition\n         at /nix/store/rcmh3p-source/lib/modules.nix:331:9:\n         error: attribute 'hyprland' missing",
+    rule: "stated_fix",
+    difficulty: "3",
+  },
+  {
     ask: "make the ring rendering dim all parts of the ring that have already passed today",
     rule: "pattern_feature",
+    difficulty: "5",
+  },
+  {
+    ask: "three things: bump the opencode pin to v1.18.30, drop the vial module from t480s, and add commit-mono to the font list",
+    rule: "multi_file_change",
     difficulty: "5",
   },
   {
@@ -106,16 +178,16 @@ const SYSTEM = `You grade how hard a task is for a coding agent. You never do th
 
 The agent you are grading for is competent but not the strongest model available. It has full tool access to the repository and gets one attempt. Grade how likely it is to finish the turn correctly without a stronger model having to redo the work. Hard means unlikely.
 
-Step 1. Pick exactly one rule id from this list, the one that describes the hardest requirement in the turn:
-${RULES.map((rule) => `- ${rule.id}: ${rule.text}`).join("\n")}
+Step 1. Pick exactly one rule id, the one that describes the hardest requirement in the turn. The number after each rule is where that kind of turn usually lands.
+${RULES.map((rule) => `- ${rule.id} (${rule.band}): ${rule.text}`).join("\n")}
 
 Pick continuation only when the turn genuinely makes no sense alone. A turn that states its own task is not a continuation, however short.
 
-Step 2. Give a difficulty from 1 to 9. For a continuation, grade the work it appears to be authorising or reporting on, not the length of the reply.
+Step 2. Give a difficulty from 1 to 9. Start from the rule's usual band and move within it, or one step outside it, if the specifics of this turn warrant it. For a continuation, grade the work it appears to be authorising or reporting on, not the length of the reply.
 1-2  asks for nothing, or a one-line answer
 3-4  one mechanical action, location known, no judgement
-5-6  routine work with a clear approach, follows an existing pattern
-7-8  several files, or a real design decision, or a cause that must be found
+5-6  routine work with a clear approach, even when it touches several files
+7-8  a decision that has not been made yet, or a cause that has to be found first
 9    correctness critical, ambiguous, or open ended; a plausible wrong answer is expensive
 
 How to grade:
@@ -123,7 +195,12 @@ How to grade:
 - Length is not difficulty. Pasted logs, stack traces and file dumps make a prompt long, not hard.
 - Being specific makes a task easier. A prompt that names the files, states the wanted behaviour and gives a way to verify it is easier than a vague one. A short prompt can be the hardest kind.
 - Being about code is not difficulty. Most coding turns are 3 to 6.
+- Touching many files is not by itself hard. If the change is the same kind of edit in each place, or the turn says what to do in each place, it stays a 5 or a 6. What makes a turn a 7 is that somebody still has to decide something.
 - A cause that is already stated is easy. A cause that has to be found is hard. A cause that only appears sometimes is harder.
+- A pasted error message, stack trace or compiler diagnostic is a stated cause, not an unknown one, however long or unfamiliar it looks. Reading an error and fixing what it names is a 3 or a 4.
+- Running commands and reporting what they say is easy even when there are several of them.
+- "sometimes", "occasionally", "every so often", "can't reproduce it", "it's unreliable" mean intermittent_defect, not unknown_cause. A fault that will not hold still is the hardest kind there is.
+- Deleting, overwriting, or rewriting anything that cannot be got back is correctness_critical even when the method is obvious. Getting it wrong is not recoverable by trying again.
 - If the turn can be read two reasonable ways and nothing decides between them, that is hard.
 - Deleting data, changing authentication, editing a migration, or touching something every machine depends on adds one.
 - Tone is not difficulty. Frustration does not make a task hard and politeness does not make it easy.
@@ -217,8 +294,10 @@ const DEFAULTS = {
   model: "qwen3:4b-instruct-2507-q8_0",
   // A miss costs the difference between two models on one turn. A stall costs
   // the user staring at an idle terminal, so the budget is tight and the
-  // heuristic takes over the moment it is exceeded.
-  timeoutMs: 5000,
+  // heuristic takes over the moment it is exceeded. Measured p99 on the
+  // configured model is under 1.4s, so this is roughly double the worst
+  // observed case and well short of being noticed.
+  timeoutMs: 3000,
   numCtx: 8192,
   // Enough for {"rule":"unfamiliar_integration","difficulty":"7"} and nothing else.
   numPredict: 32,
@@ -226,8 +305,11 @@ const DEFAULTS = {
   // Ends of a long turn to keep, in characters. Roughly 750 and 375 tokens.
   headChars: 3000,
   tailChars: 1500,
-  // Lower bound of each tier on the 1-9 scale.
-  thresholds: { simple: 2.6, medium: 4.3, complex: 6.2, reasoning: 7.9 },
+  // Lower bound of each tier on the 1-9 scale. Every rule's band sits wholly
+  // inside one tier, so these are the midpoints between bands rather than
+  // numbers fitted to a sample: `mechanical_edit` (2-3) is `simple` whatever
+  // the graded set happens to contain, and that stability is the point.
+  thresholds: { simple: 1.5, medium: 3.5, complex: 5.5, reasoning: 8.0 },
   // Consecutive failures before the endpoint is left alone. One dropped packet
   // should not disable the classifier; a machine that is off should not be
   // dialled on every keystroke.
@@ -346,11 +428,14 @@ export function createClassifier({ config: overrides, log = () => {}, fetch: fet
     succeed()
 
     const expectation = expectedDifficulty(payload?.logprobs, digit)
-    const difficulty = expectation.value
+    // Round before deciding, not after. Reporting 8 and routing as though it
+    // were 7.996 makes the logged number unable to explain the decision it
+    // caused, which is exactly the thing that erodes trust in a router.
+    const difficulty = Number(expectation.value.toFixed(2))
     const rule = typeof verdict?.rule === "string" ? verdict.rule : undefined
     const result = {
       tier: difficultyTier(difficulty, config.thresholds),
-      difficulty: Number(difficulty.toFixed(2)),
+      difficulty,
       emitted: digit,
       rule,
       // A turn that only makes sense as a reply to the previous one carries no

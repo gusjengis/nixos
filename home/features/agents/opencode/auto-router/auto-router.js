@@ -20,6 +20,7 @@ import fs from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 
+import { classifierDefaults, createClassifier } from "./classifier.js"
 import {
   continuationKind,
   directiveTier,
@@ -168,6 +169,12 @@ const DEFAULTS = {
 
   tokenThresholds: { simple: 15, complex: 400 },
   reminderMarkers: ["<system-reminder>", "</system-reminder>"],
+
+  // The real classifier: a small model held resident on the fleet's GPU box,
+  // asked to grade each turn. Everything above is what runs when that box is
+  // unreachable, which on a laptop off the tailnet is most of the time. See
+  // classifier.js for the defaults and why each one is what it is.
+  classifier: classifierDefaults(),
 
   // Subscription-aware routing. Reads the usage cache the quickshell bar
   // already maintains.
@@ -346,6 +353,8 @@ export const AutoRouterPlugin = async ({ client }) => {
     if (!config.log) return
     client.app.log({ body: { service: SERVICE, level, message, extra } }).catch(() => {})
   }
+
+  const classifier = createClassifier({ config: config.classifier, log })
 
   for (const [tier, configured] of Object.entries(config.tiers ?? {})) {
     const pool = Array.isArray(configured) ? configured : [configured]
@@ -669,7 +678,7 @@ export const AutoRouterPlugin = async ({ client }) => {
     return entry
   }
 
-  const decide = (sessionID, ask, parts, previous) => {
+  const decide = async (sessionID, ask, parts, previous) => {
 
     const directive = directiveTier(ask)
     if (directive) {
@@ -703,39 +712,71 @@ export const AutoRouterPlugin = async ({ client }) => {
       return { tier: "trivial", cause: "acknowledgement", signals: ["asks for nothing"], score: null, sticky: false }
     }
 
-    const keyword = keywordTier(ask, config.keywordRules)
-    const scored = score({
-      ask,
-      weights: config.weights,
-      boundaries: config.boundaries,
-      tokenThresholds: config.tokenThresholds,
-      technicalKeywords: config.technicalKeywords,
-    })
+    const attachments = attachmentCount(parts)
 
-    let tier = scored.tier
-    let cause = "heuristic"
-    const signals = [...scored.signals]
+    let tier
+    let cause
+    let signals
+    let scoreValue = null
+    let tokens
+    let graded
 
-    if (keyword && tierIndex(keyword.tier) > tierIndex(tier)) {
-      tier = keyword.tier
-      cause = "keyword"
-      signals.push(`keyword "${keyword.keyword}"`)
-    } else if (keyword && tierIndex(keyword.tier) < tierIndex(tier) && scored.signals.length <= 1) {
-      // Only let a keyword pull a turn *down* when the scorer had nothing much
-      // to say, so "thanks, now fix the deadlock" is not filed as a greeting.
-      tier = keyword.tier
-      cause = "keyword"
-      signals.push(`keyword "${keyword.keyword}"`)
+    // Ask the model first. It returns undefined when the box is unreachable,
+    // the breaker is open, or it answered with something unusable, and each of
+    // those has to end up on the keyword scorer rather than stalling the turn.
+    if (classifier) graded = await classifier.classify(ask, { attachments })
+
+    if (graded?.continuation) {
+      // The model read the turn as a reply to the previous one. Its own text
+      // says nothing about how hard the work is, so it inherits, exactly as a
+      // recognised "yes" does.
+      tier = previous ?? config.continuationFallback
+      cause = "continuation"
+      signals = [previous ? `continues ${previous}` : "continues an unseen turn", `${graded.ms}ms`]
+    } else if (graded) {
+      tier = graded.tier
+      cause = graded.cached ? "classifier/cached" : "classifier"
+      scoreValue = graded.difficulty
+      signals = [`${graded.rule ?? "?"} ${graded.difficulty}/9`]
+      if (!graded.calibrated) signals.push("uncalibrated")
+      if (graded.truncated) signals.push("truncated")
+      if (!graded.cached) signals.push(`${graded.ms}ms`)
+    } else {
+      const keyword = keywordTier(ask, config.keywordRules)
+      const scored = score({
+        ask,
+        weights: config.weights,
+        boundaries: config.boundaries,
+        tokenThresholds: config.tokenThresholds,
+        technicalKeywords: config.technicalKeywords,
+      })
+
+      tier = scored.tier
+      cause = "heuristic"
+      scoreValue = scored.score
+      tokens = scored.tokens
+      signals = [...scored.signals]
+
+      if (keyword && tierIndex(keyword.tier) > tierIndex(tier)) {
+        tier = keyword.tier
+        cause = "keyword"
+        signals.push(`keyword "${keyword.keyword}"`)
+      } else if (keyword && tierIndex(keyword.tier) < tierIndex(tier) && scored.signals.length <= 1) {
+        // Only let a keyword pull a turn *down* when the scorer had nothing much
+        // to say, so "thanks, now fix the deadlock" is not filed as a greeting.
+        tier = keyword.tier
+        cause = "keyword"
+        signals.push(`keyword "${keyword.keyword}"`)
+      }
     }
 
      // The trivial tier is for turns that ask for nothing: greetings,
      // acknowledgements, "thanks". Those are not cheap turns - they carry the
      // whole accumulated context - but they are lightweight. Anything that asks
      // for work on the repository needs a model that can be trusted with tools.
-    const attachments = attachmentCount(parts)
     if (
       tier === "trivial" &&
-      (attachments > 0 || scored.tokens > config.tokenThresholds.simple || wantsWork(ask))
+      (attachments > 0 || (tokens !== undefined && tokens > config.tokenThresholds.simple) || wantsWork(ask))
     ) {
       tier = "simple"
       signals.push("asks for work")
@@ -754,7 +795,7 @@ export const AutoRouterPlugin = async ({ client }) => {
       cause = `${cause}+floor`
     }
 
-    return { tier, cause, signals, score: scored.score }
+    return { tier, cause, signals, score: scoreValue, rule: graded?.rule, graded: Boolean(graded) }
   }
 
 
@@ -789,7 +830,7 @@ export const AutoRouterPlugin = async ({ client }) => {
       usage?.poll()
 
       const ask = extractAsk(output.parts, config.reminderMarkers)
-      const decision = decide(sessionID, ask, output.parts, state?.tier)
+      const decision = await decide(sessionID, ask, output.parts, state?.tier)
 
       // A variant selected by hand on the Auto entry is an explicit effort
       // override and beats the tier default. Once the TUI has swapped the
@@ -831,6 +872,12 @@ export const AutoRouterPlugin = async ({ client }) => {
         sessionTier: tier,
         cause: decision.cause,
         score: decision.score,
+        // Whether the local model graded this turn or the keyword scorer stood
+        // in for it. The status line shows the difference, because a router
+        // running on the fallback is a router making worse decisions and that
+        // should not be invisible.
+        graded: decision.graded,
+        rule: decision.rule ?? null,
         signals: decision.signals,
         providerID: target.providerID,
         modelID: target.modelID,

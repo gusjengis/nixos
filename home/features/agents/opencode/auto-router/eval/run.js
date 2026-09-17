@@ -75,6 +75,11 @@ async function main() {
     }
     if (typeof flag("model") === "string") config.model = flag("model")
     if (typeof flag("endpoint") === "string") config.endpoint = flag("endpoint")
+    // --thresholds 2.5,4.5,6.5,8.5
+    if (typeof flag("thresholds") === "string") {
+      const [simple, medium, complex, reasoning] = String(flag("thresholds")).split(",").map(Number)
+      config.thresholds = { simple, medium, complex, reasoning }
+    }
     // An evaluation run must see every failure rather than quietly falling
     // back, so the breaker never opens but every attempt still logs.
     config.failuresBeforeOpen = 1
@@ -138,6 +143,34 @@ async function main() {
   process.stderr.write("            \r")
 
   report(results)
+
+  // Threshold calibration does not need the model. Keeping the raw gradings
+  // makes a sweep instant and, more importantly, reproducible: the numbers in
+  // README.md can be recomputed from a file instead of from a GPU that has to
+  // be up and holding the same weights.
+  const dump = flag("dump")
+  if (dump) {
+    const file = typeof dump === "string" ? dump : path.join(HERE, "gradings.json")
+    fs.writeFileSync(
+      file,
+      JSON.stringify(
+        {
+          model: label,
+          when: new Date().toISOString(),
+          gradings: results.map(({ item, out }) => ({
+            id: item.id,
+            gold: item.tier,
+            difficulty: out.difficulty ?? null,
+            rule: out.rule ?? null,
+            tier: out.tier ?? null,
+          })),
+        },
+        null,
+        1,
+      ),
+    )
+    console.log(`\nwrote ${file}`)
+  }
 
   if (argv.includes("--tune") && !useHeuristic) tune(results)
 }
@@ -239,6 +272,13 @@ function report(results) {
 const UNDER_COST = 2.0
 const OVER_COST = 1.0
 
+// Every tier has to keep a band it can actually be predicted from. Left alone,
+// the search discovers that the cheapest way to avoid ever under-grading is to
+// squeeze a tier down to a sliver nothing lands in, and then reports a good
+// average while never routing anything to that tier at all. A typo fix graded 3
+// out of 9 must come out `simple`, not `medium`, whatever the mean says.
+const MIN_BAND = 1.2
+
 function tierCost(predictedIndex, goldIndex) {
   const gap = predictedIndex - goldIndex
   return gap >= 0 ? gap * OVER_COST : -gap * UNDER_COST
@@ -270,21 +310,18 @@ function macroCost(scored, thresholds) {
   return { cost: total / perTier.size, exact: exact / n, adjacent: adjacent / n }
 }
 
-function tune(results) {
-  const scored = results.filter(({ out }) => typeof out.difficulty === "number")
-  if (!scored.length) return
-
+function search(scored) {
   const grid = []
   for (let v = 1.2; v <= 8.9; v += 0.1) grid.push(Number(v.toFixed(1)))
 
   let best
   for (const simple of grid) {
     for (const medium of grid) {
-      if (medium <= simple) continue
+      if (medium - simple < MIN_BAND) continue
       for (const complex of grid) {
-        if (complex <= medium) continue
+        if (complex - medium < MIN_BAND) continue
         for (const reasoning of grid) {
-          if (reasoning <= complex) continue
+          if (reasoning - complex < MIN_BAND) continue
           const thresholds = { simple, medium, complex, reasoning }
           const scoreCard = macroCost(scored, thresholds)
           if (!best || scoreCard.cost < best.cost) best = { ...scoreCard, thresholds }
@@ -292,8 +329,35 @@ function tune(results) {
       }
     }
   }
+  return best
+}
 
-  console.log("\nbest thresholds on this set (minimising mean per-tier cost)")
+function tune(results) {
+  const scored = results.filter(({ out }) => typeof out.difficulty === "number")
+  if (!scored.length) return
+
+  // Boundaries fitted and scored on the same prompts flatter themselves, and a
+  // flattering number is the one thing this exercise cannot afford. Five folds:
+  // fit on four, score on the fifth, report the mean of the held-out scores.
+  // That is what the router will do on prompts nobody has graded.
+  const folds = 5
+  const held = []
+  for (let fold = 0; fold < folds; fold++) {
+    const train = scored.filter((_, index) => index % folds !== fold)
+    const test = scored.filter((_, index) => index % folds === fold)
+    if (!train.length || !test.length) continue
+    const fitted = search(train)
+    held.push(macroCost(test, fitted.thresholds))
+  }
+
+  const mean = (key) => held.reduce((sum, entry) => sum + entry[key], 0) / held.length
+  console.log(`\nheld out over ${held.length} folds`)
+  console.log(
+    `  cost ${mean("cost").toFixed(3)}  exact ${(mean("exact") * 100).toFixed(1)}%  adjacent ${(mean("adjacent") * 100).toFixed(1)}%`,
+  )
+
+  const best = search(scored)
+  console.log("\nbest thresholds over the whole set")
   console.log(`  ${JSON.stringify(best.thresholds)}`)
   console.log(
     `  cost ${best.cost.toFixed(3)}  exact ${(best.exact * 100).toFixed(1)}%  adjacent ${(best.adjacent * 100).toFixed(1)}%`,

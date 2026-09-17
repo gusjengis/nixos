@@ -77,7 +77,16 @@ const tui = async (api, options) => {
                 <text fg={entry().free ? theme()?.success : theme()?.textMuted}>Auto</text>
                 <text fg={theme()?.text}>
                   {entry().modelName ?? entry().modelID}
-                  <span fg={theme()?.textMuted}> ({entry().tier})</span>
+                  {/* A trailing `?` means the local classifier was unreachable
+                      and the keyword scorer picked this tier instead. The
+                      router still routes, but it is guessing, and hiding that
+                      would make a worse decision look like a better one. */}
+                  <span fg={entry().graded === false ? theme()?.warning : theme()?.textMuted}>
+                    {" ("}
+                    {entry().tier}
+                    {entry().graded === false ? "?" : ""}
+                    {")"}
+                  </span>
                 </text>
                 <text fg={theme()?.textMuted}>{"\u00b7"}</text>
                 <text>

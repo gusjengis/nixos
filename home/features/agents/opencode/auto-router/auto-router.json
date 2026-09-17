@@ -59,6 +59,19 @@
     "switchOpenAIMinGain": 20
   },
 
+  "classifier": {
+    "enabled": true,
+    "endpoint": "http://omega:11434",
+    "model": "qwen3:4b-instruct-2507-q8_0",
+    "timeoutMs": 3000,
+    "thresholds": {
+      "simple": 1.5,
+      "medium": 3.5,
+      "complex": 5.5,
+      "reasoning": 8.0
+    }
+  },
+
   "technicalKeywords": [],
   "log": true,
   "weights": {
