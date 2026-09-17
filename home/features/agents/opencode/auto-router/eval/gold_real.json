@@ -1,0 +1,1052 @@
+[
+ {
+  "id": "R000",
+  "ask": "~ tailscale status \nLogged out.\n ~ systemctl list-units --type=service --state=running\n  UNIT                              LOAD   ACTIVE SUB     DESCRIPTION                                       \n  acpid.service                     loaded active running ACPI Daemon\n  bluetooth.service                 loaded active running Bluetooth service\n  dbus.service                      loaded active running D-Bus System Message Bus\n  docker.service                    loaded active running Docker Application Container Engine\n  getty@tty1.service                loaded active running Getty on tty1\n  libvirtd.service                  loaded active running libvirt legacy monolithic daemon\n  ModemManager.service              loaded active running Modem Manager\n  NetworkManager-dispatcher.service loaded active running Network Manager Script Dispatcher Service\n  NetworkManager.service            loaded active running Network Manager\n  nscd.service                      loaded active running Name Service Cache Daemon (nsncd)\n  polkit.service                    loaded active running Authorization Manager\n  rtkit-daemon.service              loaded active running RealtimeKit Scheduling Policy Service\n  systemd-journald.service          loaded active running Journal Service\n  systemd-logind.service            loaded active running User Login Management\n  systemd-machined.service          loaded active running Virtual Machine and Container Registration Service\n  systemd-oomd.service              loaded active running Userspace Out-Of-Memory (OOM) Killer\n  systemd-timesyncd.service         loaded active running Network Time Synchronization\n  systemd-udevd.service             loaded active running Rule-based Manager for Device Events and Files\n  tailscaled.service                loaded active running Tailscale node agent\n  udisks2.service                   loaded active running Disk Manager\n  user@1000.service                 loaded active running User Manager for UID 1000\n  wpa_supplicant.service            loaded active running WPA supplicant\n\nLegend: LOAD   \u2192 Reflects whether the unit definition was properly loaded.\n        ACTIVE \u2192 The high-level unit activation state, i.e. generalization of SUB.\n        SUB    \u2192 The low-level unit activation state, values depend on unit type.\n\n22 loaded units listed.\n ~ systemctl --failed\n  UNIT                      LOAD   ACTIVE SUB    DESCRIPTION                          \n\u25cf tailscale-authkey.service loaded failed failed Create tailscale authkey file at boot\n\nLegend: LOAD   \u2192 Reflects whether the unit definition was properly loaded.\n        ACTIVE \u2192 The high-level unit activation state, i.e. generalization of SUB.\n        SUB    \u2192 The low-level unit activation state, values depend on unit type.\n\n1 loaded units listed.  read all files again, help me figure this out",
+  "tier": "complex",
+  "why": "failed boot unit, cause unknown, needs investigation",
+  "src": "real"
+ },
+ {
+  "id": "R001",
+  "ask": "I think a pre-sorted list is the correct approach, I'm already doing that with the titles list in each class, and the classes list in the model. The only thing is, I need to maintain the sort, and because there is always something in focus, ticking up it's duration, the data needs to be checked for sortedness all the time, like before each draw, because the current window could pass something else at any time. But I guess running a sort that only swaps two things is way faster than sorting everything every frame, right?",
+  "tier": "complex",
+  "why": "incremental sort invariant, real perf design decision",
+  "src": "real"
+ },
+ {
+  "id": "R002",
+  "ask": "my bad, go ahead",
+  "tier": "medium",
+  "why": "bare approval authorising unseen work",
+  "src": "real"
+ },
+ {
+  "id": "R003",
+  "ask": "I'm working on changing intervals in this interactive tui. It's beginning to work, but still crashes in some cases. All crashes seem to come from the timeline_sections file, they have to do with index out of bounds errors. Take a look and see what you can come up with.",
+  "tier": "complex",
+  "why": "crashes in some cases, cause not given",
+  "src": "real"
+ },
+ {
+  "id": "R004",
+  "ask": "When I deal with changes in interval, I want to do a check to speed things up. If I've already visited a day/interval, it's logs should already exist in the model, and I don't need to spawn a log reader and walk through the file(s) for that interval. Can you add this optimization?",
+  "tier": "medium",
+  "why": "cache-skip optimization, clear approach, existing model",
+  "src": "real"
+ },
+ {
+  "id": "R005",
+  "ask": "hit it",
+  "tier": "medium",
+  "why": "bare approval authorising unseen work",
+  "src": "real"
+ },
+ {
+  "id": "R006",
+  "ask": "can you center that?",
+  "tier": "simple",
+  "why": "one mechanical layout tweak, no judgement",
+  "src": "real"
+ },
+ {
+  "id": "R007",
+  "ask": "Let's try for option B.",
+  "tier": "medium",
+  "why": "approves unseen option B implementation",
+  "src": "real"
+ },
+ {
+  "id": "R008",
+  "ask": "be aware, just did a little renaming. Go ahead with the clamping fix",
+  "tier": "medium",
+  "why": "approval of named fix plus rename awareness",
+  "src": "real"
+ },
+ {
+  "id": "R009",
+  "ask": "can you run commands, or do you just edit files? I'm trying to figure out how similar you are in capability to cursor",
+  "tier": "trivial",
+  "why": "capability question, no lookup, no work",
+  "src": "real"
+ },
+ {
+  "id": "R010",
+  "ask": "Map overlap, model.rs, what the fuck is this horseshit about double borrowing, stupid fucking language, if it would just read the function I'm calling it would see that there is obviously zero overlap, one borrow just uses the logs vec, the other borrow doesn't touch the logs vec. Evil fucks wasting my time with their braindead borrow checker. How the fuck do I get around this?",
+  "tier": "medium",
+  "why": "borrow-checker fix, file named, standard workarounds",
+  "src": "real"
+ },
+ {
+  "id": "R011",
+  "ask": "oh",
+  "tier": "trivial",
+  "why": "pure acknowledgement, asks nothing",
+  "src": "real"
+ },
+ {
+  "id": "R012",
+  "ask": "can you help me with this update? the automatic sync didn't work. A problem occurred configuring root project 'SimpleDigital'.\n> Could not resolve all artifacts for configuration 'classpath'.\n   > Could not resolve com.android.tools.build:gradle:8.13.1.\n     Required by:\n         root project : > com.android.application:com.android.application.gradle.plugin:8.13.1\n      > Dependency requires at least JVM runtime version 11. This build uses a Java 8 JVM.\n\n* Try:\n> Run this build using a Java 11 or newer JVM.\n> Run with --stacktrace option to get the stack trace.\n> Run with --info or --debug option to get more log output.\n> Run with --scan to get full insights.\n> Get more help at https://help.gradle.org.\n\nDeprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.\n\nYou can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.\n\nFor more on this, please refer to https://docs.gradle.org/8.14.3/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.\nFix with AI",
+  "tier": "medium",
+  "why": "error states cause; JDK version config change",
+  "src": "real"
+ },
+ {
+  "id": "R013",
+  "ask": "I need a post build script for the unity cloud build system. When I do a build for IOS, I want a script to run after that will automatically upload the build and put it on testflight. Do you know how to do that?",
+  "tier": "complex",
+  "why": "new CI script, unfamiliar TestFlight upload API",
+  "src": "real"
+ },
+ {
+  "id": "R014",
+  "ask": "okay, so your heuristic already handles this?",
+  "tier": "simple",
+  "why": "direct yes/no about just-written heuristic",
+  "src": "real"
+ },
+ {
+  "id": "R015",
+  "ask": "okay, I'd like to try zsh, what does it take to switch my system to use that? is it a pain?",
+  "tier": "medium",
+  "why": "shell switch, couple config files, known pattern",
+  "src": "real"
+ },
+ {
+  "id": "R016",
+  "ask": "I want to update this script so that it asks prompts the user about which modules they want enabled during installation, both for the system and home build. For the system build, in the configuration.nix file, modules should be enabled by adding a line for each that says module_name.enabled = true/false. I want this to be an interface that pops up and lets the user thumb through options, toggle them on and off with enter, then submit when they are happy, like little tui. I want the same thing during the home_manager installation. In home manager, there is a modules.nix file, that just contains curly braces with module_name.enable = true/false; statements. Somehow, this script needs to look into these repos once they are pulled and find a complete list of these modules. Go read through /etc/nix-modules/, /etc/nixos, and ~/.home-manager, get the relevant context, then tell me if this is possible.",
+  "tier": "complex",
+  "why": "new TUI, three repos, module discovery design",
+  "src": "real"
+ },
+ {
+  "id": "R017",
+  "ask": "restore the images",
+  "tier": "simple",
+  "why": "one mechanical restore of known files",
+  "src": "real"
+ },
+ {
+  "id": "R018",
+  "ask": "beautiful, thank you. You'e done a lot of stuff here, anything left over that you can remove without changing the function of these scripts?",
+  "tier": "medium",
+  "why": "dead-code cleanup, behaviour must stay unchanged",
+  "src": "real"
+ },
+ {
+  "id": "R019",
+  "ask": "I want a detailed implementation plan, the part I really want you to handle is the sorting. Creating the vec is great, but maintaining the order is the hard part.",
+  "tier": "complex",
+  "why": "design plan for maintaining order under live updates",
+  "src": "real"
+ },
+ {
+  "id": "R020",
+  "ask": "give it a shot",
+  "tier": "medium",
+  "why": "bare approval authorising unseen work",
+  "src": "real"
+ },
+ {
+  "id": "R021",
+  "ask": "every minute is probably good, on the minute if you can",
+  "tier": "medium",
+  "why": "sets schedule, authorises minute-aligned timer work",
+  "src": "real"
+ },
+ {
+  "id": "R022",
+  "ask": "okay, new info: raw:0 cols:?/?",
+  "tier": "complex",
+  "why": "terse new symptom, cause still unknown",
+  "src": "real"
+ },
+ {
+  "id": "R023",
+  "ask": "I'd like to add mouse controls, I have a tui with a timeline, and the left and right arrow keys jump left or right by one day. I'd like to now add panning with the mouse, click and drag. Can you handle that for me?",
+  "tier": "medium",
+  "why": "mouse drag panning follows existing key handling",
+  "src": "real"
+ },
+ {
+  "id": "R024",
+  "ask": "1 sounds good, do 2, 3 sounds good, 4 leave harpoon alone, 5 sounds good. Also give me the textobjects thing from treesitter, that sounds badass. Show me the changes you will make, then I'll put you in build mode.",
+  "tier": "medium",
+  "why": "batch of routine nvim config items, plan first",
+  "src": "real"
+ },
+ {
+  "id": "R025",
+  "ask": "I want to improve the label placement logic. When you save simple single events, things are fine, but when there is an overlap, it seems a little off. For example, I'm looking at a couple of events here that overlap, one is Eat+Work, and it contains an event called Sous Vide, the Eat+Work event is much longer than sous vide, and it has a 1 hour section with nothing overlapping. Currently the eat+work label is in the center of the whole interval, and it's beating out the sous vide label in a collision, so I only see the one label. There is space to center the eat+work label on the part of that event with no collisions, and put the sous vide label in the center of the sous vide event. Do you understand what I'm getting at? How would this kind of logic generalize, so that it made sense with a bunch of different combinations of overlapping events?",
+  "tier": "reasoning",
+  "why": "open-ended general label layout algorithm, unspecified cases",
+  "src": "real"
+ },
+ {
+  "id": "R026",
+  "ask": "hey, my eww widget for selecting tailscale devices is showing me my galaxy s23, which is fine because it's on the network, but I want this thing to only show me devices that I can actually launch stuff on with waypipe, meaning other nixos devices. Is there a way to check that and filter out devices without waypipe?",
+  "tier": "medium",
+  "why": "filter device list; detection method reasonably obvious",
+  "src": "real"
+ },
+ {
+  "id": "R027",
+  "ask": "what? why would I want this to take a parameter? model.logs is already contained in model?",
+  "tier": "medium",
+  "why": "explain rationale of proposed signature change",
+  "src": "real"
+ },
+ {
+  "id": "R028",
+  "ask": "that flew through them, why is my shortcut that switches to the next wallpaper so unreliable, I often hhave to hit it many times before I get a response. Can you make it more reliable?",
+  "tier": "reasoning",
+  "why": "intermittent unreliable shortcut, unknown timing cause",
+  "src": "real"
+ },
+ {
+  "id": "R029",
+  "ask": "okay, I'm liking fzf, the basic integration is useful, gives me completion, what are the other things that fzf bash integration allows, look it up and list out all the keymaps for me",
+  "tier": "medium",
+  "why": "lookup and enumerate fzf keymaps, research task",
+  "src": "real"
+ },
+ {
+  "id": "R030",
+  "ask": "how do i tell which files are being put into lfs before commiting or pushing",
+  "tier": "simple",
+  "why": "direct git-lfs question, one command answer",
+  "src": "real"
+ },
+ {
+  "id": "R031",
+  "ask": "hmm, let's go back to no colored background, put an @ between username and machine",
+  "tier": "simple",
+  "why": "two mechanical prompt string tweaks",
+  "src": "real"
+ },
+ {
+  "id": "R032",
+  "ask": "by error, I mean any message about the repo not syncing, please make these red",
+  "tier": "simple",
+  "why": "clarified rule, colour specific script messages red",
+  "src": "real"
+ },
+ {
+  "id": "R033",
+  "ask": "I could use a better terminal prompt. I see lots of different pretty ones. I've currently customized mine to be very simple, and just display the cwd in green. I like this pretty well. Something I would like is autocomplete. I see lots of people with dim text that suggests the rest of the command, with some way to accept the completion, that would be nice. I would also like a way to fuzzy find commands in my history, pressing up a million times to get back to old commands sucks. How do people usually set these things up?",
+  "tier": "medium",
+  "why": "research shell tooling options, routine config setup",
+  "src": "real"
+ },
+ {
+  "id": "R034",
+  "ask": "would this work better if I ran thi on my actual watch? I'm doing this all over ssh, is there a way to remotely use the adb? My phone is on the same tailscale network as my pc, maybe there is a way there?",
+  "tier": "medium",
+  "why": "remote adb over tailscale, known technique, explanatory",
+  "src": "real"
+ },
+ {
+  "id": "R035",
+  "ask": "would it work with ~ instead of $HOME?",
+  "tier": "simple",
+  "why": "direct factual expansion question",
+  "src": "real"
+ },
+ {
+  "id": "R036",
+  "ask": "I just restarted, still losing the highlight on the current special workspace when changing wallpapers",
+  "tier": "complex",
+  "why": "prior fix failed, cause still unfound, cross-component",
+  "src": "real"
+ },
+ {
+  "id": "R037",
+  "ask": "hey, check out the model file, you should see a path through the get_class and get title functions that have print statemets, that is the path that is being traveled, why is this failing to find titles? the print statements clearly show correct data that is in the model",
+  "tier": "complex",
+  "why": "lookup fails despite correct prints, cause unknown",
+  "src": "real"
+ },
+ {
+  "id": "R038",
+  "ask": "Okay, so I should make a totally seperate repo for this, containing a nix system module file, all of my configuration, and the hass folder (would probably store the folder in the repo and symlink it to the proper location). Then in my nix modules I can import this module file, set it disabled by default, and turn it on in the server's local system config?",
+  "tier": "medium",
+  "why": "validate proposed module/repo layout, approach already stated",
+  "src": "real"
+ },
+ {
+  "id": "R039",
+  "ask": "interval.rs, that pan days function, I want it to accept a number of days and a direction boolean, then pan the interval that far to the left or the right. I also want it to stop when it hits the present. So if it says to pan 10 days to the right, but the present is soon than that, it should just round down to moving until the right edge of the interval is midnight tonight, while retaining the current interval width/duration. Can you show me how you'd implement this? I've kinda done some of it already, just want help with stopping it from going too far.",
+  "tier": "medium",
+  "why": "single function, behaviour and clamping fully specified",
+  "src": "real"
+ },
+ {
+  "id": "R040",
+  "ask": "hey, how do I enable ssh now that I have tailscale so that my laptop can connect to my pc and vice versa? They both share this nix-modules repo.",
+  "tier": "complex",
+  "why": "ssh auth across fleet-shared modules, blast radius",
+  "src": "real"
+ },
+ {
+  "id": "R041",
+  "ask": "/etc/nix-modules rebuild\nerror:\n       \u2026 while calling the 'seq' builtin\n         at /nix/store/3w2nr2aq2gp76nb6lh1alx6h10mwvp5d-source/lib/modules.nix:361:18:\n          360|         options = checked options;\n          361|         config = checked (removeAttrs config [ \"_module\" ]);\n             |                  ^\n          362|         _module = checked (config._module);\n\n       \u2026 while calling the 'throw' builtin\n         at /nix/store/3w2nr2aq2gp76nb6lh1alx6h10mwvp5d-source/lib/modules.nix:333:13:\n          332|           else\n          333|             throw baseMsg\n             |             ^\n          334|         else\n\n       error: The option `tailscale' does not exist. Definition values:\n       - In `/etc/nix-modules/nixosModules':\n           {\n             enable = {\n               _type = \"override\";\n               content = true;\n               priority = 1000;\n           ...\nCommand 'nix --extra-experimental-features 'nix-command flakes' build --print-out-paths '/etc/nixos/#nixosConfigurations.\"nixos\".config.system.build.nixos-rebuild' --impure --no-link' returned non-zero exit status 1.",
+  "tier": "medium",
+  "why": "error names missing option; localized nix fix",
+  "src": "real"
+ },
+ {
+  "id": "R042",
+  "ask": "look through the repo to see if there are any other file types that should be added to lfs",
+  "tier": "medium",
+  "why": "repo-wide scan plus judgement on lfs types",
+  "src": "real"
+ },
+ {
+  "id": "R043",
+  "ask": "weird run df and see what it tells you, I'm starting to think thunar is wrong",
+  "tier": "simple",
+  "why": "run named command, report output",
+  "src": "real"
+ },
+ {
+  "id": "R044",
+  "ask": "how would this watchdog work, what is AlarmManager?",
+  "tier": "medium",
+  "why": "explain watchdog design and AlarmManager concept",
+  "src": "real"
+ },
+ {
+  "id": "R045",
+  "ask": "I tested myself. I played a 3 player, 1 round singleplayer match. What I found was that at the end of the match, when I hit play again, it restarted the game behind the end of game popup, and I could continue to press play again, but the popup wouldn't go away, only going to main menu worked.",
+  "tier": "complex",
+  "why": "popup/restart state bug, cause not given",
+  "src": "real"
+ },
+ {
+  "id": "R046",
+  "ask": "I found the spot to put in keys, what are these missing values?",
+  "tier": "simple",
+  "why": "direct question about named config placeholders",
+  "src": "real"
+ },
+ {
+  "id": "R047",
+  "ask": "can you stage all files for me? also, can you do this in a new terminal in this current tmux session? also, can I create custom commands for you?",
+  "tier": "simple",
+  "why": "stage files plus two capability questions",
+  "src": "real"
+ },
+ {
+  "id": "R048",
+  "ask": "is there a way to detect changes in the calendar and trigger an immediate refresh? I'd like this to react right away when I change stuff",
+  "tier": "medium",
+  "why": "calendar change observer, common event-driven pattern",
+  "src": "real"
+ },
+ {
+  "id": "R049",
+  "ask": "new log, LOG2.log, what is the fix?",
+  "tier": "complex",
+  "why": "diagnose failure from log, cause not stated",
+  "src": "real"
+ },
+ {
+  "id": "R050",
+  "ask": "Dude, you're a freaking genius. That question you asked about the color in the cross-class title list, holy shit. I just did that while you were thinking about the sorting stuff, you read my mind. You're a beast. Yes the titles should be colored based on their parent class, but it's already done so don't worry about it. But wow, very impressive that you thought of that on your own. Great minds think alike. Back to the sorting stuff, is it necessary to do this manual bubble sort? I have a couple existing sort functions, one of which calls the other, so that I just say model.sort and everything is set, but I'm just using a built in sort_by function and defining the comparator, not sure what that's doing under the hood, but is that not fast enough already? Can we just do something similar for this new data structure? Is what I'm doing wasteful? is it doing some O(n) check even though it's usually just checking and moving nothing and occasionally swapping a couple things because something ticked up past another thing?",
+  "tier": "complex",
+  "why": "sort strategy complexity tradeoff, real perf design decision",
+  "src": "real"
+ },
+ {
+  "id": "R051",
+  "ask": "hey, we have two copies of the game, one singleplayer, one online, can you start by orienting yourself and figuring out which files are which? This is a unity game, after the main main menu there is a game scene (singleplayer) and a game_online scene, each have their own seperate copies of the game logic, the singleplayer stuff came first.",
+  "tier": "complex",
+  "why": "orient in unfamiliar repo, map duplicated game logic",
+  "src": "real"
+ },
+ {
+  "id": "R052",
+  "ask": "shadow?",
+  "tier": "simple",
+  "why": "one-word nudge about small shadow tweak",
+  "src": "real"
+ },
+ {
+  "id": "R053",
+  "ask": "~/.home-manager/ rehome\nwarning: Git tree '/home/gusjengis/.home-manager' is dirty\nwarning: Git tree '/home/gusjengis/.home-manager' is dirty\nwarning: Git tree '/home/gusjengis/.home-manager' is dirty\nwarning: Git tree '/home/gusjengis/.home-manager' is dirty\nStarting Home Manager activation\nActivating createDirs\nActivating syncRepos\nskipping sync for hyprlog: has uncommitted changes\n100% 21:0=0s /home/gusjengis/Documents/Code/Mosaic/ https://github.com/gusjengis/Mosaic-Android.git /home/gusjengis/Documents/Code/Mosaic/ https://github.com/gusjengis/Mosaic-Snitch.git                                                                                        \nActivating checkFilesChanged\nActivating checkLinkTargets\nActivating writeBoundary\nActivating copyDefaultWallpaper\nActivating installPackages\nreplacing old 'home-manager-path'\ninstalling 'home-manager-path'\nActivating dconfSettings\nActivating linkGeneration\nCleaning up orphan links from /home/gusjengis\nCreating home file links in /home/gusjengis\nActivating reloadSystemd\nStarting units: flatpak-managed-install.service\nActivating flatpak-managed-install\nActivating onFilesChange\nActivating pcHyprSetup\nActivating symlinkHyprlandConf\nActivating symlinkHyprpaperConf\nActivating symlinkKittyConf\nActivating symlinkTmuxConf\nActivating symlinkWofiConf\nwarning: Git tree '/home/gusjengis/.home-manager' is dirty\n\nThere are 321 unread and relevant news items.\nRead them by running the command \"home-manager news\".   here is my home manager output. I want the progress bar to disappear when it's done, don't even want to leave a blank line. Also, the error there is still white",
+  "tier": "medium",
+  "why": "two localized script fixes, symptoms stated, log padding",
+  "src": "real"
+ },
+ {
+  "id": "R054",
+  "ask": "Now I'm getting a crash, going forward is fine because I'm hitting that boundary, but going backward causes a crash. Can you help me figure out what might be causing it? The application panicked (crashed).\nMessage:  index out of bounds: the len is 273 but the index is 273\nLocation: src/hyprlog/timeline_sections.rs:106",
+  "tier": "medium",
+  "why": "panic file and line given, boundary off-by-one",
+  "src": "real"
+ },
+ {
+  "id": "R055",
+  "ask": "oh, it just updated when I wasn't looking, when from 6:01 to 6:04, not sure what triggered it",
+  "tier": "complex",
+  "why": "unexplained self-triggered update, cause unknown",
+  "src": "real"
+ },
+ {
+  "id": "R056",
+  "ask": "why the hell are you deleting methods? bring back print, index_of, logs_iter, and get_title",
+  "tier": "simple",
+  "why": "restore four named methods, mechanical",
+  "src": "real"
+ },
+ {
+  "id": "R057",
+  "ask": "Check out my tailscale module, pretty nice, right? Only trouble is, it has a private key in it. I have a file at ~/.config/secrets/api-keys/env_vars that can be sourced to add TAILSCALE_AUTH_KEY to my path. That is the same key you see here. Can you modify the script in the tailscale file to source that file and use the env var instead?",
+  "tier": "complex",
+  "why": "secret removal from nix store, credential handling blast radius",
+  "src": "real"
+ },
+ {
+  "id": "R058",
+  "ask": "Hey, man, you're in the folder for this project that's failing. I've done a commit, go nuts and see if you can fix this stuff.",
+  "tier": "complex",
+  "why": "unspecified project failure, open-ended, cause unknown",
+  "src": "real"
+ },
+ {
+  "id": "R059",
+  "ask": "now, can you help me figure out why android studio isn't pairing with my phone wirelessly?",
+  "tier": "reasoning",
+  "why": "environment-dependent wireless pairing failure, unknown cause",
+  "src": "real"
+ },
+ {
+  "id": "R060",
+  "ask": "yo, I'm working on build automation, can you read this compact log and tell me what's wrong? If you need more I'll see if I can download the full log and put it the folder for you to read [error] [2026-02-19T03:45:27.662Z] - 7.6.34.3.3.5 - INFO: Downloaded /BUILD_PATH/de2c74ff-5bf8-4c99-0000-12403bf62955.a7e34uxrqtt/Assets/Mobile Games Bundle/Word Puzzle Games Sound Effects and Music Pack/AUDIO/SFX/Error_Fail/SFX_UI_Word_Fail_1.wav from Hundo/Hundo@20067093195093@unity\n[error] [2026-02-19T03:45:27.663Z] - 7.6.34.3.3.5 - INFO: Downloaded /BUILD_PATH/de2c74ff-5bf8-4c99-0000-12403bf62955.a7e34uxrqtt/Assets/Mobile Games Bundle/Word Puzzle Games Sound Effects and Music Pack/AUDIO/SFX/Error_Fail/SFX_UI_Word_Fail_1.wav.meta from Hundo/Hundo@20067093195093@unity\n[error] [2026-02-19T03:45:27.664Z] - 7.6.34.3.3.5 - INFO: Downloaded /BUILD_PATH/de2c74ff-5bf8-4c99-0000-12403bf62955.a7e34uxrqtt/Assets/Mobile Games Bundle/Word Puzzle Games Sound Effects and Music Pack/AUDIO/SFX/Error_Fail/SFX_UI_Word_Fail_2.wav from Hundo/Hundo@20067093195093@unity\n[error] [2026-02-19T03:45:27.664Z] - 7.6.34.3.3.5 - INFO: Downloaded /BUILD_PATH/de2c74ff-5bf8-4c99-0000-12403bf62955.a7e34uxrqtt/Assets/Mobile Games Bundle/Word Puzzle Games Sound Effects and Music Pack/AUDIO/SFX/Error_Fail/SFX_UI_Word_Fail_2.wav.meta from Hundo/Hundo@20067093195093@unity\n[important] [2026-02-19T03:45:52Z - Unity] Initialize engine version: 6000.0.60f1 (f02d6f9f9009)\n[error] [2026-02-19T03:46:50Z - Unity] \t\t\tLogAssemblyErrors (0ms)\n[warning] [2026-02-19T03:46:52Z - Unity] A meta data file (.meta) exists but its asset 'Assets/Feel/FeelDemos/FeelTemplatesDemo.unitypackage' can't be found. When moving or deleting files outside of Unity, please ensure that the corresponding .meta file is moved or deleted along with it.\n[warning] [2026-02-19T03:46:52Z - Unity] A meta data file (.meta) exists but its asset 'Assets/Feel/FeelDemosURP/FeelDemosURP.unitypackage' can't be found. When moving or deleting files outside of Unity, please ensure that the corresponding .meta file is moved or deleted along with it.\n[warning] [2026-02-19T03:46:52Z - Unity] A meta data file (.meta) exists but its asset 'Assets/Feel/NiceVibrations/OlderVersions/v1.7/NiceVibrations-v-1-7.unitypackage' can't be found. When moving or deleting files outside of Unity, please ensure that the corresponding .meta file is moved or deleted along with it.\n[warning] [2026-02-19T03:46:52Z - Unity] A meta data file (.meta) exists but its asset 'Assets/Feel/NiceVibrations/OlderVersions/v2.0.1/NiceVibrations-v-2-0-1.unitypackage' can't be found. When moving or deleting files outside of Unity, please ensure that the corresponding .meta file is moved or deleted along with it.\n[warning] [2026-02-19T03:46:52Z - Unity] A meta data file (.meta) exists but its asset 'Assets/Feel/NiceVibrations/OlderVersions/v3.9/NiceVibrations-v-3-9-0.unitypackage' can't be found. When moving or deleting files outside of Unity, please ensure that the corresponding .meta file is moved or deleted along with it.\n[warning] [2026-02-19T03:46:52Z - Unity] A meta data file (.meta) exists but its asset 'Assets/GooglePlayGames/com.google.play.games/current-build/GooglePlayGamesPlugin-2.0.0.unitypackage' can't be found. When moving or deleting files outside of Unity, please ensure that the corresponding .meta file is moved or deleted along with it.\n[warning] [2026-02-19T03:46:52Z - Unity] A meta data file (.meta) exists but its asset 'Assets/Plugins/AllIn1SpringsToolkit/Scripts/UiToolkitSpring.unitypackage' can't be found. When moving or deleting files outside of Unity, please ensure that the corresponding .meta file is moved or deleted along with it.\n[warning] [2026-02-19T03:46:52Z - Unity] A meta data file (.meta) exists but its asset 'Assets/Plugins/AllIn1SpriteShader/2DRenderer-URP.unitypackage' can't be found. When moving or deleting files outside of Unity, please ensure that the corresponding .meta file is moved or deleted along with it.\n[warning] [2026-02-19T03:46:52Z - Unity] A meta data file (.meta) exists but its asset 'Assets/Resources/DOTweenSettings.asset' can't be found. When moving or deleting files outside of Unity, please ensure that the corresponding .meta file is moved or deleted along with it.\n[warning] [2026-02-19T03:46:52Z - Unity] A meta data file (.meta) exists but its asset 'Assets/StompyRobot/SRDebugger/PlaymakerIntegration.unitypackage' can't be found. When moving or deleting files outside of Unity, please ensure that the corresponding .meta file is moved or deleted along with it.\n[warning] [2026-02-19T03:46:52Z - Unity] A meta data file (.meta) exists but its asset 'Assets/Feel/FeelDemos/FeelTemplatesDemo.unitypackage' can't be found. When moving or deleting files outside of Unity, please ensure that the corresponding .meta file is moved or deleted along with it.\n[warning] [2026-02-19T03:46:52Z - Unity] A meta data file (.meta) exists but its asset 'Assets/Feel/FeelDemosURP/FeelDemosURP.unitypackage' can't be found. When moving or deleting files outside of Unity, please ensure that the corresponding .meta file is moved or deleted along with it.\n[warning] [2026-02-19T03:46:52Z - Unity] A meta data file (.meta) exists but its asset 'Assets/Feel/NiceVibrations/OlderVersions/v1.7/NiceVibrations-v-1-7.unitypackage' can't be found. When moving or deleting files outside of Unity, please ensure that the corresponding .meta file is moved or deleted along with it.\n[warning] [2026-02-19T03:46:52Z - Unity] A meta data file (.meta) exists but its asset 'Assets/Feel/NiceVibrations/OlderVersions/v2.0.1/NiceVibrations-v-2-0-1.unitypackage' can't be found. When moving or deleting files outside of Unity, please ensure that the corresponding .meta file is moved or deleted along with it.\n[warning] [2026-02-19T03:46:52Z - Unity] A meta data file (.meta) exists but its asset 'Assets/Feel/NiceVibrations/OlderVersions/v3.9/NiceVibrations-v-3-9-0.unitypackage' can't be found. When moving or deleting files outside of Unity, please ensure that the corresponding .meta file is moved or deleted along with it.\n[warning] [2026-02-19T03:46:52Z - Unity] A meta data file (.meta) exists but its asset 'Assets/GooglePlayGames/com.google.play.games/current-build/GooglePlayGamesPlugin-2.0.0.unitypackage' can't be found. When moving or deleting files outside of Unity, please ensure that the corresponding .meta file is moved or deleted along with it.\n[warning] [2026-02-19T03:46:52Z - Unity] A meta data file (.meta) exists but its asset 'Assets/Plugins/AllIn1SpringsToolkit/Scripts/UiToolkitSpring.unitypackage' can't be found. When moving or deleting files outside of Unity, please ensure that the corresponding .meta file is moved or deleted along with it.\n[warning] [2026-02-19T03:46:52Z - Unity] A meta data file (.meta) exists but its asset 'Assets/Plugins/AllIn1SpriteShader/2DRenderer-URP.unitypackage' can't be found. When moving or deleting files outside of Unity, please ensure that the corresponding .meta file is moved or deleted along with it.\n[warning] [2026-02-19T03:46:52Z - Unity] A meta data file (.meta) exists but its asset 'Assets/Resources/DOTweenSettings.asset' can't be found. When moving or deleting files outside of Unity, please ensure that the corresponding .meta file is moved or deleted along with it.\n[warning] [2026-02-19T03:46:52Z - Unity] A meta data file (.meta) exists but its asset 'Assets/StompyRobot/SRDebugger/PlaymakerIntegration.unitypackage' can't be found. When moving or deleting files outside of Unity, please ensure that the corresponding .meta file is moved or deleted along with it.\n[warning] [2026-02-19T03:46:52Z - Unity] A meta data file (.meta) exists but its asset 'Assets/Feel/FeelDemos/FeelTemplatesDemo.unitypackage' can't be found. When moving or deleting files outside of Unity, please ensure that the corresponding .meta file is moved or deleted along with it.\n[warning] [2026-02-19T03:46:52Z - Unity] A meta data file (.meta) exists but its asset 'Assets/Feel/FeelDemosURP/FeelDemosURP.unitypackage' can't be found. When moving or deleting files outside of Unity, please ensure that the corresponding .meta file is moved or deleted along with it.\n[warning] [2026-02-19T03:46:52Z - Unity] A meta data file (.meta) exists but its asset 'Assets/Feel/NiceVibrations/OlderVersions/v1.7/NiceVibrations-v-1-7.unitypackage' can't be found. When moving or deleting files outside of Unity, please ensure that the corresponding .meta file is moved or deleted along with it.\n[warning] [2026-02-19T03:46:52Z - Unity] A meta data file (.meta) exists but its asset 'Assets/Feel/NiceVibrations/OlderVersions/v2.0.1/NiceVibrations-v-2-0-1.unitypackage' can't be found. When moving or deleting files outside of Unity, please ensure that the corresponding .meta file is moved or deleted along with it.\n[warning] [2026-02-19T03:46:52Z - Unity] A meta data file (.meta) exists but its asset 'Assets/Feel/NiceVibrations/OlderVersions/v3.9/NiceVibrations-v-3-9-0.unitypackage' can't be found. When moving or deleting files outside of Unity, please ensure that the corresponding .meta file is moved or deleted along with it.\n[warning] [2026-02-19T03:46:52Z - Unity] A meta data file (.meta) exists but its asset 'Assets/GooglePlayGames/com.google.play.games/current-build/GooglePlayGamesPlugin-2.0.0.unitypackage' can't be found. When moving or deleting files outside of Unity, please ensure that the corresponding .meta file is moved or deleted along with it.\n[warning] [2026-02-19T03:46:52Z - Unity] A meta data file (.meta) exists but its asset 'Assets/Plugins/AllIn1SpringsToolkit/Scripts/UiToolkitSpring.unitypackage' can't be found. When moving or deleting files outside of Unity, please ensure that the corresponding .meta file is moved or deleted along with it.\n[warning] [2026-02-19T03:46:52Z - Unity] A meta data file (.meta) exists but its asset 'Assets/Plugins/AllIn1SpriteShader/2DRenderer-URP.unitypackage' can't be found. When moving or deleting files outside of Unity, please ensure that the corresponding .meta file is moved or deleted along with it.\n[warning] [2026-02-19T03:46:52Z - Unity] A meta data file (.meta) exists but its asset 'Assets/Resources/DOTweenSettings.asset' can't be found. When moving or deleting files outside of Unity, please ensure that the corresponding .meta file is moved or deleted along with it.\n[warning] [2026-02-19T03:46:52Z - Unity] A meta data file (.meta) exists but its asset 'Assets/StompyRobot/SRDebugger/PlaymakerIntegration.unitypackage' can't be found. When moving or deleting files outside of Unity, please ensure that the corresponding .meta file is moved or deleted along with it.\n[warning] [2026-02-19T03:47:03Z - Unity] Exception:System.IO.IOException: The process cannot access the file '/BUILD_PATH/de2c74ff-5bf8-4c99-0000-12403bf62955.a7e34uxrqtt/Library/APIUpdater/ConfigurationCache/UnityEngine.dll.B2845D06B45EFD860F82861A8334D67B1923E88287B66E8A5D4782DC22BADB9E.apiupaterconfigs' because it is being used by another process.\n[warning] [2026-02-19T03:47:03Z - Unity] Exception:System.IO.IOException: The process cannot access the file '/BUILD_PATH/de2c74ff-5bf8-4c99-0000-12403bf62955.a7e34uxrqtt/Library/APIUpdater/ConfigurationCache/UnityEditor.dll.0BFEDD27CF0BA3E5280276C4491BC5C22242D8F5DE56D68F860940E6EC4F0D51.apiupaterconfigs' because it is being used by another process.\n[warning] [2026-02-19T03:47:03Z - Unity] Exception:System.IO.IOException: The process cannot access the file '/BUILD_PATH/de2c74ff-5bf8-4c99-0000-12403bf62955.a7e34uxrqtt/Library/APIUpdater/ConfigurationCache/UnityEngine.dll.B2845D06B45EFD860F82861A8334D67B1923E88287B66E8A5D4782DC22BADB9E.apiupaterconfigs' because it is being used by another process.\n[error] [2026-02-19T03:47:03Z - Unity] [AssemblyUpdater] Reference to method System.Void Google.PackageManagerClient/Error::.ctor(System.Object) ignored in IL_005c: newobj System.Void Google.PackageManagerClient/Error::.ctor(System.Object) (not a callsite)\n[error] [2026-02-19T03:47:03Z - Unity] [AssemblyUpdater] Reference to method System.Void Google.PackageMigrator/PackageMap/<>c__DisplayClass38_0::<CachePackageInfo>b__0(Google.PackageManagerClient/Error) ignored in IL_0023: ldftn System.Void Google.PackageMigrator/PackageMap/<>c__DisplayClass38_0::<CachePackageInfo>b__0(Google.PackageManagerClient/Error) (not a callsite)\n[error] [2026-02-19T03:47:03Z - Unity] [AssemblyUpdater] Reference to method System.Void System.Action`1<Google.PackageManagerClient/Error>::.ctor(System.Object,System.IntPtr) ignored in IL_0029: newobj System.Void System.Action`1<Google.PackageManagerClient/Error>::.ctor(System.Object,System.IntPtr) (not a callsite)\n[error] [2026-02-19T03:47:03Z - Unity] [AssemblyUpdater] Reference to method System.Void Google.PackageMigrator/PackageMap/<>c__DisplayClass39_0::<FindPackagesToMigrate>b__0(Google.PackageManagerClient/Error) ignored in IL_017c: ldftn System.Void Google.PackageMigrator/PackageMap/<>c__DisplayClass39_0::<FindPackagesToMigrate>b__0(Google.PackageManagerClient/Error) (not a callsite)\n[error] [2026-02-19T03:47:03Z - Unity] [AssemblyUpdater] Reference to method System.Void System.Action`1<Google.PackageManagerClient/Error>::.ctor(System.Object,System.IntPtr) ignored in IL_0182: newobj System.Void System.Action`1<Google.PackageManagerClient/Error>::.ctor(System.Object,System.IntPtr) (not a callsite)\n[error] [2026-02-19T03:47:03Z - Unity] [AssemblyUpdater] Reference to method System.Void Google.PackageMigrator/PackageMap/<>c__DisplayClass38_0::<CachePackageInfo>b__2(Google.PackageManagerClient/Error) ignored in IL_0035: ldftn System.Void Google.PackageMigrator/PackageMap/<>c__DisplayClass38_0::<CachePackageInfo>b__2(Google.PackageManagerClient/Error) (not a callsite)\n[error] [2026-02-19T03:47:03Z - Unity] [AssemblyUpdater] Reference to method System.Void System.Action`1<Google.PackageManagerClient/Error>::.ctor(System.Object,System.IntPtr) ignored in IL_003b: newobj System.Void System.Action`1<Google.PackageManagerClient/Error>::.ctor(System.Object,System.IntPtr) (not a callsite)\n[error] [2026-02-19T03:47:03Z - Unity] [AssemblyUpdater] Reference to method System.Void Google.PackageMigrator/<>c__DisplayClass13_0::<StartOrResumeMigration>b__1(Google.PackageManagerClient/Error) ignored in IL_006f: ldftn System.Void Google.PackageMigrator/<>c__DisplayClass13_0::<StartOrResumeMigration>b__1(Google.PackageManagerClient/Error) (not a callsite)\n[error] [2026-02-19T03:47:03Z - Unity] [AssemblyUpdater] Reference to method System.Void System.Action`1<Google.PackageManagerClient/Error>::.ctor(System.Object,System.IntPtr) ignored in IL_0075: newobj System.Void System.Action`1<Google.PackageManagerClient/Error>::.ctor(System.Object,System.IntPtr) (not a callsite)\n[error] [2026-02-19T03:47:03Z - Unity] [AssemblyUpdater] Reference to method System.Void Google.PackageManagerClient/Error::.ctor(System.Object) ignored in IL_001a: newobj System.Void Google.PackageManagerClient/Error::.ctor(System.Object) (not a callsite)\n[error] [2026-02-19T03:47:03Z - Unity] [AssemblyUpdater] Reference to method System.Void Google.PackageManagerClient/Error::.ctor(System.Object) ignored in IL_0016: newobj System.Void Google.PackageManagerClient/Error::.ctor(System.Object) (not a callsite)\n[error] [2026-02-19T03:47:03Z - Unity] [AssemblyUpdater] Reference to method System.Void Google.PackageManagerClient/Error::.ctor(System.Object) ignored in IL_0012: newobj System.Void Google.PackageManagerClient/Error::.ctor(System.Object) (not a callsite)\n[error] [2026-02-19T03:47:03Z - Unity] [AssemblyUpdater] Reference to method System.Void Google.PackageManagerClient/Error::.ctor(System.Object) ignored in IL_0078: newobj System.Void Google.PackageManagerClient/Error::.ctor(System.Object) (not a callsite)\n[error] [2026-02-19T03:47:03Z - Unity] [AssemblyUpdater] Reference to method System.Void Google.PackageManagerClient/Error::.ctor(System.Object) ignored in IL_00a6: newobj System.Void Google.PackageManagerClient/Error::.ctor(System.Object) (not a callsite)\n[error] [2026-02-19T03:47:03Z - Unity] [AssemblyUpdater] Reference to method System.Void Google.PackageManagerClient/Error::.ctor(System.Object) ignored in IL_0064: newobj System.Void Google.PackageManagerClient/Error::.ctor(System.Object) (not a callsite)\n[error] [2026-02-19T03:47:03Z - Unity] [AssemblyUpdater] Reference to method System.Void Google.PackageManagerClient/Error::.ctor(System.Object) ignored in IL_0055: newobj System.Void Google.PackageManagerClient/Error::.ctor(System.Object) (not a callsite)\n[error] [2026-02-19T03:47:03Z - Unity] [AssemblyUpdater] Reference to method System.Void System.Collections.Generic.List`1<UnityCloudBuild.Newtonsoft.Json.Serialization.SerializationErrorCallback>::.ctor() ignored in IL_0181: newobj System.Void System.Collections.Generic.List`1<UnityCloudBuild.Newtonsoft.Json.Serialization.SerializationErrorCallback>::.ctor() (not a callsite)\n[error] [2026-02-19T03:47:03Z - Unity] [AssemblyUpdater] Reference to method System.Void System.Collections.Generic.List`1<UnityCloudBuild.Newtonsoft.Json.Serialization.SerializationErrorCallback>::.ctor() ignored in IL_0009: newobj System.Void System.Collections.Generic.List`1<UnityCloudBuild.Newtonsoft.Json.Serialization.SerializationErrorCallback>::.ctor() (not a callsite)\n[error] [2026-02-19T03:47:03Z - Unity] [AssemblyUpdater] Reference to method System.Void UnityCloudBuild.Newtonsoft.Json.Serialization.JsonContract/<>c__DisplayClass74_0::<CreateSerializationErrorCallback>b__0(System.Object,System.Runtime.Serialization.StreamingContext,UnityCloudBuild.Newtonsoft.Json.Serialization.ErrorContext) ignored in IL_000c: ldftn System.Void UnityCloudBuild.Newtonsoft.Json.Serialization.JsonContract/<>c__DisplayClass74_0::<CreateSerializationErrorCallback>b__0(System.Object,System.Runtime.Serialization.StreamingContext,UnityCloudBuild.Newtonsoft.Json.Serialization.ErrorContext) (not a callsite)\n[error] [2026-02-19T03:47:03Z - Unity] [AssemblyUpdater] Reference to method System.Void UnityCloudBuild.Newtonsoft.Json.Serialization.SerializationErrorCallback::.ctor(System.Object,System.IntPtr) ignored in IL_0012: newobj System.Void UnityCloudBuild.Newtonsoft.Json.Serialization.SerializationErrorCallback::.ctor(System.Object,System.IntPtr) (not a callsite)\n[error] [2026-02-19T03:47:03Z - Unity] [AssemblyUpdater] Reference to method System.Void UnityCloudBuild.Newtonsoft.Json.Serialization.ErrorContext::.ctor(System.Object,System.Object,System.String,System.Exception) ignored in IL_000e: newobj System.Void UnityCloudBuild.Newtonsoft.Json.Serialization.ErrorContext::.ctor(System.Object,System.Object,System.String,System.Exception) (not a callsite)\n[error] [2026-02-19T03:47:03Z - Unity] [AssemblyUpdater] Reference to method System.Void UnityCloudBuild.Newtonsoft.Json.Serialization.ErrorEventArgs::.ctor(System.Object,UnityCloudBuild.Newtonsoft.Json.Serialization.ErrorContext) ignored in IL_00df: newobj System.Void UnityCloudBuild.Newtonsoft.Json.Serialization.ErrorEventArgs::.ctor(System.Object,UnityCloudBuild.Newtonsoft.Json.Serialization.ErrorContext) (not a callsite)\n[error] [2026-02-19T03:47:03Z - Unity] [AssemblyUpdater] Reference to method System.Void UnityEditor.CloudBuild.BuildLogger::HighlightUnityErrors(System.String,System.String,UnityEngine.LogType) ignored in IL_000b: ldftn System.Void UnityEditor.CloudBuild.BuildLogger::HighlightUnityErrors(System.String,System.String,UnityEngine.LogType) (not a callsite)\n[error] [2026-02-19T03:47:03Z - Unity] [AssemblyUpdater] Reference to method System.Void UnityEditor.CloudBuild.BuildLogger::HighlightUnityErrors(System.String,System.String,UnityEngine.LogType) ignored in IL_0327: ldftn System.Void UnityEditor.CloudBuild.BuildLogger::HighlightUnityErrors(System.String,System.String,UnityEngine.LogType) (not a callsite)\n[error] [2026-02-19T03:47:33Z - Unity] [Script Updater] Library/PackageCache/com.unity.2d.pixel-perfect@e3ae982b672d/Editor/Converter/U2DToURPPixelPerfectConverter.cs(26,65): error CS0234: The type or namespace name 'PixelPerfectCamera' does not exist in the namespace 'UnityEngine.Experimental.Rendering.Universal' (are you missing an assembly reference?)\n[error] [2026-02-19T03:47:33Z - Unity] [Script Updater] Library/PackageCache/com.unity.2d.pixel-perfect@e3ae982b672d/Editor/Converter/U2DToURPPixelPerfectConverter.cs(36,39): error CS0234: The type or namespace name 'PixelPerfectCamera' does not exist in the namespace 'UnityEngine.Experimental.Rendering.Universal' (are you missing an assembly reference?)\n[error] [2026-02-19T03:47:33Z - Unity] [Script Updater] Library/PackageCache/com.unity.2d.pixel-perfect@e3ae982b672d/Editor/Converter/U2DToURPPixelPerfectConverter.cs(38,39): error CS0234: The type or namespace name 'PixelPerfectCamera' does not exist in the namespace 'UnityEngine.Experimental.Rendering.Universal' (are you missing an assembly reference?)\n[error] [2026-02-19T03:47:33Z - Unity] [Script Updater] Library/PackageCache/com.unity.2d.pixel-perfect@e3ae982b672d/Editor/Converter/U2DToURPPixelPerfectConverter.cs(43,40): error CS0234: The type or namespace name 'PixelPerfectCamera' does not exist in the namespace 'UnityEngine.Experimental.Rendering.Universal' (are you missing an assembly reference?)\n[error] [2026-02-19T03:47:33Z - Unity] [Script Updater] Library/PackageCache/com.unity.2d.pixel-perfect@e3ae982b672d/Editor/Converter/U2DToURPPixelPerfectConverter.cs(45,40): error CS0234: The type or namespace name 'PixelPerfectCamera' does not exist in the namespace 'UnityEngine.Experimental.Rendering.Universal' (are you missing an assembly reference?)\n[error] [2026-02-19T03:47:33Z - Unity] [Script Updater] Library/PackageCache/com.unity.2d.pixel-perfect@e3ae982b672d/Editor/Converter/U2DToURPPixelPerfectConverter.cs(49,36): error CS0234: The type or namespace name 'PixelPerfectCamera' does not exist in the namespace 'UnityEngine.Experimental.Rendering.Universal' (are you missing an assembly reference?)\n[error] [2026-02-19T03:47:33Z - Unity] [Script Updater] Library/PackageCache/com.unity.2d.pixel-perfect@e3ae982b672d/Editor/Converter/U2DToURPPixelPerfectConverter.cs(53,36): error CS0234: The type or namespace name 'PixelPerfectCamera' does not exist in the namespace 'UnityEngine.Experimental.Rendering.Universal' (are you missing an assembly reference?)\n[error] [2026-02-19T03:47:33Z - Unity] [Script Updater] Library/PackageCache/com.unity.2d.pixel-perfect@e3ae982b672d/Editor/Converter/U2DToURPPixelPerfectConverter.cs(57,36): error CS0234: The type or namespace name 'PixelPerfectCamera' does not exist in the namespace 'UnityEngine.Experimental.Rendering.Universal' (are you missing an assembly reference?)\n[warning] [2026-02-19T03:47:42Z - Unity] Assets/StompyRobot/SRF/Scripts/Components/SRAutoSingleton.cs(27,39): warning CS0618: 'Object.FindObjectOfType<T>()' is obsolete: 'Object.FindObjectOfType has been deprecated. Use Object.FindFirstObjectByType instead or if finding any instance is acceptable the faster Object.FindAnyObjectByType'\n[warning] [2026-02-19T03:47:42Z - Unity] Assets/StompyRobot/SRDebugger/Scripts/Internal/Util.cs(58,21): warning CS0618: 'Object.FindObjectOfType<T>()' is obsolete: 'Object.FindObjectOfType has been deprecated. Use Object.FindFirstObjectByType instead or if finding any instance is acceptable the faster Object.FindAnyObjectByType'\n[warning] [2026-02-19T03:47:42Z - Unity] Assets/StompyRobot/SRDebugger/Scripts/Profiler/SRPProfilerService.cs(53,13): warning CS0618: 'RenderPipelineManager.beginFrameRendering' is obsolete: 'beginFrameRendering is deprecated. Use beginContextRendering instead. #from 2023.3'\n[warning] [2026-02-19T03:47:42Z - Unity] Assets/UTPTransport/UtpTransport.cs(66,35): warning CS0618: 'Transport.OnServerConnected' is obsolete: 'Use OnServerConnectedWithAddress and pass the remote client address instead'\n[warning] [2026-02-19T03:47:42Z - Unity] Assets/UTPTransport/UtpTransport.cs(89,17): warning CS0618: 'Transport.OnServerConnected' is obsolete: 'Use OnServerConnectedWithAddress and pass the remote client address instead'\n[warning] [2026-02-19T03:47:42Z - Unity] Assets/UTPTransport/UtpTransport.cs(91,17): warning CS0618: 'Transport.OnServerConnected' is obsolete: 'Use OnServerConnectedWithAddress and pass the remote client address instead'\n[warning] [2026-02-19T03:47:42Z - Unity] Assets/GooglePlayGames/com.google.play.games/Editor/GPGSAndroidSetupUI.cs(359,25): warning CS0618: 'PlayerSettings.GetApplicationIdentifier(BuildTargetGroup)' is obsolete: 'Use GetApplicationIdentifier(NamedBuildTarget buildTarget) instead'\n[warning] [2026-02-19T03:47:42Z - Unity] Assets/GooglePlayGames/com.google.play.games/Editor/GPGSAndroidSetupUI.cs(370,21): warning CS0618: 'PlayerSettings.SetApplicationIdentifier(BuildTargetGroup, string)' is obsolete: 'Use SetApplicationIdentifier(NamedBuildTarget buildTarget, string identifier) instead'\n[warning] [2026-02-19T03:47:42Z - Unity] Assets/GooglePlayGames/com.google.play.games/Editor/GPGSAndroidSetupUI.cs(388,25): warning CS0618: 'PlayerSettings.SetApplicationIdentifier(BuildTargetGroup, string)' is obsolete: 'Use SetApplicationIdentifier(NamedBuildTarget buildTarget, string identifier) instead'\n[warning] [2026-02-19T03:47:42Z - Unity] Assets/StompyRobot/SRDebugger/Scripts/Editor/SRDebugEditor.Compiler.cs(20,40): warning CS0618: 'PlayerSettings.GetScriptingDefineSymbolsForGroup(BuildTargetGroup)' is obsolete: 'Use GetScriptingDefineSymbols(NamedBuildTarget buildTarget) instead'\n[warning] [2026-02-19T03:47:42Z - Unity] Assets/StompyRobot/SRDebugger/Scripts/Editor/SRDebugEditor.Compiler.cs(41,17): warning CS0618: 'PlayerSettings.SetScriptingDefineSymbolsForGroup(BuildTargetGroup, string)' is obsolete: 'Use SetScriptingDefineSymbols(NamedBuildTarget buildTarget, string defines) instead'\n[warning] [2026-02-19T03:47:42Z - Unity] /nowarn:0169\n[warning] [2026-02-19T03:47:42Z - Unity] /nowarn:0649\n[warning] [2026-02-19T03:47:42Z - Unity] /nowarn:0282\n[warning] [2026-02-19T03:47:42Z - Unity] /nowarn:1701\n[warning] [2026-02-19T03:47:42Z - Unity] /nowarn:1702\n[warning] [2026-02-19T03:47:42Z - Unity] -warn:0\n[error] [2026-02-19T03:47:42Z - Unity] Library/PackageCache/com.unity.2d.pixel-perfect@e3ae982b672d/Editor/Converter/U2DToURPPixelPerfectConverter.cs(26,65): error CS0234: The type or namespace name 'PixelPerfectCamera' does not exist in the namespace 'UnityEngine.Experimental.Rendering.Universal' (are you missing an assembly reference?)\n[error] [2026-02-19T03:47:42Z - Unity] Library/PackageCache/com.unity.2d.pixel-perfect@e3ae982b672d/Editor/Converter/U2DToURPPixelPerfectConverter.cs(36,39): error CS0234: The type or namespace name 'PixelPerfectCamera' does not exist in the namespace 'UnityEngine.Experimental.Rendering.Universal' (are you missing an assembly reference?)\n[error] [2026-02-19T03:47:42Z - Unity] Library/PackageCache/com.unity.2d.pixel-perfect@e3ae982b672d/Editor/Converter/U2DToURPPixelPerfectConverter.cs(38,39): error CS0234: The type or namespace name 'PixelPerfectCamera' does not exist in the namespace 'UnityEngine.Experimental.Rendering.Universal' (are you missing an assembly reference?)\n[error] [2026-02-19T03:47:42Z - Unity] Library/PackageCache/com.unity.2d.pixel-perfect@e3ae982b672d/Editor/Converter/U2DToURPPixelPerfectConverter.cs(43,40): error CS0234: The type or namespace name 'PixelPerfectCamera' does not exist in the namespace 'UnityEngine.Experimental.Rendering.Universal' (are you missing an assembly reference?)\n[error] [2026-02-19T03:47:42Z - Unity] Library/PackageCache/com.unity.2d.pixel-perfect@e3ae982b672d/Editor/Converter/U2DToURPPixelPerfectConverter.cs(45,40): error CS0234: The type or namespace name 'PixelPerfectCamera' does not exist in the namespace 'UnityEngine.Experimental.Rendering.Universal' (are you missing an assembly reference?)\n[error] [2026-02-19T03:47:42Z - Unity] Library/PackageCache/com.unity.2d.pixel-perfect@e3ae982b672d/Editor/Converter/U2DToURPPixelPerfectConverter.cs(49,36): error CS0234: The type or namespace name 'PixelPerfectCamera' does not exist in the namespace 'UnityEngine.Experimental.Rendering.Universal' (are you missing an assembly reference?)\n[error] [2026-02-19T03:47:42Z - Unity] Library/PackageCache/com.unity.2d.pixel-perfect@e3ae982b672d/Editor/Converter/U2DToURPPixelPerfectConverter.cs(53,36): error CS0234: The type or namespace name 'PixelPerfectCamera' does not exist in the namespace 'UnityEngine.Experimental.Rendering.Universal' (are you missing an assembly reference?)\n[error] [2026-02-19T03:47:42Z - Unity] Library/PackageCache/com.unity.2d.pixel-perfect@e3ae982b672d/Editor/Converter/U2DToURPPixelPerfectConverter.cs(57,36): error CS0234: The type or namespace name 'PixelPerfectCamera' does not exist in the namespace 'UnityEngine.Experimental.Rendering.Universal' (are you missing an assembly reference?)\n[warning] [2026-02-19T03:47:44Z - Unity] Assets/1 - Scripts/Client/UI_CardAnimationManager.cs(30,13): warning CS0219: The variable 'clusterOffset' is assigned but its value is never used\n[warning] [2026-02-19T03:47:44Z - Unity] Assets/1 - Scripts/Services/Service_Auth.cs(74,24): warning CS1998: This async method lacks 'await' operators and will run synchronously. Consider using the 'await' operator to await non-blocking API calls, or 'await Task.Run(...)' to do CPU-bound work on a background thread.\n[warning] [2026-02-19T03:47:44Z - Unity] Assets/1 - Scripts/Services/Service_Lobby.cs(199,9): warning CS4014: Because this call is not awaited, execution of the current method continues before the call is completed. Consider applying the 'await' operator to the result of the call.\n[warning] [2026-02-19T03:47:44Z - Unity] Assets/1 - Scripts/Services/Service_Lobby.cs(399,24): warning CS1998: This async method lacks 'await' operators and will run synchronously. Consider using the 'await' operator to await non-blocking API calls, or 'await Task.Run(...)' to do CPU-bound work on a background thread.\n[warning] [2026-02-19T03:47:44Z - Unity] Assets/1 - Scripts/Services/Service_Lobby.cs(492,9): warning CS4014: Because this call is not awaited, execution of the current method continues before the call is completed. Consider applying the 'await' operator to the result of the call.\n[warning] [2026-02-19T03:47:44Z - Unity] Assets/1 - Scripts/Client/UI/EndOfRoundCardDisplay.cs(17,17): warning CS0414: The field 'EndOfRoundCardDisplay.maxVisibleCardsBeforeShrink' is assigned but its value is never used\n[warning] [2026-02-19T03:47:44Z - Unity] Assets/1 - Scripts/Server/Server_InGameLobby.cs(19,38): warning CS0414: The field 'Server_InGameLobby.startGameCountdownDuration' is assigned but its value is never used\n[warning] [2026-02-19T03:47:44Z - Unity] Assets/1 - Scripts/Client/UI_CardAnimationManager.cs(30,13): warning CS0219: The variable 'clusterOffset' is assigned but its value is never used\n[warning] [2026-02-19T03:47:44Z - Unity] Assets/1 - Scripts/Services/Service_Auth.cs(74,24): warning CS1998: This async method lacks 'await' operators and will run synchronously. Consider using the 'await' operator to await non-blocking API calls, or 'await Task.Run(...)' to do CPU-bound work on a background thread.\n[warning] [2026-02-19T03:47:44Z - Unity] Assets/1 - Scripts/Services/Service_Lobby.cs(199,9): warning CS4014: Because this call is not awaited, execution of the current method continues before the call is completed. Consider applying the 'await' operator to the result of the call.\n[warning] [2026-02-19T03:47:44Z - Unity] Assets/1 - Scripts/Services/Service_Lobby.cs(399,24): warning CS1998: This async method lacks 'await' operators and will run synchronously. Consider using the 'await' operator to await non-blocking API calls, or 'await Task.Run(...)' to do CPU-bound work on a background thread.\n[warning] [2026-02-19T03:47:44Z - Unity] Assets/1 - Scripts/Services/Service_Lobby.cs(492,9): warning CS4014: Because this call is not awaited, execution of the current method continues before the call is completed. Consider applying the 'await' operator to the result of the call.\n[warning] [2026-02-19T03:47:44Z - Unity] Assets/1 - Scripts/Client/UI/EndOfRoundCardDisplay.cs(17,17): warning CS0414: The field 'EndOfRoundCardDisplay.maxVisibleCardsBeforeShrink' is assigned but its value is never used\n[warning] [2026-02-19T03:47:44Z - Unity] Assets/1 - Scripts/Server/Server_InGameLobby.cs(19,38): warning CS0414: The field 'Server_InGameLobby.startGameCountdownDuration' is assigned but its value is never used\n[error] [2026-02-19T03:47:47Z - Unity] Start importing Packages/com.unity.services.qos/Runtime/ErrorMitigation using Guid(109dfeb96e2fe43e5b1e0ae9ef4dea79) (DefaultImporter)\n[error] [2026-02-19T03:47:47Z - Unity] Start importing Packages/com.unity.services.multiplayer/Runtime/Multiplay/ErrorMitigation using Guid(20411922c0e98d64989f6f1e7b738f1e)\n[error] [2026-02-19T03:47:47Z - Unity] Start importing Packages/com.unity.services.multiplayer/Runtime/Lobbies/ErrorMitigation using Guid(42167ffe24dfb6044abc0778129c3829) (DefaultImporter)\n[error] [2026-02-19T03:47:47Z - Unity] Start importing Packages/com.unity.services.multiplayer/Runtime/Matchmaker/ErrorMitigation using Guid(79b119f3e0f0bad4f8d7c436642253a0)\n[error] [2026-02-19T03:47:47Z - Unity] Start importing Packages/com.unity.services.multiplayer/Runtime/Relay/ErrorMitigation using Guid(e9d6edbb2dd9cb743a0b3341baddb9d2)\n[error] [2026-02-19T03:47:47Z - Unity] Start importing Packages/com.unity.collab-proxy/Editor/UI/Errors using Guid(4edf5537f8245134c8b023ab85d8e640) (DefaultImporter)\n[error] [2026-02-19T03:47:47Z - Unity] Start importing Packages/com.unity.services.multiplayer/Runtime/DistributedAuthority/ErrorMitigation using Guid(0f5512a86aef54daa83246b3720b9695)\n[error] [2026-02-19T03:47:47Z - Unity] Start importing Packages/com.unity.services.qos/Runtime/v2/ErrorMitigation using Guid(5fc28b31af62149408cbf5f732a81b73)\n[error] [2026-02-19T03:47:47Z - Unity] Start importing Assets/Mobile Games Bundle/Cute UI _ Interact Sound Effects Pack/AUDIO/UI/Error using Guid(c2f867ed3a653f840a8b1f546e2794f9)\n[error] [2026-02-19T03:47:47Z - Unity] Start importing Assets/Mobile Games Bundle/Word Puzzle Games Sound Effects and Music Pack/AUDIO/SFX/Error_Fail using Guid(45aff74650055b540a4646f8aa12b458) (DefaultImporter) -> (artifact id: '75a7e1a2bf2e0cb5b791629c313c57bb') in 0.000437958 seconds\n[error] [2026-02-19T03:47:48Z - Unity] Start importing Packages/com.unity.services.core/Editor/Core/Environments/Client/ErrorMitigation using Guid(4f2e6d0ab1a754839a258e070611eedd) (DefaultImporter)\n[error] [2026-02-19T03:47:48Z - Unity] Start importing Packages/com.unity.services.multiplayer/Editor/Multiplay/Authoring/AdminApis/Allocations/ErrorMitigation using Guid(604cb80a73c0c0a428204579f348dbf6) (DefaultImporter)\n[error] [2026-02-19T03:47:48Z - Unity] Start importing Packages/com.unity.services.multiplayer/Editor/Multiplay/Authoring/AdminApis/Logs/ErrorMitigation using Guid(e5b1497622c984c4599840eb11105d65) (DefaultImporter)\n[error] [2026-02-19T03:47:48Z - Unity] Start importing Packages/com.unity.services.multiplayer/Editor/Multiplay/Authoring/AdminApis/Builds/ErrorMitigation using Guid(36e1a728276cc734ea28220b14323b0a) (DefaultImporter)\n[error] [2026-02-19T03:47:48Z - Unity] Start importing Packages/com.unity.services.multiplayer/Editor/Multiplay/Authoring/AdminApis/Ccd/ErrorMitigation using Guid(1b38bbc59e3bbe046864248e1988c9d3) (DefaultImporter)\n[error] [2026-02-19T03:47:48Z - Unity] Start importing Packages/com.unity.services.multiplayer/Editor/Multiplay/Authoring/AdminApis/Fleets/ErrorMitigation using Guid(6bf4bf496501b4c42986ebcd962843fe) (DefaultImporter)\n[error] [2026-02-19T03:47:48Z - Unity] Start importing Packages/com.unity.services.multiplayer/Editor/Multiplay/Authoring/AdminApis/Servers/ErrorMitigation using Guid(cc1fedfa6fff972408f68ed62d7aaeef) (DefaultImporter)\n[error] [2026-02-19T03:47:48Z - Unity] Start importing Packages/com.unity.services.multiplayer/Editor/Multiplay/Authoring/AdminApis/BuildConfigs/ErrorMitigation using Guid(4d59deab5064206488e74a8fa8478e65)\n[error] [2026-02-19T03:47:52Z - Unity] \t\t\tLogAssemblyErrors (0ms)\n[error] [2026-02-19T03:48:01Z - Unity] Start importing Packages/com.unity.2d.animation/Editor/Assets/ComponentIcons/d_ErrorIcon_Small@2x.png using Guid(11e6f279ade864c6d951e8db74c11b54) (TextureImporter) -> (artifact id: '1bbd87bab415e278e0c87b629ba7a002') in 0.002295 seconds\n[error] [2026-02-19T03:48:05Z - Unity] Start importing Packages/com.unity.multiplayer.playmode/Scenarios/Editor/PlayModeConfig/UI/Icons/Error@2x.png using Guid(e1ad7755f22d64a4ab0b3a24f5c3e408) (TextureImporter) -> (artifact id: '711f87107f003ada986b8f922d6811a3') in 0.001366417 seconds\n[warning] [2026-02-19T03:48:06Z - Unity] Start importing Packages/com.unity.2d.animation/Editor/Assets/EditorIcons/Light/Warning@2x.png using Guid(3233afe4c448d4eb198cfb1ca54feb3b) (TextureImporter) -> (artifact id: '5251722acfc50494d1c793c28c123d65') in 0.002166334 seconds\n[warning] [2026-02-19T03:48:24Z - Unity] Start importing Packages/com.unity.2d.animation/Editor/Assets/EditorIcons/Dark/d_Warning@2x.png using Guid(4701020ad5a254186b3082d1f2f37ba0) (TextureImporter) -> (artifact id: 'e019995d236dbc8c25c0e2c823e8ee92') in 0.001357792 seconds\n[warning] [2026-02-19T03:48:51Z - Unity] Start importing Packages/com.unity.2d.animation/Editor/Assets/ComponentIcons/d_WarningIcon_Small@2x.png using Guid(3f2d8e263d8314a48a35859e01318f35) (TextureImporter) -> (artifact id: '86406253c84332de1563fb2cc7f25153') in 0.002105375 seconds\n[warning] [2026-02-19T03:48:56Z - Unity] Start importing Packages/com.unity.render-pipelines.universal/Shaders/Terrain/TerrainLitBase.shader using Guid(21322c8b137c66e49b86085d3c8161f6) (ShaderImporter)WARNING: Shader Unsupported: 'Hidden/Universal Render Pipeline/Terrain/Lit (Base Pass)' - All subshaders removed\n[warning] [2026-02-19T03:48:56Z - Unity] WARNING: Shader Did you use #pragma only_renderers and omit this platform?\n[warning] [2026-02-19T03:48:56Z - Unity] WARNING: Shader If subshaders removal was intentional, you may have forgotten turning Fallback off?\n[warning] [2026-02-19T03:48:56Z - Unity] WARNING: Shader Unsupported: 'Hidden/Universal Render Pipeline/Terrain/Lit (Base Pass)' - All subshaders removed\n[warning] [2026-02-19T03:48:56Z - Unity] WARNING: Shader Did you use #pragma only_renderers and omit this platform?\n[warning] [2026-02-19T03:48:56Z - Unity] WARNING: Shader If subshaders removal was intentional, you may have forgotten turning Fallback off?\n[warning] [2026-02-19T03:48:56Z - Unity] WARNING: Shader Unsupported: 'Hidden/Universal Render Pipeline/Terrain/Lit (Base Pass)' - All subshaders removed\n[warning] [2026-02-19T03:48:56Z - Unity] WARNING: Shader Did you use #pragma only_renderers and omit this platform?\n[warning] [2026-02-19T03:48:56Z - Unity] WARNING: Shader If subshaders removal was intentional, you may have forgotten turning Fallback off?\n[warning] [2026-02-19T03:48:56Z - Unity] WARNING: Shader Unsupported: 'Hidden/Universal Render Pipeline/Terrain/Lit (Base Pass)' - All subshaders removed\n[warning] [2026-02-19T03:48:56Z - Unity] WARNING: Shader Did you use #pragma only_renderers and omit this platform?\n[warning] [2026-02-19T03:48:56Z - Unity] WARNING: Shader If subshaders removal was intentional, you may have forgotten turning Fallback off?\n[warning] [2026-02-19T03:49:01Z - Unity] Start importing Packages/com.unity.render-pipelines.universal/Shaders/SpatialMappingWireframe.shader using Guid(e8b802ac01d87144b91f12f40c1f2659) (ShaderImporter)WARNING: Shader Unsupported: 'Universal Render Pipeline/VR/SpatialMapping/Wireframe' - All subshaders removed\n[warning] [2026-02-19T03:49:01Z - Unity] WARNING: Shader Did you use #pragma only_renderers and omit this platform?\n[warning] [2026-02-19T03:49:01Z - Unity] WARNING: Shader If subshaders removal was intentional, you may have forgotten turning Fallback off?\n[warning] [2026-02-19T03:49:01Z - Unity] WARNING: Shader Unsupported: 'Universal Render Pipeline/VR/SpatialMapping/Wireframe' - All subshaders removed\n[warning] [2026-02-19T03:49:01Z - Unity] WARNING: Shader Did you use #pragma only_renderers and omit this platform?\n[warning] [2026-02-19T03:49:01Z - Unity] WARNING: Shader If subshaders removal was intentional, you may have forgotten turning Fallback off?\n[warning] [2026-02-19T03:49:01Z - Unity] WARNING: Shader Unsupported: 'Universal Render Pipeline/VR/SpatialMapping/Wireframe' - All subshaders removed\n[warning] [2026-02-19T03:49:01Z - Unity] WARNING: Shader Did you use #pragma only_renderers and omit this platform?\n[warning] [2026-02-19T03:49:01Z - Unity] WARNING: Shader If subshaders removal was intentional, you may have forgotten turning Fallback off?\n[warning] [2026-02-19T03:49:01Z - Unity] WARNING: Shader Unsupported: 'Universal Render Pipeline/VR/SpatialMapping/Wireframe' - All subshaders removed\n[warning] [2026-02-19T03:49:01Z - Unity] WARNING: Shader Did you use #pragma only_renderers and omit this platform?\n[warning] [2026-02-19T03:49:01Z - Unity] WARNING: Shader If subshaders removal was intentional, you may have forgotten turning Fallback off?\n[warning] [2026-02-19T03:49:01Z - Unity] WARNING: Shader Unsupported: 'Universal Render Pipeline/Terrain/Lit' - All subshaders removed\n[warning] [2026-02-19T03:49:01Z - Unity] WARNING: Shader Did you use #pragma only_renderers and omit this platform?\n[warning] [2026-02-19T03:49:01Z - Unity] WARNING: Shader If subshaders removal was intentional, you may have forgotten turning Fallback off?\n[warning] [2026-02-19T03:49:01Z - Unity] WARNING: Shader Unsupported: 'Universal Render Pipeline/Terrain/Lit' - All subshaders removed\n[warning] [2026-02-19T03:49:01Z - Unity] WARNING: Shader Did you use #pragma only_renderers and omit this platform?\n[warning] [2026-02-19T03:49:01Z - Unity] WARNING: Shader If subshaders removal was intentional, you may have forgotten turning Fallback off?\n[warning] [2026-02-19T03:49:01Z - Unity] WARNING: Shader Unsupported: 'Universal Render Pipeline/Terrain/Lit' - All subshaders removed\n[warning] [2026-02-19T03:49:01Z - Unity] WARNING: Shader Did you use #pragma only_renderers and omit this platform?\n[warning] [2026-02-19T03:49:01Z - Unity] WARNING: Shader If subshaders removal was intentional, you may have forgotten turning Fallback off?\n[warning] [2026-02-19T03:49:01Z - Unity] WARNING: Shader Unsupported: 'Universal Render Pipeline/Terrain/Lit' - All subshaders removed\n[warning] [2026-02-19T03:49:01Z - Unity] WARNING: Shader Did you use #pragma only_renderers and omit this platform?\n[warning] [2026-02-19T03:49:01Z - Unity] WARNING: Shader If subshaders removal was intentional, you may have forgotten turning Fallback off?\n[error] [2026-02-19T03:49:02Z - Unity] Shader 'Universal Render Pipeline/Lit': fallback shader 'Hidden/Universal Render Pipeline/FallbackError' not found\n[error] [2026-02-19T03:49:02Z - Unity] Shader 'Universal Render Pipeline/VR/SpatialMapping/Occlusion': fallback shader 'Hidden/Universal Render Pipeline/FallbackError' not found\n[error] [2026-02-19T03:49:02Z - Unity] Shader 'Universal Render Pipeline/Lit': fallback shader 'Hidden/Universal Render Pipeline/FallbackError' not found\n[error] [2026-02-19T03:49:02Z - Unity] Shader 'Universal Render Pipeline/VR/SpatialMapping/Wireframe': fallback shader 'Hidden/Universal Render Pipeline/FallbackError' not found\n[warning] [2026-02-19T03:49:02Z - Unity] WARNING: Shader Unsupported: 'Universal Render Pipeline/VR/SpatialMapping/Wireframe' - All subshaders removed\n[warning] [2026-02-19T03:49:02Z - Unity] WARNING: Shader Did you use #pragma only_renderers and omit this platform?\n[warning] [2026-02-19T03:49:02Z - Unity] WARNING: Shader If subshaders removal was intentional, you may have forgotten turning Fallback off?\n[warning] [2026-02-19T03:49:02Z - Unity] WARNING: Shader Unsupported: 'Universal Render Pipeline/VR/SpatialMapping/Wireframe' - All subshaders removed\n[warning] [2026-02-19T03:49:02Z - Unity] WARNING: Shader Did you use #pragma only_renderers and omit this platform?\n[warning] [2026-02-19T03:49:02Z - Unity] WARNING: Shader If subshaders removal was intentional, you may have forgotten turning Fallback off?\n[error] [2026-02-19T03:49:02Z - Unity] Start importing Packages/com.unity.render-pipelines.universal/Runtime/Materials/SimpleLit.mat using Guid(6a1143ee683302f4aa628c052723efc1) (NativeFormatImporter)Shader 'Universal Render Pipeline/Simple Lit': fallback shader 'Hidden/Universal Render Pipeline/FallbackError' not found\n[warning] [2026-02-19T03:49:04Z - Unity] Start importing Assets/TextMesh Pro/Shaders/TMP_SDF-HDRP UNLIT.shadergraph using Guid(f63d574838ccfb44f84acc05fed0af48) (ScriptedImporter)WARNING: Shader Unsupported: 'TextMeshPro/SRP/TMP_SDF-HDRP UNLIT' - All subshaders removed\n[warning] [2026-02-19T03:49:04Z - Unity] WARNING: Shader Did you use #pragma only_renderers and omit this platform?\n[warning] [2026-02-19T03:49:04Z - Unity] WARNING: Shader If subshaders removal was intentional, you may have forgotten turning Fallback off?\n[warning] [2026-02-19T03:49:04Z - Unity] WARNING: Shader Unsupported: 'TextMeshPro/SRP/TMP_SDF-HDRP UNLIT' - All subshaders removed\n[warning] [2026-02-19T03:49:04Z - Unity] WARNING: Shader Did you use #pragma only_renderers and omit this platform?\n[warning] [2026-02-19T03:49:04Z - Unity] WARNING: Shader If subshaders removal was intentional, you may have forgotten turning Fallback off?\n[warning] [2026-02-19T03:49:04Z - Unity] WARNING: Shader Unsupported: 'TextMeshPro/SRP/TMP_SDF-HDRP UNLIT' - All subshaders removed\n[warning] [2026-02-19T03:49:04Z - Unity] WARNING: Shader Did you use #pragma only_renderers and omit this platform?\n[warning] [2026-02-19T03:49:04Z - Unity] WARNING: Shader If subshaders removal was intentional, you may have forgotten turning Fallback off?\n[warning] [2026-02-19T03:49:04Z - Unity] WARNING: Shader Unsupported: 'TextMeshPro/SRP/TMP_SDF-HDRP UNLIT' - All subshaders removed\n[warning] [2026-02-19T03:49:04Z - Unity] WARNING: Shader Did you use #pragma only_renderers and omit this platform?\n[warning] [2026-02-19T03:49:04Z - Unity] WARNING: Shader If subshaders removal was intentional, you may have forgotten turning Fallback off?\n[warning] [2026-02-19T03:49:05Z - Unity] Start importing Assets/TextMesh Pro/Shaders/TMP_SDF-HDRP LIT.shadergraph using Guid(ca2ed216f98028c4dae6c5224a952b3c) (ScriptedImporter)WARNING: Shader Unsupported: 'TextMeshPro/SRP/TMP_SDF-HDRP LIT' - All subshaders removed\n[warning] [2026-02-19T03:49:05Z - Unity] WARNING: Shader Did you use #pragma only_renderers and omit this platform?\n[warning] [2026-02-19T03:49:05Z - Unity] WARNING: Shader If subshaders removal was intentional, you may have forgotten turning Fallback off?\n[warning] [2026-02-19T03:49:05Z - Unity] WARNING: Shader Unsupported: 'TextMeshPro/SRP/TMP_SDF-HDRP LIT' - All subshaders removed\n[warning] [2026-02-19T03:49:05Z - Unity] WARNING: Shader Did you use #pragma only_renderers and omit this platform?\n[warning] [2026-02-19T03:49:05Z - Unity] WARNING: Shader If subshaders removal was intentional, you may have forgotten turning Fallback off?\n[warning] [2026-02-19T03:49:05Z - Unity] WARNING: Shader Unsupported: 'TextMeshPro/SRP/TMP_SDF-HDRP LIT' - All subshaders removed\n[warning] [2026-02-19T03:49:05Z - Unity] WARNING: Shader Did you use #pragma only_renderers and omit this platform?\n[warning] [2026-02-19T03:49:05Z - Unity] WARNING: Shader If subshaders removal was intentional, you may have forgotten turning Fallback off?\n[warning] [2026-02-19T03:49:05Z - Unity] WARNING: Shader Unsupported: 'TextMeshPro/SRP/TMP_SDF-HDRP LIT' - All subshaders removed\n[warning] [2026-02-19T03:49:05Z - Unity] WARNING: Shader Did you use #pragma only_renderers and omit this platform?\n[warning] [2026-02-19T03:49:05Z - Unity] WARNING: Shader If subshaders removal was intentional, you may have forgotten turning Fallback off?\n[error] [2026-02-19T03:49:07Z - Unity] Shader 'Universal Render Pipeline/Lit': fallback shader 'Hidden/Universal Render Pipeline/FallbackError' not found\n[error] [2026-02-19T03:49:08Z - Unity] Shader 'TextMeshPro/SRP/TMP_SDF-HDRP UNLIT': fallback shader 'Hidden/Shader Graph/FallbackError' not found\n[warning] [2026-02-19T03:49:08Z - Unity] WARNING: Shader Unsupported: 'TextMeshPro/SRP/TMP_SDF-HDRP UNLIT' - All subshaders removed\n[warning] [2026-02-19T03:49:08Z - Unity] WARNING: Shader Did you use #pragma only_renderers and omit this platform?\n[warning] [2026-02-19T03:49:08Z - Unity] WARNING: Shader If subshaders removal was intentional, you may have forgotten turning Fallback off?\n[warning] [2026-02-19T03:49:08Z - Unity] WARNING: Shader Unsupported: 'TextMeshPro/SRP/TMP_SDF-HDRP UNLIT' - All subshaders removed\n[warning] [2026-02-19T03:49:08Z - Unity] WARNING: Shader Did you use #pragma only_renderers and omit this platform?\n[warning] [2026-02-19T03:49:08Z - Unity] WARNING: Shader If subshaders removal was intentional, you may have forgotten turning Fallback off?\n[error] [2026-02-19T03:50:48Z - Unity] Start importing Assets/Mobile Games Bundle/Word Puzzle Games Sound Effects and Music Pack/AUDIO/SFX/Error_Fail/SFX_UI_Word_Fail_1.wav using Guid(a97b0c5216c34d944b29ef3719af7325) (AudioImporter) -> (artifact id: 'c22ecb5d97b33a35edf0b759523adaad') in 0.023524875 seconds\n[error] [2026-02-19T03:51:38Z - Unity] Start importing Assets/Mobile Games Bundle/Word Puzzle Games Sound Effects and Music Pack/AUDIO/SFX/Error_Fail/SFX_UI_Word_Fail_2.wav using Guid(aeaddb5523b485b47af698d2f261b7ac) (AudioImporter)\n[error] [2026-02-19T03:51:57Z - Unity] Shader 'Universal Render Pipeline/Particles/Unlit': fallback shader 'Hidden/Universal Render Pipeline/FallbackError' not found\n[error] [2026-02-19T03:51:57Z - Unity] Shader 'Universal Render Pipeline/Terrain/Lit': fallback shader 'Hidden/Universal Render Pipeline/FallbackError' not found\n[error] [2026-02-19T03:51:57Z - Unity] Shader 'Shader Graphs/Decal': fallback shader 'Hidden/Shader Graph/FallbackError' not found\n[warning] [2026-02-19T03:51:58Z - Unity] WARNING: Shader Unsupported: 'TextMeshPro/SRP/TMP_SDF-HDRP LIT' - All subshaders removed\n[warning] [2026-02-19T03:51:58Z - Unity] WARNING: Shader Did you use #pragma only_renderers and omit this platform?\n[warning] [2026-02-19T03:51:58Z - Unity] WARNING: Shader If subshaders removal was intentional, you may have forgotten turning Fallback off?\n[warning] [2026-02-19T03:51:58Z - Unity] WARNING: Shader Unsupported: 'TextMeshPro/SRP/TMP_SDF-HDRP LIT' - All subshaders removed\n[warning] [2026-02-19T03:51:58Z - Unity] WARNING: Shader Did you use #pragma only_renderers and omit this platform?\n[warning] [2026-02-19T03:51:58Z - Unity] WARNING: Shader If subshaders removal was intentional, you may have forgotten turning Fallback off?\n[warning] [2026-02-19T03:51:58Z - Unity] WARNING: Shader Unsupported: 'Hidden/Universal Render Pipeline/Terrain/Lit (Base Pass)' - All subshaders removed\n[warning] [2026-02-19T03:51:58Z - Unity] WARNING: Shader Did you use #pragma only_renderers and omit this platform?\n[warning] [2026-02-19T03:51:58Z - Unity] WARNING: Shader If subshaders removal was intentional, you may have forgotten turning Fallback off?\n[warning] [2026-02-19T03:51:58Z - Unity] WARNING: Shader Unsupported: 'Hidden/Universal Render Pipeline/Terrain/Lit (Base Pass)' - All subshaders removed\n[warning] [2026-02-19T03:51:58Z - Unity] WARNING: Shader Did you use #pragma only_renderers and omit this platform?\n[warning] [2026-02-19T03:51:58Z - Unity] WARNING: Shader If subshaders removal was intentional, you may have forgotten turning Fallback off?\n[warning] [2026-02-19T03:51:58Z - Unity] WARNING: Shader Unsupported: 'Universal Render Pipeline/VR/SpatialMapping/Wireframe' - All subshaders removed\n[warning] [2026-02-19T03:51:58Z - Unity] WARNING: Shader Did you use #pragma only_renderers and omit this platform?\n[warning] [2026-02-19T03:51:58Z - Unity] WARNING: Shader If subshaders removal was intentional, you may have forgotten turning Fallback off?\n[warning] [2026-02-19T03:51:58Z - Unity] WARNING: Shader Unsupported: 'Universal Render Pipeline/VR/SpatialMapping/Wireframe' - All subshaders removed\n[warning] [2026-02-19T03:51:58Z - Unity] WARNING: Shader Did you use #pragma only_renderers and omit this platform?\n[warning] [2026-02-19T03:51:58Z - Unity] WARNING: Shader If subshaders removal was intentional, you may have forgotten turning Fallback off?\n[warning] [2026-02-19T03:51:58Z - Unity] WARNING: Shader Unsupported: 'TextMeshPro/SRP/TMP_SDF-HDRP UNLIT' - All subshaders removed\n[warning] [2026-02-19T03:51:58Z - Unity] WARNING: Shader Did you use #pragma only_renderers and omit this platform?\n[warning] [2026-02-19T03:51:58Z - Unity] WARNING: Shader If subshaders removal was intentional, you may have forgotten turning Fallback off?\n[warning] [2026-02-19T03:51:58Z - Unity] WARNING: Shader Unsupported: 'TextMeshPro/SRP/TMP_SDF-HDRP UNLIT' - All subshaders removed\n[warning] [2026-02-19T03:51:58Z - Unity] WARNING: Shader Did you use #pragma only_renderers and omit this platform?\n[warning] [2026-02-19T03:51:58Z - Unity] WARNING: Shader If subshaders removal was intentional, you may have forgotten turning Fallback off?\n[warning] [2026-02-19T03:52:27Z - Unity] UnityEngine.Logger:LogWarning (string,object)\n[warning] [2026-02-19T03:52:27Z - Unity] Unity.Services.Core.Internal.CoreLogger:LogWarning (object) (at ./Library/PackageCache/com.unity.services.core@9e81a5e38245/Runtime/Core.Internal/Logging/CoreLogger.cs:15)\n[warning] [2026-02-19T03:52:47Z - Unity] Assets/Plugins/AllIn1SpriteShader/Scripts/AllIn1Shader.cs(32,22): warning CS0414: The field 'AllIn1Shader.matAssigned' is assigned but its value is never used\n[warning] [2026-02-19T03:52:47Z - Unity] Assets/StompyRobot/SRDebugger/Scripts/Internal/Util.cs(58,21): warning CS0618: 'Object.FindObjectOfType<T>()' is obsolete: 'Object.FindObjectOfType has been deprecated. Use Object.FindFirstObjectByType instead or if finding any instance is acceptable the faster Object.FindAnyObjectByType'\n[warning] [2026-02-19T03:52:47Z - Unity] Assets/StompyRobot/SRDebugger/Scripts/Profiler/SRPProfilerService.cs(53,13): warning CS0618: 'RenderPipelineManager.beginFrameRendering' is obsolete: 'beginFrameRendering is deprecated. Use beginContextRendering instead. #from 2023.3'\n[warning] [2026-02-19T03:52:47Z - Unity] Assets/StompyRobot/SRDebugger/Scripts/Settings.cs(577,39): warning CS0414: The field 'Settings._disableWelcomePopup' is assigned but its value is never used\n[warning] [2026-02-19T03:52:47Z - Unity] Assets/UTPTransport/UtpTransport.cs(66,35): warning CS0618: 'Transport.OnServerConnected' is obsolete: 'Use OnServerConnectedWithAddress and pass the remote client address instead'\n[warning] [2026-02-19T03:52:47Z - Unity] Assets/UTPTransport/UtpTransport.cs(89,17): warning CS0618: 'Transport.OnServerConnected' is obsolete: 'Use OnServerConnectedWithAddress and pass the remote client address instead'\n[warning] [2026-02-19T03:52:47Z - Unity] Assets/UTPTransport/UtpTransport.cs(91,17): warning CS0618: 'Transport.OnServerConnected' is obsolete: 'Use OnServerConnectedWithAddress and pass the remote client address instead'\n[warning] [2026-02-19T03:52:47Z - Unity] Assets/1 - Scripts/Client/UI_CardAnimationManager.cs(30,13): warning CS0219: The variable 'clusterOffset' is assigned but its value is never used\n[warning] [2026-02-19T03:52:47Z - Unity] Assets/1 - Scripts/Services/Service_Auth.cs(74,24): warning CS1998: This async method lacks 'await' operators and will run synchronously. Consider using the 'await' operator to await non-blocking API calls, or 'await Task.Run(...)' to do CPU-bound work on a background thread.\n[warning] [2026-02-19T03:52:47Z - Unity] Assets/1 - Scripts/Services/Service_Lobby.cs(199,9): warning CS4014: Because this call is not awaited, execution of the current method continues before the call is completed. Consider applying the 'await' operator to the result of the call.\n[warning] [2026-02-19T03:52:47Z - Unity] Assets/1 - Scripts/Services/Service_Lobby.cs(399,24): warning CS1998: This async method lacks 'await' operators and will run synchronously. Consider using the 'await' operator to await non-blocking API calls, or 'await Task.Run(...)' to do CPU-bound work on a background thread.\n[warning] [2026-02-19T03:52:47Z - Unity] Assets/1 - Scripts/Services/Service_Lobby.cs(492,9): warning CS4014: Because this call is not awaited, execution of the current method continues before the call is completed. Consider applying the 'await' operator to the result of the call.\n[warning] [2026-02-19T03:52:47Z - Unity] Assets/1 - Scripts/Server/Server_InGameLobby.cs(19,38): warning CS0414: The field 'Server_InGameLobby.startGameCountdownDuration' is assigned but its value is never used\n[warning] [2026-02-19T03:52:47Z - Unity] Assets/1 - Scripts/Client/UI/EndOfRoundCardDisplay.cs(17,17): warning CS0414: The field 'EndOfRoundCardDisplay.maxVisibleCardsBeforeShrink' is assigned but its value is never used\n[warning] [2026-02-19T03:52:47Z - Unity] Assets/Plugins/AllIn1SpriteShader/Scripts/AllIn1Shader.cs(32,22): warning CS0414: The field 'AllIn1Shader.matAssigned' is assigned but its value is never used\n[warning] [2026-02-19T03:52:47Z - Unity] Assets/StompyRobot/SRDebugger/Scripts/Internal/Util.cs(58,21): warning CS0618: 'Object.FindObjectOfType<T>()' is obsolete: 'Object.FindObjectOfType has been deprecated. Use Object.FindFirstObjectByType instead or if finding any instance is acceptable the faster Object.FindAnyObjectByType'\n[warning] [2026-02-19T03:52:47Z - Unity] Assets/StompyRobot/SRDebugger/Scripts/Profiler/SRPProfilerService.cs(53,13): warning CS0618: 'RenderPipelineManager.beginFrameRendering' is obsolete: 'beginFrameRendering is deprecated. Use beginContextRendering instead. #from 2023.3'\n[warning] [2026-02-19T03:52:47Z - Unity] Assets/StompyRobot/SRDebugger/Scripts/Settings.cs(577,39): warning CS0414: The field 'Settings._disableWelcomePopup' is assigned but its value is never used\n[warning] [2026-02-19T03:52:47Z - Unity] Assets/UTPTransport/UtpTransport.cs(66,35): warning CS0618: 'Transport.OnServerConnected' is obsolete: 'Use OnServerConnectedWithAddress and pass the remote client address instead'\n[warning] [2026-02-19T03:52:47Z - Unity] Assets/UTPTransport/UtpTransport.cs(89,17): warning CS0618: 'Transport.OnServerConnected' is obsolete: 'Use OnServerConnectedWithAddress and pass the remote client address instead'\n[warning] [2026-02-19T03:52:47Z - Unity] Assets/UTPTransport/UtpTransport.cs(91,17): warning CS0618: 'Transport.OnServerConnected' is obsolete: 'Use OnServerConnectedWithAddress and pass the remote client address instead'\n[warning] [2026-02-19T03:52:47Z - Unity] Assets/UTPTransport/UtpTransport.cs(89,17): warning CS0618: 'Transport.OnServerConnected' is obsolete: 'Use OnServerConnectedWithAddress and pass the remote client address instead'\n[warning] [2026-02-19T03:52:47Z - Unity] Assets/UTPTransport/UtpTransport.cs(91,17): warning CS0618: 'Transport.OnServerConnected' is obsolete: 'Use OnServerConnectedWithAddress and pass the remote client address instead'\n[warning] [2026-02-19T03:52:47Z - Unity] Assets/UTPTransport/UtpTransport.cs(89,17): warning CS0618: 'Transport.OnServerConnected' is obsolete: 'Use OnServerConnectedWithAddress and pass the remote client address instead'\n[warning] [2026-02-19T03:52:47Z - Unity] Assets/UTPTransport/UtpTransport.cs(91,17): warning CS0618: 'Transport.OnServerConnected' is obsolete: 'Use OnServerConnectedWithAddress and pass the remote client address instead'\n[warning] [2026-02-19T03:52:47Z - Unity] Assets/UTPTransport/UtpTransport.cs(89,17): warning CS0618: 'Transport.OnServerConnected' is obsolete: 'Use OnServerConnectedWithAddress and pass the remote client address instead'\n[warning] [2026-02-19T03:52:47Z - Unity] Assets/UTPTransport/UtpTransport.cs(91,17): warning CS0618: 'Transport.OnServerConnected' is obsolete: 'Use OnServerConnectedWithAddress and pass the remote client address instead'\n[warning] [2026-02-19T03:52:47Z - Unity] Assets/1 - Scripts/Client/UI_CardAnimationManager.cs(30,13): warning CS0219: The variable 'clusterOffset' is assigned but its value is never used\n[warning] [2026-02-19T03:52:47Z - Unity] Assets/1 - Scripts/Services/Service_Auth.cs(74,24): warning CS1998: This async method lacks 'await' operators and will run synchronously. Consider using the 'await' operator to await non-blocking API calls, or 'await Task.Run(...)' to do CPU-bound work on a background thread.\n[warning] [2026-02-19T03:52:47Z - Unity] Assets/1 - Scripts/Services/Service_Lobby.cs(199,9): warning CS4014: Because this call is not awaited, execution of the current method continues before the call is completed. Consider applying the 'await' operator to the result of the call.\n[warning] [2026-02-19T03:52:47Z - Unity] Assets/1 - Scripts/Services/Service_Lobby.cs(399,24): warning CS1998: This async method lacks 'await' operators and will run synchronously. Consider using the 'await' operator to await non-blocking API calls, or 'await Task.Run(...)' to do CPU-bound work on a background thread.\n[warning] [2026-02-19T03:52:47Z - Unity] Assets/1 - Scripts/Services/Service_Lobby.cs(492,9): warning CS4014: Because this call is not awaited, execution of the current method continues before the call is completed. Consider applying the 'await' operator to the result of the call.\n[warning] [2026-02-19T03:52:47Z - Unity] Assets/1 - Scripts/Server/Server_InGameLobby.cs(19,38): warning CS0414: The field 'Server_InGameLobby.startGameCountdownDuration' is assigned but its value is never used\n[warning] [2026-02-19T03:52:47Z - Unity] Assets/1 - Scripts/Client/UI/EndOfRoundCardDisplay.cs(17,17): warning CS0414: The field 'EndOfRoundCardDisplay.maxVisibleCardsBeforeShrink' is assigned but its value is never used\n[warning] [2026-02-19T03:52:47Z - Unity] Assets/1 - Scripts/Services/Service_Lobby.cs(199,9): warning CS4014: Because this call is not awaited, execution of the current method continues before the call is completed. Consider applying the 'await' operator to the result of the call.\n[warning] [2026-02-19T03:52:47Z - Unity] Assets/1 - Scripts/Services/Service_Lobby.cs(399,24): warning CS1998: This async method lacks 'await' operators and will run synchronously. Consider using the 'await' operator to await non-blocking API calls, or 'await Task.Run(...)' to do CPU-bound work on a background thread.\n[warning] [2026-02-19T03:52:47Z - Unity] Assets/1 - Scripts/Services/Service_Lobby.cs(492,9): warning CS4014: Because this call is not awaited, execution of the current method continues before the call is completed. Consider applying the 'await' operator to the result of the call.\n[warning] [2026-02-19T03:52:47Z - Unity] Assets/1 - Scripts/Server/Server_InGameLobby.cs(19,38): warning CS0414: The field 'Server_InGameLobby.startGameCountdownDuration' is assigned but its value is never used\n[warning] [2026-02-19T03:52:47Z - Unity] Assets/1 - Scripts/Client/UI/EndOfRoundCardDisplay.cs(17,17): warning CS0414: The field 'EndOfRoundCardDisplay.maxVisibleCardsBeforeShrink' is assigned but its value is never used\n[warning] [2026-02-19T03:52:47Z - Unity] .cs(91,17): warning CS0618: 'Transport.OnServerConnected' is obsolete: 'Use OnServerConnectedWithAddress and pass the remote client address instead'\n[warning] [2026-02-19T03:52:47Z - Unity] .cs(91,17): warning CS0618: 'Transport.OnServerConnected' is obsolete: 'Use OnServerConnectedWithAddress and pass the remote client address instead'\n[error] [2026-02-19T03:52:53Z - Unity] Compiling shader \"Hidden/Core/FallbackError\" pass \"\" (vp)\n[error] [2026-02-19T03:52:53Z - Unity] Compiling shader \"Hidden/Core/FallbackError\" pass \"\" (fp)\n[warning] [2026-02-19T03:53:26Z - Unity] Shader warning in 'Hidden/Light2D': implicit truncation of vector type at Packages/com.unity.render-pipelines.universal/Shaders/2D/Light2D.shader(183) (on metal)\n[warning] [2026-02-19T03:53:26Z - Unity] Shader warning in 'Hidden/Light2D': implicit truncation of vector type at Packages/com.unity.render-pipelines.universal/Shaders/2D/Light2D.shader(223) (on metal)\n[error] [2026-02-19T03:53:33Z - Unity] Compiling shader \"Hidden/Universal Render Pipeline/FallbackError\" pass \"\" (vp)\n[error] [2026-02-19T03:53:33Z - Unity] Compiling shader \"Hidden/Universal Render Pipeline/FallbackError\" pass \"\" (fp)\n[error] [2026-02-19T03:53:52Z - Unity] Compiling shader \"Hidden/Shader Graph/FallbackError\" pass \"\" (vp)\n[error] [2026-02-19T03:53:52Z - Unity] Compiling shader \"Hidden/Shader Graph/FallbackError\" pass \"\" (fp)\n[warning] [2026-02-19T03:53:53Z - Unity] Script attached to 'MM_6D_Shake' in asset 'Assets/Feel/MMFeedbacks/MMFeedbacksForThirdParty/Cinemachine/Resources/MM_6D_Shake.asset' is missing or no valid script is attached.\n[warning] [2026-02-19T03:53:53Z - Unity] Script attached to 'MMDefaultPostProcessingProfile' in asset 'Assets/Feel/MMFeedbacks/MMFeedbacksForThirdParty/PostProcessing/Resources/MMDefaultPostProcessingProfile.asset' is missing or no valid script is attached.\n[warning] [2026-02-19T03:53:53Z - Unity] Script attached to 'SR_ScrollView' in asset 'Assets/StompyRobot/SRDebugger/Resources/SRDebugger/UI/Prefabs/BugReportPopover.prefab' is missing or no valid script is attached.\n[warning] [2026-02-19T03:53:53Z - Unity] Script attached to 'MMDefaultPostProcessingVolume' in asset 'Assets/Feel/MMFeedbacks/MMFeedbacksForThirdParty/PostProcessing/Resources/MMDefaultPostProcessingVolume.prefab' is missing or no valid script is attached.\n[warning] [2026-02-19T03:53:57Z - Unity] UnityEngine.Debug:LogWarning (object)\n[warning] [2026-02-19T03:53:57Z - Unity] UnityEngine.Debug:LogWarning (object)\n[warning] [2026-02-19T03:53:57Z - Unity] UnityEngine.Debug:LogWarning (object)\n[warning] [2026-02-19T03:53:57Z - Unity] UnityEngine.Debug:LogWarning (object)\n[warning] [2026-02-19T03:53:57Z - Unity] UnityEngine.Debug:LogWarning (object)\n[warning] [2026-02-19T03:53:57Z - Unity] UnityEngine.Debug:LogWarning (object)\n[warning] [2026-02-19T03:53:57Z - Unity] UnityEngine.Debug:LogWarning (object)\n[warning] [2026-02-19T03:53:57Z - Unity] UnityEngine.Debug:LogWarning (object)\n[warning] [2026-02-19T03:53:57Z - Unity] UnityEngine.Debug:LogWarning (object)\n[warning] [2026-02-19T03:53:57Z - Unity] UnityEngine.Debug:LogWarning (object)\n[warning] [2026-02-19T03:53:57Z - Unity] UnityEngine.Debug:LogWarning (object)\n[warning] [2026-02-19T03:53:57Z - Unity] UnityEngine.Debug:LogWarning (object)\n[warning] [2026-02-19T03:53:57Z - Unity] UnityEngine.Debug:LogWarning (object)\n[warning] [2026-02-19T03:53:57Z - Unity] UnityEngine.Debug:LogWarning (object)\n[warning] [2026-02-19T03:53:57Z - Unity] UnityEngine.Debug:LogWarning (object)\n[warning] [2026-02-19T03:53:57Z - Unity] UnityEngine.Debug:LogWarning (object)\n[warning] [2026-02-19T03:53:57Z - Unity] UnityEngine.Debug:LogWarning (object)\n[warning] [2026-02-19T03:53:57Z - Unity] UnityEngine.Debug:LogWarning (object)\n[warning] [2026-02-19T03:53:57Z - Unity] UnityEngine.Debug:LogWarning (object)\n[warning] [2026-02-19T03:54:29Z - Unity] Warning: [Mirror.BouncyCastle.Cryptography] - System.Void Mirror.BouncyCastle.Pqc.Crypto.Falcon.FprEngine::.ctor() - Method was given it's own cpp file because it is large and costly to compile\n[warning] [2026-02-19T03:54:29Z - Unity] Warning: [Unity.TextMeshPro] - System.Void TMPro.TextMeshPro::GenerateTextMesh() - Method was given it's own cpp file because it is large and costly to compile\n[warning] [2026-02-19T03:54:29Z - Unity] Warning: [Unity.TextMeshPro] - System.Void TMPro.TextMeshProUGUI::GenerateTextMesh() - Method was given it's own cpp file because it is large and costly to compile\n[warning] [2026-02-19T03:54:29Z - Unity] Warning: [Unity.TextMeshPro] - System.Void TMPro.TMP_TextParsingUtilities::.cctor() - Method was given it's own cpp file because it is large and costly to compile\n[warning] [2026-02-19T03:54:29Z - Unity] Warning: [Mirror.BouncyCastle.Cryptography] - System.Void Mirror.BouncyCastle.Pqc.Crypto.Falcon.FprEngine::.ctor() - High Instruction Count of 10496\n[warning] [2026-02-19T03:54:29Z - Unity] Warning: [Mirror.BouncyCastle.Cryptography] - System.Void Mirror.BouncyCastle.Pqc.Crypto.Falcon.FprEngine::.ctor() - High CodeSize of 51928\n[warning] [2026-02-19T03:54:29Z - Unity] Warning: [Unity.TextMeshPro] - System.Void TMPro.TextMeshPro::GenerateTextMesh() - High Variable Count of 220\n[warning] [2026-02-19T03:54:29Z - Unity] Warning: [Unity.TextMeshPro] - System.Void TMPro.TextMeshPro::GenerateTextMesh() - High Instruction Count of 9647\n[warning] [2026-02-19T03:54:29Z - Unity] Warning: [Unity.TextMeshPro] - System.Void TMPro.TextMeshPro::GenerateTextMesh() - High CodeSize of 29574\n[warning] [2026-02-19T03:54:29Z - Unity] Warning: [Unity.TextMeshPro] - System.Void TMPro.TextMeshProUGUI::GenerateTextMesh() - High Variable Count of 225\n[warning] [2026-02-19T03:54:29Z - Unity] Warning: [Unity.TextMeshPro] - System.Void TMPro.TextMeshProUGUI::GenerateTextMesh() - High Instruction Count of 9738\n[warning] [2026-02-19T03:54:29Z - Unity] Warning: [Unity.TextMeshPro] - System.Void TMPro.TextMeshProUGUI::GenerateTextMesh() - High CodeSize of 29853\n[warning] [2026-02-19T03:54:29Z - Unity] Warning: [Unity.TextMeshPro] - System.Void TMPro.TMP_TextParsingUtilities::.cctor() - High Instruction Count of 10579\n[warning] [2026-02-19T03:54:29Z - Unity] Warning: [Unity.TextMeshPro] - System.Void TMPro.TMP_TextParsingUtilities::.cctor() - High CodeSize of 31711\n[warning] [2026-02-19T03:54:29Z - Unity] Warning: [mscorlib] - System.Void System.Security.Cryptography.RIPEMD160Managed::MDTransform(System.UInt32*,System.UInt32*,System.Byte*) - High Instruction Count of 5579\n[warning] [2026-02-19T03:54:29Z - Unity] Warning: [Unity.InputSystem] - System.Void UnityEngine.InputSystem.FastTouchscreen::.ctor() - High Variable Count of 315\n[warning] [2026-02-19T03:54:29Z - Unity] Warning: [UnityEngine.TextCoreTextEngineModule] - System.Boolean UnityEngine.TextCore.Text.TextGenerator::ValidateHtmlTag(UnityEngine.TextCore.Text.TextProcessingElement[],System\n[warning] [2026-02-19T03:54:34Z - Unity] Warning: [UnityEngine.TextCoreTextEngineModule] - System.Boolean UnityEngine.TextCore.Text.TextGenerator::ValidateHtmlTag(UnityEngine.TextCore.Text.TextProcessingElement[],System.Int32,System.Int32&,UnityEngine.TextCore.Text.TextGenerationSettings,UnityEngine.TextCore.Text.TextInfo,System.Boolean&) - High Instruction Count of 6212\n[warning] [2026-02-19T03:54:34Z - Unity] Warning: [UnityEngine.TextCoreTextEngineModule] - System.Boolean UnityEngine.TextCore.Text.TextGenerator::ValidateHtmlTag(UnityEngine.TextCore.Text.TextProcessingElement[],System.Int32,System.Int32&,UnityEngine.TextCore.Text.TextGenerationSettings,UnityEngine.TextCore.Text.TextInfo,System.Boolean&) - High CodeSize of 17548\n[warning] [2026-02-19T03:54:34Z - Unity] Warning: [UnityEngine.TextCoreTextEngineModule] - System.Void UnityEngine.TextCore.Text.TextGenerator::ParsingPhase(UnityEngine.TextCore.Text.TextInfo,UnityEngine.TextCore.Text.TextGenerationSettings,System.UInt32&,System.Single&) - High Variable Count of 305\n[warning] [2026-02-19T03:54:34Z - Unity] Warning: [UnityEngine.TextCoreTextEngineModule] - System.Void UnityEngine.TextCore.Text.TextGenerator::ParsingPhase(UnityEngine.TextCore.Text.TextInfo,UnityEngine.TextCore.Text.TextGenerationSettings,System.UInt32&,System.Single&) - High Instruction Count of 5830\n[warning] [2026-02-19T03:54:34Z - Unity] Warning: [UnityEngine.TextCoreTextEngineModule] - System.Void UnityEngine.TextCore.Text.TextGenerator::ParsingPhase(UnityEngine.TextCore.Text.TextInfo,UnityEngine.TextCore.Text.TextGenerationSettings,System.UInt32&,System.Single&) - High CodeSize of 15180\n[warning] [2026-02-19T03:54:34Z - Unity] Warning: [UnityEngine.TextCoreTextEngineModule] - UnityEngine.Vector2 UnityEngine.TextCore.Text.TextGenerator::CalculatePreferredValues(System.Single&,UnityEngine.Vector2,System.Boolean,UnityEngine.TextCore.Text.TextGenerationSettings,UnityEngine.TextCore.Text.TextInfo) - High Variable Count of 211\n[warning] [2026-02-19T03:54:36Z - Unity] warning: Unknown file extension: xml\n[warning] [2026-02-19T03:54:36Z - Unity] UnityEngine.Debug:LogWarning (object)\n[warning] [2026-02-19T03:54:36Z - Unity] warning: Unknown file extension: properties\n[warning] [2026-02-19T03:54:36Z - Unity] UnityEngine.Debug:LogWarning (object)\n[error] [2026-02-19T03:54:38Z - Unity]  0.2 kb\t 0.0% Packages/com.unity.services.multiplayer/Runtime/DistributedAuthority/ErrorMitigation/StatusCodePolicyConfig.cs\n[error] [2026-02-19T03:54:38Z - Unity]  0.2 kb\t 0.0% Packages/com.unity.services.multiplayer/Runtime/Matchmaker/ErrorMitigation/StatusCodePolicyConfig.cs\n[error] [2026-02-19T03:54:38Z - Unity]  0.2 kb\t 0.0% Packages/com.unity.services.multiplayer/Runtime/DistributedAuthority/ErrorMitigation/RetryPolicyConfig.cs\n[error] [2026-02-19T03:54:38Z - Unity]  0.1 kb\t 0.0% Packages/com.unity.services.multiplayer/Runtime/Lobbies/ErrorMitigation/StatusCodePolicyConfig.cs\n[error] [2026-02-19T03:54:38Z - Unity]  0.1 kb\t 0.0% Packages/com.unity.services.multiplayer/Runtime/Relay/ErrorMitigation/StatusCodePolicyConfig.cs\n[error] [2026-02-19T03:54:38Z - Unity]  0.1 kb\t 0.0% Packages/com.unity.services.multiplayer/Runtime/Matchmaker/ErrorMitigation/RetryPolicyConfig.cs\n[error] [2026-02-19T03:54:38Z - Unity]  0.1 kb\t 0.0% Packages/com.unity.services.multiplayer/Runtime/DistributedAuthority/ErrorMitigation/RetryPolicy.cs\n[error] [2026-02-19T03:54:38Z - Unity]  0.1 kb\t 0.0% Packages/com.unity.services.multiplayer/Runtime/DistributedAuthority/ErrorMitigation/IRetryPolicy.cs\n[error] [2026-02-19T03:54:38Z - Unity]  0.1 kb\t 0.0% Packages/com.unity.services.qos/Runtime/v2/ErrorMitigation/StatusCodePolicyConfig.cs\n[error] [2026-02-19T03:54:38Z - Unity]  0.1 kb\t 0.0% Packages/com.unity.services.multiplayer/Runtime/Lobbies/ErrorMitigation/RetryPolicyConfig.cs\n[error] [2026-02-19T03:54:38Z - Unity]  0.1 kb\t 0.0% Packages/com.unity.services.qos/Runtime/ErrorMitigation/StatusCodePolicyConfig.cs\n[error] [2026-02-19T03:54:38Z - Unity]  0.1 kb\t 0.0% Packages/com.unity.services.multiplayer/Runtime/Relay/ErrorMitigation/RetryPolicyConfig.cs\n[error] [2026-02-19T03:54:38Z - Unity]  0.1 kb\t 0.0% Packages/com.unity.services.multiplayer/Runtime/Matchmaker/ErrorMitigation/RetryPolicy.cs\n[error] [2026-02-19T03:54:38Z - Unity]  0.1 kb\t 0.0% Packages/com.unity.services.multiplayer/Runtime/Matchmaker/ErrorMitigation/IRetryPolicy.cs\n[error] [2026-02-19T03:54:38Z - Unity]  0.1 kb\t 0.0% Packages/com.unity.services.qos/Runtime/v2/ErrorMitigation/RetryPolicyConfig.cs\n[error] [2026-02-19T03:54:38Z - Unity]  0.1 kb\t 0.0% Packages/com.unity.services.multiplayer/Runtime/Lobbies/ErrorMitigation/RetryPolicy.cs\n[error] [2026-02-19T03:54:38Z - Unity]  0.1 kb\t 0.0% Packages/com.unity.services.multiplayer/Runtime/Lobbies/ErrorMitigation/IRetryPolicy.cs\n[error] [2026-02-19T03:54:38Z - Unity]  0.1 kb\t 0.0% Packages/com.unity.services.qos/Runtime/ErrorMitigation/RetryPolicyConfig.cs\n[error] [2026-02-19T03:54:38Z - Unity]  0.1 kb\t 0.0% Packages/com.unity.services.multiplayer/Runtime/Relay/ErrorMitigation/RetryPolicy.cs\n[error] [2026-02-19T03:54:38Z - Unity]  0.1 kb\t 0.0% Packages/com.unity.services.multiplayer/Runtime/Relay/ErrorMitigation/IRetryPolicy.cs\n[error] [2026-02-19T03:54:38Z - Unity]  0.1 kb\t 0.0% Packages/com.unity.services.qos/Runtime/v2/ErrorMitigation/RetryPolicy.cs\n[error] [2026-02-19T03:54:38Z - Unity]  0.1 kb\t 0.0% Packages/com.unity.services.qos/Runtime/v2/ErrorMitigation/IRetryPolicy.cs\n[error] [2026-02-19T03:54:38Z - Unity]  0.1 kb\t 0.0% Packages/com.unity.services.qos/Runtime/ErrorMitigation/RetryPolicy.cs\n[error] [2026-02-19T03:54:38Z - Unity]  0.1 kb\t 0.0% Packages/com.unity.services.qos/Runtime/ErrorMitigation/IRetryPolicy.cs\n[success] [2026-02-19T03:54:39Z - Unity] Finished exporting player successfully.\n[warning] [2026-02-19T03:55:11.041Z] - 7.6.34.3.3.5 - WARN:        build was signed for app store!\n[error] [2026-02-19T03:58:58.361Z] - 7.6.34.3.3.5 - INFO: \u25b8 clang++: error: linker command failed with exit code 1 (use -v to see invocation)\n[warning] [2026-02-19T03:58:58.361Z] - 7.6.34.3.3.5 - INFO: \u25b8 warning: Run script build phase 'Run Script' will be run during every build because it does not specify any outputs. To address this issue, either add output dependencies to the script phase, or configure it to run in every build by unchecking \"Based on dependency analysis\" in the script phase. (in target 'GameAssembly' from project 'Unity-iPhone')\n[error] [2026-02-19T03:58:58.374Z] - 7.6.34.3.3.5 - INFO: fastlane finished with errors\n[error] [2026-02-19T03:58:58.379Z] - 7.6.34.3.3.5 - ERROR: xcode build failed\n[error]   RuntimeError (Build Failure):\n[warning] [2026-02-19T03:58:59.360Z] - 7.6.34.3.3.5 - WARN: Attempted to override a protected variable. The environment variable \"CI\" cannot be overridden.\n[warning] [2026-02-19T03:58:59.360Z] - 7.6.34.3.3.5 - INFO: Setting the environment variable \"SKIP_SLOW_FASTLANE_WARNING\".\n[error] [upload_testflight] ERROR: ASC_ISSUER_ID is required\n[error] [2026-02-19T03:59:00.479Z] - 7.6.34.3.3.5 - ERROR: User script exited with status 1. Aborting.\n[error] [2026-02-19T03:59:00.946Z] - 7.6.34.3.3.5 - ERROR: Build of 'ios' failed. unexpected token at ''\n[error] Finished: FAILURE",
+  "tier": "complex",
+  "why": "root-cause CI build failure buried in huge log",
+  "src": "real"
+ },
+ {
+  "id": "R061",
+  "ask": "thank you, this works really well, my update times on now on the scale of a few microseconds instead of potentially many ms depending on how large the interval I'm rendering is, this in now a constant time step, thank you. I noticed some things that I'm working on fixing. One is that you forgot to filter the class names using the function in build model, so new classes would show up with their raw class names in their own classes. I fixed this though, and I never mentioned it to you so fair enough. The other thing is, this forced render thing is not snappy. I notice you added a forced render boolean, which is great, but you passed it into the event loop file then never used it, so it didn't do anything. I tried changing it so that this boolean would cause the event loop to be skipped, but it's still not snappy, because if the event loop has already been entered, then it will sit and poll for 250ms. I need the event loop to also be polling this forced render boolean, and instantly quit if it's set to true. This also means that another thread needs to asynchronously set this boolean while the main thread is busy polling, so setting this boolean shouldn't be the main threads responsibility. Can you show me how you would fix this?",
+  "tier": "reasoning",
+  "why": "cross-thread flag polling, async wakeup, concurrency correctness",
+  "src": "real"
+ },
+ {
+  "id": "R062",
+  "ask": "~/.home-manager/ rehome\nerror:\n       \u2026 while evaluating a branch condition\n         at /nix/store/rcmh3pyadyy2rrv2xalgw9pcbfnw06j7-source/lib/lists.nix:141:18:\n          140|       len = length list;\n          141|       fold' = n: if n == len then nul else op (elemAt list n) (fold' (n + 1));\n             |                  ^\n          142|     in\n\n       \u2026 while calling the 'length' builtin\n         at /nix/store/rcmh3pyadyy2rrv2xalgw9pcbfnw06j7-source/lib/lists.nix:140:13:\n          139|     let\n          140|       len = length list;\n             |             ^\n          141|       fold' = n: if n == len then nul else op (elemAt list n) (fold' (n + 1));\n\n       (stack trace truncated; use '--show-trace' to show the full, detailed trace)\n\n       error: syntax error, unexpected invalid token, expecting '}'\n       at /nix/store/5ds1v21bbrsk1jc0318m5rsmirh1i401-source/programs/terminal.nix:30:29:\n           29|         if [ -n \"$TS_NAME\" ] && [ \"$TS_NAME\" != \"null\" ]; then\n           30|           TS_NAME=\"${TS_NAME%.ts.net}\"\n             |                             ^\n           31|         else",
+  "tier": "simple",
+  "why": "nix syntax error at stated line, escape interpolation",
+  "src": "real"
+ },
+ {
+  "id": "R063",
+  "ask": "What would you recommend to spruce up my hyprland desktop environment?",
+  "tier": "medium",
+  "why": "open-ended recommendation, research multi-step but easy",
+  "src": "real"
+ },
+ {
+  "id": "R064",
+  "ask": "add just a few pixels of padding above the preview image, hide the text that says the number of events being previewed and that we are syncing to watch.  make the settings thing put those settings buttons in some kind of scrollable panel, right now the settings view on the phone seems to be an actual simulation of a watch, where you can swip up and down and they all scroll, even though there are currently only 3 and they all fit on screen, they shouldn't scroll if they aren\"t going off screen",
+  "tier": "medium",
+  "why": "several specified UI tweaks in one view",
+  "src": "real"
+ },
+ {
+  "id": "R065",
+  "ask": "I just wrote a function signature for maintain logs, filled it with some comments describing it's purpose, and set up calls to it everywhere it needs to be called right now. Don't worry about adding new data structures right now, just fill in that function so it maintains order in the existing data structures. Look in model.rs, at the bottom.",
+  "tier": "medium",
+  "why": "fill named function, location and contract stated",
+  "src": "real"
+ },
+ {
+  "id": "R066",
+  "ask": "fuck, that sucks, option 1 I guess, controlling assholes. Lets start with making the watch face default to this complication, then use empty as a fallback.",
+  "tier": "medium",
+  "why": "default complication with empty fallback, specified feature",
+  "src": "real"
+ },
+ {
+  "id": "R067",
+  "ask": "in the model file, add a method to the class impl that returns an iterator that lets me iterate through all of the logs in the log lists of the title structs stored in the class",
+  "tier": "simple",
+  "why": "add one iterator method in named file",
+  "src": "real"
+ },
+ {
+  "id": "R068",
+  "ask": "check out maintain order in model. Why are we using while loops? Aren't these just for loops? Also, I need this to update the titles vec when it moves stuff.",
+  "tier": "medium",
+  "why": "explain loops plus small change keeping titles vec synced",
+  "src": "real"
+ },
+ {
+  "id": "R069",
+  "ask": "when there is no selected class, can you make the titles table display all titles in the model, sorted by total duration? I'm concerned that this will be inefficient, how would you implement this?",
+  "tier": "complex",
+  "why": "new aggregate view plus efficiency design decision",
+  "src": "real"
+ },
+ {
+  "id": "R070",
+  "ask": "can you run some commands to connect to my watch and print out the actual calendar data? I want to check the actual sleep event to see what data is there",
+  "tier": "medium",
+  "why": "multi-step device commands to dump calendar data",
+  "src": "real"
+ },
+ {
+  "id": "R071",
+  "ask": "dude, you're getting really dumb here. /etc/nix-modules rebuild\nerror:\n       \u2026 while calling the 'seq' builtin\n         at /nix/store/3w2nr2aq2gp76nb6lh1alx6h10mwvp5d-source/lib/modules.nix:361:18:\n          360|         options = checked options;\n          361|         config = checked (removeAttrs config [ \"_module\" ]);\n             |                  ^\n          362|         _module = checked (config._module);\n\n       \u2026 while evaluating a branch condition\n         at /nix/store/3w2nr2aq2gp76nb6lh1alx6h10mwvp5d-source/lib/modules.nix:297:9:\n          296|       checkUnmatched =\n          297|         if config._module.check && config._module.freeformType == null && merged.unmatchedDefns != [ ] then\n             |         ^\n          298|           let\n\n       (stack trace truncated; use '--show-trace' to show the full, detailed trace)\n\n       error: attribute 'ExecStart' already defined at /etc/nix-modules/nixosModules/software/tailscale.nix:31:7\n       at /etc/nix-modules/nixosModules/software/tailscale.nix:32:7:\n           31|       ExecStart = \"${pkgs.coreutils}/bin/mkdir -p /run/secrets\";\n           32|       ExecStart = \"${pkgs.coreutils}/bin/chmod 700 /run/secrets\";\n             |       ^\n           33|       RemainAfterExit = true;\nCommand 'nix --extra-experimental-features 'nix-command flakes' build --print-out-paths '/etc/nixos/#nixosConfigurations.\"nixos\".config.system.build.nixos-rebuild' --impure --no-link' returned non-zero exit status 1.",
+  "tier": "simple",
+  "why": "duplicate ExecStart at stated line, obvious fix",
+  "src": "real"
+ },
+ {
+  "id": "R072",
+  "ask": "~ tailscale status\nLogged out.\n ~ systemctl list-units --type=service --state=running\n  UNIT                      LOAD   ACTIVE SUB     DESCRIPTION                                       \n  acpid.service             loaded active running ACPI Daemon\n  bluetooth.service         loaded active running Bluetooth service\n  dbus.service              loaded active running D-Bus System Message Bus\n  docker.service            loaded active running Docker Application Container Engine\n  getty@tty1.service        loaded active running Getty on tty1\n  libvirtd.service          loaded active running libvirt legacy monolithic daemon\n  ModemManager.service      loaded active running Modem Manager\n  NetworkManager.service    loaded active running Network Manager\n  nscd.service              loaded active running Name Service Cache Daemon (nsncd)\n  polkit.service            loaded active running Authorization Manager\n  rtkit-daemon.service      loaded active running RealtimeKit Scheduling Policy Service\n  systemd-hostnamed.service loaded active running Hostname Service\n  systemd-journald.service  loaded active running Journal Service\n  systemd-logind.service    loaded active running User Login Management\n  systemd-machined.service  loaded active running Virtual Machine and Container Registration Service\n  systemd-oomd.service      loaded active running Userspace Out-Of-Memory (OOM) Killer\n  systemd-timesyncd.service loaded active running Network Time Synchronization\n  systemd-udevd.service     loaded active running Rule-based Manager for Device Events and Files\n  tailscaled.service        loaded active running Tailscale node agent\n  udisks2.service           loaded active running Disk Manager\n  user@1000.service         loaded active running User Manager for UID 1000\n  wpa_supplicant.service    loaded active running WPA supplicant\n\nLegend: LOAD   \u2192 Reflects whether the unit definition was properly loaded.\n        ACTIVE \u2192 The high-level unit activation state, i.e. generalization of SUB.\n        SUB    \u2192 The low-level unit activation state, values depend on unit type.\n\n22 loaded units listed.\n ~ systemctl --failed\n  UNIT LOAD ACTIVE SUB DESCRIPTION\n\n0 loaded units listed.",
+  "tier": "complex",
+  "why": "pasted logged-out state, no question, cause unknown",
+  "src": "real"
+ },
+ {
+  "id": "R073",
+  "ask": "Do you see the hashmaps in model, these hashmaps map class or title names to indices that can be used to access the class or title with the given class or title name in the classes or titles field. Can you make this get title method you made use the hashmaps instead of iterating through all classes and titles, that should be much faster, right?",
+  "tier": "simple",
+  "why": "swap linear scan for existing hashmap lookup",
+  "src": "real"
+ },
+ {
+  "id": "R074",
+  "ask": "hey, when I open a project with tmux session dispensary, it gives me nvim and opencode right away, which is great, but sometimes I !qa to get out of vim, then run vim again, just to reset things. When I do this from the nvim that is spawned by the dispensary, the whole tmux window disappears. Is there a way to launch this stuff, but have the window persist and return me to a normal command line if I close the program?",
+  "tier": "medium",
+  "why": "tmux window persistence config, known behavior, clear goal",
+  "src": "real"
+ },
+ {
+  "id": "R075",
+  "ask": "hey, when I open tmux, I'm always greeted with an empty session in the home directory. I never use this though, I always use my session dispenser to go somewhere else immediately. Is there a way to start me in some kind of nice home page instead of opening a session that I never use and only clutters my session list?",
+  "tier": "medium",
+  "why": "tmux startup config change, small design choice",
+  "src": "real"
+ },
+ {
+  "id": "R076",
+  "ask": "This is pretty good, but when I search something, the top result is still selected, but it gets dimmed, if the top result is dimmed, I want the first arrow down to just rehighlight it instead of going doing to the second result, if this is not possible, just don't dim the selected entry",
+  "tier": "medium",
+  "why": "selection highlight tweak, fallback behavior specified",
+  "src": "real"
+ },
+ {
+  "id": "R077",
+  "ask": "The script fails before it even runs the rebuild, it quits instantly, why would it do this if that line is way down at the bottom of main, after a bunch of other stuff?",
+  "tier": "complex",
+  "why": "script exits early for unstated reason, needs investigation",
+  "src": "real"
+ },
+ {
+  "id": "R078",
+  "ask": "Noticing a weird edge case, I have an event that overlaps two other events, but these two other events don't overlap each other. It is split right down the middle overlapping these other events. One half is on the inside, the other half is on the outside of the ring. This creates a discontinuity in it's colored section. Tell me why this is happening and what the fix is.",
+  "tier": "complex",
+  "why": "subtle ring overlap discontinuity, cause and fix unknown",
+  "src": "real"
+ },
+ {
+  "id": "R079",
+  "ask": "no alias required, install with nixpkgs and use the actual command name, yes use english",
+  "tier": "simple",
+  "why": "small install directive, no alias, english",
+  "src": "real"
+ },
+ {
+  "id": "R080",
+  "ask": "is that little tick mark updating live or will it just sit there? are we using this force update function?",
+  "tier": "simple",
+  "why": "direct question about existing update code path",
+  "src": "real"
+ },
+ {
+  "id": "R081",
+  "ask": "make it so that the clock always has 4 digits, ex: 05:40, just a temporary change, I want to see how much space it takes up and I don't want to wait for 10pm",
+  "tier": "simple",
+  "why": "zero-pad clock format, one temporary edit",
+  "src": "real"
+ },
+ {
+  "id": "R082",
+  "ask": "great, thank you, only thing is, this relies on my home manager config already having run, so on a totally new computer I guess this would fail until I've run my home manager config, which is fine. Can you modify the script to fail gracefully in the case that this file doesn't exist or contain the key, or is a change not even necessary?",
+  "tier": "medium",
+  "why": "graceful failure path in secrets bootstrap script",
+  "src": "real"
+ },
+ {
+  "id": "R083",
+  "ask": "hey, install niri for me",
+  "tier": "medium",
+  "why": "add compositor to nix config, routine module work",
+  "src": "real"
+ },
+ {
+  "id": "R084",
+  "ask": "I'm working on a new script, symlink.sh. A couple of questions. Is there a better looking way to seperate the arguments here? Semicolon is kinda  weird, I'd prefer a space or something. Second, Is there a way to guarantee that the destination path exists? Does this symlink command force that by creating the path if it isn't there? Third, will this script even work?",
+  "tier": "medium",
+  "why": "review small script, three specific concrete questions",
+  "src": "real"
+ },
+ {
+  "id": "R085",
+  "ask": "1. Once per boot. 2. Just to keep things snappy, it should run after hyprland starts, or in parallel with it. I'd like to just put rehome in the exec-once/autostart file, but this requires a network connection, so it should be triggered by that. Meaning if I'm on a laptop and it takes me 5 minutes to figure out how to join wifi, it should still trigger then, but ideally only the first time I connect after a boot, though doing it on every connection wouldn't really hurt I guess. 3. I'm using nixos with home manager, but right now I'm just focused on my home manager config. IMPORTANT: Everything done here needs to be declarative, so if you want to make a service file, make it inside the home-manager repo and symlink it to the correct location. You should be able to find plenty of examples in the repo of that already. Same with enabling the service, that should be done with home manager, however home manager facilitates that.",
+  "tier": "complex",
+  "why": "declarative service, network trigger, once-per-boot guard",
+  "src": "real"
+ },
+ {
+  "id": "R086",
+  "ask": "okay, this is seriously lagging behind the native calendar app in showing updates to the calendar, how would you suggest fixing this?",
+  "tier": "complex",
+  "why": "calendar update lag, cause unknown, sync mechanism choice",
+  "src": "real"
+ },
+ {
+  "id": "R087",
+  "ask": "let's see if you can handle this. Right now, the only indicator of when anything happens is a header in a line above the tables. Now that we have granular panning, I'll like to add little tick marks under the timeline with labels. To show things like the beginning and end of days, maybe each hour if there is enough room. This should also depend on how wide the focused interval is, we can call this our scale.  you should probably make a helper on settings called scale() that returns the with of the focused interval in ms. So with a really large scale the ticks should only show up for days, weeks, months, years, etc. Basically there should be a step in rendering that renders a row of characters with tickmarks, this could possibly be the same line as the header, lets just have the header cover whatever tick marks might be behind it. Can you handle that? It's kinda complex",
+  "tier": "complex",
+  "why": "new scale-adaptive tick rendering layer, granularity design decisions",
+  "src": "real"
+ },
+ {
+  "id": "R088",
+  "ask": "I want this to be a local-only file, this is where I can specailize one of my machines by changing it from the default module settings",
+  "tier": "medium",
+  "why": "local machine override file, module pattern exists",
+  "src": "real"
+ },
+ {
+  "id": "R089",
+  "ask": "that tmux window doesn't seem to show up anywhere, can you open a new window and just leave it there in my current session?",
+  "tier": "simple",
+  "why": "open a tmux window in current session",
+  "src": "real"
+ },
+ {
+  "id": "R090",
+  "ask": "do you know what model you are? how smart are you?",
+  "tier": "trivial",
+  "why": "chit-chat about model identity, no lookup",
+  "src": "real"
+ },
+ {
+  "id": "R091",
+  "ask": "I want a script that tests out cloudsave, look for Service_CloudSave.cs. Have it sub to the OnAuthenticated event, then run a function that writes to the current users cloudsave data, key: test, value: test. Do the write, then do a read and print the result to the console. Also print when you start the attempt",
+  "tier": "medium",
+  "why": "fully specified test script following existing service pattern",
+  "src": "real"
+ },
+ {
+  "id": "R092",
+  "ask": "nope, still crashing in landscape",
+  "tier": "complex",
+  "why": "crash persists in landscape, cause still unknown",
+  "src": "real"
+ },
+ {
+  "id": "R093",
+  "ask": "testing whisper-live, it just sits there, I'm not seeing anything as I speak",
+  "tier": "reasoning",
+  "why": "live audio pipeline silent, environment-dependent unknown cause",
+  "src": "real"
+ },
+ {
+  "id": "R094",
+  "ask": "Why does this say Wolfie",
+  "tier": "simple",
+  "why": "trace where one string literal comes from",
+  "src": "real"
+ },
+ {
+  "id": "R095",
+  "ask": "thanks, I just fixed a bug that was causing super long startup, add_log now takes a bulk_addition boolean, if that is true it doesn't maintain order and trusts that whatever is calling will run sort at the end of the bulk additions, maintaining order on every log addition was mad expensive, took forever to start with lots of logs.",
+  "tier": "simple",
+  "why": "informs of new bulk flag, adapt call sites",
+  "src": "real"
+ },
+ {
+  "id": "R096",
+  "ask": "What I want to do now is add some kind of seperator so that adjacent events of the same color won't blend together, can you take a crack at that? Just some kind of thin contrasting line where they meet, not any wider than the ring itself",
+  "tier": "medium",
+  "why": "thin separator in ring rendering, existing pattern",
+  "src": "real"
+ },
+ {
+  "id": "R097",
+  "ask": "Check out the view file, there should be a format duration fuction, use that instead of the inline formatting you did in footer_line",
+  "tier": "simple",
+  "why": "use existing format_duration instead of inline formatting",
+  "src": "real"
+ },
+ {
+  "id": "R098",
+  "ask": "Subfolders are fine, settings can stay in it's own file, go ahead",
+  "tier": "medium",
+  "why": "bare approval authorising unseen structural work",
+  "src": "real"
+ },
+ {
+  "id": "R099",
+  "ask": "still not red, just make all printout from the parallel job red",
+  "tier": "medium",
+  "why": "force color on parallel job output, previous attempt failed",
+  "src": "real"
+ },
+ {
+  "id": "R100",
+  "ask": "i figured it out, I'm testing the phone app on device, I have a pinhole camera, and it's taking a chuck out of the ring on the watch face preview, is there some official way to leave space for pinholes, notches, and status bars?  like some pixel height that can be requesting to use for padding at the top?",
+  "tier": "medium",
+  "why": "API question on display cutout insets, clear scope",
+  "src": "real"
+ },
+ {
+  "id": "R101",
+  "ask": "why 2?",
+  "tier": "simple",
+  "why": "direct follow-up asking justification of prior answer",
+  "src": "real"
+ },
+ {
+  "id": "R102",
+  "ask": "can you link that ui?",
+  "tier": "simple",
+  "why": "one lookup, produce link to referenced UI",
+  "src": "real"
+ },
+ {
+  "id": "R103",
+  "ask": "part of that is wrong, you would add fastfetch to my nix files, throw it in utilitles/mod.nix",
+  "tier": "simple",
+  "why": "add package to named nix file, mechanical",
+  "src": "real"
+ },
+ {
+  "id": "R104",
+  "ask": "go for it, keep the simple prompt for now",
+  "tier": "medium",
+  "why": "bare approval authorising unseen proposed work",
+  "src": "real"
+ },
+ {
+  "id": "R105",
+  "ask": "tailnet ACLs? What is that, where does it live, what does it do, how can that be modified declaratively?",
+  "tier": "medium",
+  "why": "focused explanation plus declarative config approach",
+  "src": "real"
+ },
+ {
+  "id": "R106",
+  "ask": "is there a way to force the sync from the kotlin code? from the complication provider?",
+  "tier": "medium",
+  "why": "targeted API question about forcing sync from provider",
+  "src": "real"
+ },
+ {
+  "id": "R107",
+  "ask": "In the watch version of the settings, it's still the case that changing a setting works locally, but nothing changes in the preview on the phone. I'm also noticing that if I have the settings page up on the watch and change settings on the phone, the settings page on the watch doesn't sync, even though when I leave it the watch face has the settings from the phone applied",
+  "tier": "complex",
+  "why": "phone-watch sync broken, cause not stated",
+  "src": "real"
+ },
+ {
+  "id": "R108",
+  "ask": "LOG3.log, what's the deal now?",
+  "tier": "complex",
+  "why": "vague log inspection, unknown cause, no spec",
+  "src": "real"
+ },
+ {
+  "id": "R109",
+  "ask": "okay, now it works in landscape, but it's locked that way, it's always in landscape no matter the orientation, also, the watch face preview is tiny, it should fill the height of the screen in landscape mode",
+  "tier": "medium",
+  "why": "two UI fixes, behaviour stated, one component",
+  "src": "real"
+ },
+ {
+  "id": "R110",
+  "ask": "When I have a wide interval loaded up and I hold down the arrow to scroll through days, it becomes pretty slow. I know this is because the function that handles changes in interval completely wipes all of the data structures in model that make rendering efficient and rebuilds them for the interval. This makes sense for single day intervals, but when I have 100 days loaded up this becomes really wasteful. Would it be faster to figure out which logs were added/removed to the focused interval and update the data structures to only add/remove those logs? To speed this up, it may make sense to create a hashmap that maps days/dates to tuples of indices representing the location in the logs list of that day of logs, then use that slice/subarray to update the rest of the model. The only issue I see with that is that moving the interval into new data will append  new logs, then sort them, so all of the indices will have to shift, and if somehow the data is bad and something new gets mixed in with groups of already loaded data then the ranges become incorrect even if they are shifted by the number of new elements after loading. There is also the complication that I'm planning to add zooming, in which case things could be added to both the beginning and end of the logs list after a change in interval, which makes maintaining this day to log slice map even more complicated. Even so, something like this seems neccesary for panning, we can't be rebuilding everything when only a fraction of the data has changed. What are your thoughts? How should I approach this problem?",
+  "tier": "reasoning",
+  "why": "open-ended perf redesign, index invalidation, asks approach",
+  "src": "real"
+ },
+ {
+  "id": "R111",
+  "ask": "~/.home-manager/ rehome\nwarning: Git tree '/home/gusjengis/.home-manager' is dirty\nwarning: Git tree '/home/gusjengis/.home-manager' is dirty\nwarning: Git tree '/home/gusjengis/.home-manager' is dirty\nwarning: Git tree '/home/gusjengis/.home-manager' is dirty\nerror:\n       \u2026 while evaluating a branch condition\n         at /nix/store/rcmh3pyadyy2rrv2xalgw9pcbfnw06j7-source/lib/lists.nix:141:18:\n          140|       len = length list;\n          141|       fold' = n: if n == len then nul else op (elemAt list n) (fold' (n + 1));\n             |                  ^\n          142|     in\n\n       \u2026 while calling the 'length' builtin\n         at /nix/store/rcmh3pyadyy2rrv2xalgw9pcbfnw06j7-source/lib/lists.nix:140:13:\n          139|     let\n          140|       len = length list;\n             |             ^\n          141|       fold' = n: if n == len then nul else op (elemAt list n) (fold' (n + 1));\n\n       (stack trace truncated; use '--show-trace' to show the full, detailed trace)\n\n       error: undefined variable 'PWD'\n       at /nix/store/0nrab2ajcqp4g8qlab1rhqrxgdfmxijk-source/programs/terminal.nix:34:11:\n           33|         set_title \"${\n           34|           PWD # #*/} $BASH_COMMAND\"\n             |           ^\n           35|         }",
+  "tier": "simple",
+  "why": "error names file, line and undefined variable",
+  "src": "real"
+ },
+ {
+  "id": "R112",
+  "ask": "hmm, the phone app just crashes now, but the centered label looks good on the watch",
+  "tier": "complex",
+  "why": "app crash reported, cause not given",
+  "src": "real"
+ },
+ {
+  "id": "R113",
+  "ask": "/etc/nixos rebuild\nbuilding the system configuration...\nupdating GRUB 2 menu...\nWarning: os-prober will be executed to detect other bootable partitions.\nIts output will be used to detect bootable binaries on them and create new boot entries.\nlsblk: /dev/mapper/no*[0-9]: not a block device\nlsblk: /dev/mapper/raid*[0-9]: not a block device\nlsblk: /dev/mapper/disks*[0-9]: not a block device\nFound Windows Boot Manager on /dev/nvme1n1p1@/efi/Microsoft/Boot/bootmgfw.efi\nFound Ubuntu 22.04 LTS (22.04) on /dev/sdc3\nactivating the configuration...\nsetting up /etc...\nreloading user units for gusjengis...\nrestarting sysinit-reactivation.target\nthe following new units were started: libvirtd.service\nwarning: the following units failed: tailscaled-autoconnect.service\n\u00d7 tailscaled-autoconnect.service\n     Loaded: loaded (/etc/systemd/system/tailscaled-autoconnect.service; enabled; preset: ignored)\n     Active: failed (Result: timeout) since Mon 2026-02-02 14:24:42 PST; 274ms ago\n Invocation: ed34c83dcea24107b6fbbd44fd9a4add\n    Process: 124121 ExecStart=/nix/store/gfpqh112f1w0109gl1yjc9lqyg7r4agj-unit-script-tailscaled-autoconnect-start/bin/tailscaled-autoconnect-start (code=killed, signal=TERM)\n   Main PID: 124121 (code=killed, signal=TERM)\n         IP: 0B in, 0B out\n         IO: 0B read, 0B written\n   Mem peak: 5.6M\n        CPU: 30ms\n\nFeb 02 14:23:12 nixos systemd[1]: Starting tailscaled-autoconnect.service...\nFeb 02 14:23:12 nixos tailscaled-autoconnect-start[124121]: Server needs authentication, sending auth key\nFeb 02 14:23:12 nixos tailscaled-autoconnect-start[124158]: cat: /run/secrets/tailscale-authkey: No such file or directory\nFeb 02 14:23:13 nixos tailscaled-autoconnect-start[124161]: To authenticate, visit:\nFeb 02 14:23:13 nixos tailscaled-autoconnect-start[124161]:         https://login.tailscale.com/a/1f28912801997b\nFeb 02 14:24:42 nixos systemd[1]: tailscaled-autoconnect.service: start operation timed out. Terminating.\nFeb 02 14:24:42 nixos tailscaled-autoconnect-start[124161]: context canceled\nFeb 02 14:24:42 nixos systemd[1]: tailscaled-autoconnect.service: Failed with result 'timeout'.\nFeb 02 14:24:42 nixos systemd[1]: Failed to start tailscaled-autoconnect.service.\nCommand 'systemd-run -E LOCALE_ARCHIVE -E NIXOS_INSTALL_BOOTLOADER --collect --no-ask-password --pipe --quiet --service-type=exec --unit=nixos-rebuild-switch-to-configuration /nix/store/gp4bwsf2cxff90j36fmpf13f5qmawbzj-nixos-system-nixos-26.05.20251130.2d293cb/bin/switch-t\no-configuration switch' returned non-zero exit status 4.",
+  "tier": "complex",
+  "why": "tailscale auth secret missing, system service, wide impact",
+  "src": "real"
+ },
+ {
+  "id": "R114",
+  "ask": "I just rebooted~ tailscale  status\nLogged out.\nLog in at: https://login.tailscale.com/a/5dca25601d86b\n ~ ip addr show tailscale 0\nError: either \"dev\" is duplicate, or \"0\" is garbage.\n ~ echo TAILSCALE_AUTH_KEY\nTAILSCALE_AUTH_KEY\n ~ echo $TAILSCALE_AUTH_KEY\ntskey-auth-kBdWEBm7rZ11CNTRL-RXJZpx5cnAKi3QJEe514AKGAbjgWvGaFg",
+  "tier": "complex",
+  "why": "logged out after reboot, auth wiring cause unknown",
+  "src": "real"
+ },
+ {
+  "id": "R115",
+  "ask": "There is something weird going on with tables, after changing intervals, sometimes I'll get a class/title with a stupid long duration, can you look into the logic that gives us the durations that are rendered in the tables and see what you can find?",
+  "tier": "reasoning",
+  "why": "intermittent wrong durations, subtle root cause hunt",
+  "src": "real"
+ },
+ {
+  "id": "R116",
+  "ask": "yeah, check out the tui.rs file, I want to get some performance monitoring going, can you measure the time between the end of each input phase to the beginning of the next, then print that out in the line at the bottom after all of the controls? I want to get frametimes so I can try things and see how performance is affected.",
+  "tier": "medium",
+  "why": "named file, clear frametime instrumentation and output spot",
+  "src": "real"
+ },
+ {
+  "id": "R117",
+  "ask": "there seems to be no way around copying the account from a phone. Why the fuck is their pairing broken? it used to work. I would really like to use my actual calendar here, is there a way to do this with adb?",
+  "tier": "complex",
+  "why": "diagnose broken pairing plus adb workaround research",
+  "src": "real"
+ },
+ {
+  "id": "R118",
+  "ask": "ze: file:///home/gusjengis/Documents/Code/CalendarComplication/app/src/main/java/com/example/calendarcomplication/presentation/MainActivity.kt:29:34 Unresolved reference 'focusable'.",
+  "tier": "simple",
+  "why": "unresolved reference with file and line given",
+  "src": "real"
+ },
+ {
+  "id": "R119",
+  "ask": "uh oh/etc/nix-modules rebuild\nwarning: Git tree '/etc/nixos' is dirty\nbuilding the system configuration...\nwarning: Git tree '/etc/nixos' is dirty\nupdating GRUB 2 menu...\nWarning: os-prober will be executed to detect other bootable partitions.\nIts output will be used to detect bootable binaries on them and create new boot entries.\nlsblk: /dev/mapper/no*[0-9]: not a block device\nlsblk: /dev/mapper/raid*[0-9]: not a block device\nlsblk: /dev/mapper/disks*[0-9]: not a block device\nFound Windows Boot Manager on /dev/nvme1n1p1@/efi/Microsoft/Boot/bootmgfw.efi\nFound Ubuntu 22.04 LTS (22.04) on /dev/sdc3\nactivating the configuration...\nsetting up /etc...\nreloading user units for gusjengis...\nrestarting sysinit-reactivation.target\nreloading the following units: dbus.service, firewall.service\nrestarting the following units: polkit.service\n^C\n /etc/nix-modules rebuild\nwarning: Git tree '/etc/nixos' is dirty\nbuilding the system configuration...\nwarning: Git tree '/etc/nixos' is dirty\nFailed to start transient service unit: Unit nixos-rebuild-switch-to-configuration.service was already loaded or has a fragment file.\nCommand 'systemd-run -E LOCALE_ARCHIVE -E NIXOS_INSTALL_BOOTLOADER --collect --no-ask-password --pipe --quiet --service-type=exec --unit=nixos-rebuild-switch-to-configuration /nix/store/gp4bwsf2cxff90j36fmpf13f5qmawbzj-nixos-system-nixos-26.05.20251130.2d293cb/bin/switch-t\no-configuration switch' returned non-zero exit status 1.\n /etc/nix-modules rebuild\nwarning: Git tree '/etc/nixos' is dirty\nbuilding the system configuration...\nwarning: Git tree '/etc/nixos' is dirty\nFailed to start transient service unit: Unit nixos-rebuild-switch-to-configuration.service was already loaded or has a fragment file.\nCommand 'systemd-run -E LOCALE_ARCHIVE -E NIXOS_INSTALL_BOOTLOADER --collect --no-ask-password --pipe --quiet --service-type=exec --unit=nixos-rebuild-switch-to-configuration /nix/store/gp4bwsf2cxff90j36fmpf13f5qmawbzj-nixos-system-nixos-26.05.20251130.2d293cb/bin/switch-t\no-configuration switch' returned non-zero exit status 1.",
+  "tier": "medium",
+  "why": "stale transient unit after interrupt, message localizes it",
+  "src": "real"
+ },
+ {
+  "id": "R120",
+  "ask": "help me out with the logs iter method, I'm trying to make this only return logs that are in the focused interval",
+  "tier": "medium",
+  "why": "filter iterator to focused interval, named method",
+  "src": "real"
+ },
+ {
+  "id": "R121",
+  "ask": "alright, lets try it",
+  "tier": "medium",
+  "why": "bare approval authorising unseen proposed work",
+  "src": "real"
+ },
+ {
+  "id": "R122",
+  "ask": "Still not working. Try that.",
+  "tier": "complex",
+  "why": "fix failed, cause still unknown, keep debugging",
+  "src": "real"
+ },
+ {
+  "id": "R123",
+  "ask": "I guess the logic is fine then. Lets do something different, I want the settings menu to respond to the dial on my watch. I have a galaxy watch classic 6 47mm, with a dial that I can turn around the edge of my screen. In most menus this lets me scroll, but it doesn't work in our settings menu",
+  "tier": "medium",
+  "why": "rotary input in settings menu, standard Wear pattern",
+  "src": "real"
+ },
+ {
+  "id": "R124",
+  "ask": "okay, let's try this, in process on-the-minute ticker, OS-level alarm to keep it running if it dies, let's make that check every minute, don't want it to miss any updates. And I guess leave that 60s maniufest thing going as a backup, I just saw the watch face update again, from 6:04 to 6:12, still not sure what is triggering that, maybe it's the update period.",
+  "tier": "complex",
+  "why": "ticker plus alarm keepalive, timing, unexplained updates",
+  "src": "real"
+ },
+ {
+  "id": "R125",
+  "ask": "cool, now can you update any scripts I have that use the contents of rehome or rebuild to use these new executables?",
+  "tier": "medium",
+  "why": "find and update scripts referencing rehome/rebuild",
+  "src": "real"
+ },
+ {
+  "id": "R126",
+  "ask": "I'm noticing that in waybar, when I change wallpapers and a new accent color is applied, the current special workspace will lose its highlight until I switch special workspace again.",
+  "tier": "complex",
+  "why": "waybar highlight lost after accent reload, cause unknown",
+  "src": "real"
+ },
+ {
+  "id": "R127",
+  "ask": "there seems to be something wrong with the data in these hashmaps, can you make sure that the sort method in model also updates the pointers in the hashmap?",
+  "tier": "medium",
+  "why": "fix stated: sort must update hashmap index pointers",
+  "src": "real"
+ },
+ {
+  "id": "R128",
+  "ask": "great, the frame times are working perfectly, thank you. What I'd like to do now is reduce these frametimes by avoiding uneccesary file reads, which is the whole purpose of the model file, to get the data from the disk into memory for faster access. Right now in the view file, you'll see that I'm using compute_durations to create labels and colors to feed to the code that creates the timelines. I've just committed, so I'd like to turn you loose and see if you can eliminate the need for this compute durations function and create equivalent label and color inputs just from the data in the model. This should remove all file reades from the current render loop and reduce the frame times by a lot. Go nuts.",
+  "tier": "complex",
+  "why": "remove file reads from render loop, cross-file perf refactor",
+  "src": "real"
+ },
+ {
+  "id": "R129",
+  "ask": "gusjengis@pc /etc/nix-modules rebuild\nwarning: Path '/etc/nix-modules/nixosModules/flake.nix' should point at the directory containing the 'flake.nix' file, not the file itself. Pretending that you meant '/etc/nix-modules/nixosModules'\nbuilding the system configuration...\nwarning: Path '/etc/nix-modules/nixosModules/flake.nix' should point at the directory containing the 'flake.nix' file, not the file itself. Pretending that you meant '/etc/nix-modules/nixosModules'\nevaluation warning: fold has been deprecated, use foldr instead\nerror:\n       \u2026 while calling the 'head' builtin\n         at /nix/store/gnf2ayqhb31qvgh1s9mg3aqaj9378cg7-source/lib/attrsets.nix:1713:13:\n         1712|           if length values == 1 || pred here (elemAt values 1) (head values) then\n         1713|             head values\n             |             ^\n         1714|           else\n\n       \u2026 while evaluating the attribute 'value'\n         at /nix/store/gnf2ayqhb31qvgh1s9mg3aqaj9378cg7-source/lib/modules.nix:1160:7:\n         1159|     // {\n         1160|       value = addErrorContext \"while evaluating the option `${showOption loc}':\" value;\n             |       ^\n         1161|       inherit (res.defsFinal') highestPrio;\n\n       \u2026 while evaluating the option `system.build.toplevel':\n\n       \u2026 while evaluating definitions from `/nix/store/gnf2ayqhb31qvgh1s9mg3aqaj9378cg7-source/nixos/modules/system/activation/top-level.nix':\n\n       (stack trace truncated; use '--show-trace' to show the full, detailed trace)\n\n       error:\n       Failed assertions:\n       - Asahi peripheral firmware extraction is enabled but the firmware\n       location appears incorrect.\n\n       - `hardware.graphics.enable32Bit` requires a kernel that supports 32-bit emulation\nCommand 'nix --extra-experimental-features 'nix-command flakes' build --print-out-paths '/etc/nix-modules/nixosModules/flake.nix#nixosConfigurations.\"nixos\".config.system.build.toplevel' --no-link --impure' returned non-zero exit status 1. I need to keep the asahi stuff around for my mac, can you prevent this from triggering on x86? Really I want this to only trigger on a mac, but I don't know how to specify that",
+  "tier": "complex",
+  "why": "gate asahi/graphics asserts per platform, mechanism unknown",
+  "src": "real"
+ },
+ {
+  "id": "R130",
+  "ask": "CloudSave error: UnityEngine.UnityException: get_unscaledTime can only be called from the main thread.\nConstructors and field initializers will be executed from the loading thread when loading a scene.\nDon't use this function in the constructor or field initializers, instead move initialization code to the Awake or Start function.\n  at (wrapper managed-to-native) UnityEngine.Time.get_unscaledTime()\n  at Unity.Services.CloudSave.Internal.RateLimiter.get_RateLimited () [0x00000] in ./Library/PackageCache/com.unity.services.cloudsave@271cfa0557ba/Runtime/com.unity.services.cloudsave.internal/Runtime/RateLimiter.cs:29 \n  at Unity.Services.CloudSave.Internal.ApiErrorHandler.get_IsRateLimited () [0x00000] in ./Library/PackageCache/com.unity.services.cloudsave@271cfa0557ba/Runtime/com.unity.services.cloudsave.internal/Runtime/Exceptions/ApiErrorHandler.cs:80 \n  at Unity.Services.CloudSave.Internal.ApiErrorHandler.RunWithErrorHandling[T] (System.Func`1[TResult] func) [0x00011] in ./Library/PackageCache/com.unity.services.cloudsave@271cfa0557ba/Runtime/com.unity.services.cloudsave.internal/Runtime/Exceptions/ApiErrorHandler.cs:48 \n  at Unity.Services.CloudSave.Internal.PlayerDataService.SaveWithErrorHandlingAsync (Unity.Services.CloudSave.Models.IAccessClassOptions options, System.Collections.Generic.IDictionary`2[TKey,TValue] data) [0x00059] in ./Library/PackageCache/com.unity.services.cloudsave@271cfa0557ba/Runtime/com.unity.services.cloudsave.internal/Runtime/PlayerDataService.cs:237 \n  at Unity.Services.CloudSave.Internal.PlayerDataService.SaveAsync (System.Collections.Generic.IDictionary`2[TKey,TValue] data, Unity.Services.CloudSave.Models.Data.Player.SaveOptions options) [0x000a0] in ./Library/PackageCache/com.unity.services.cloudsave@271cfa0557ba/Runtime/com.unity.services.cloudsave.internal/Runtime/PlayerDataService.cs:232 \n  at Unity.Services.CloudSave.Internal.PlayerDataService.SaveAsync (System.Collections.Generic.IDictionary`2[TKey,TValue] data) [0x00028] in ./Library/PackageCache/com.unity.services.cloudsave@271cfa0557ba/Runtime/com.unity.services.cloudsave.internal/Runtime/PlayerDataService.deprecated.cs:146 \n  at Service_CloudSave.SaveAndLoadTestData () [0x0005d] in /home/gusjengis/wkspaces/Hundo/Assets/1 - Scripts/Services/Service_CloudSave.cs:36 \nUnityEngine.Debug:LogError (object)\nService_CloudSave/<SaveAndLoadTestData>d__3:MoveNext () (at Assets/1 - Scripts/Services/Service_CloudSave.cs:47)\nSystem.Runtime.CompilerServices.AsyncVoidMethodBuilder:Start<Service_CloudSave/<SaveAndLoadTestData>d__3> (Service_CloudSave/<SaveAndLoadTestData>d__3&)\nService_CloudSave:SaveAndLoadTestData ()\nService_CloudSave:HandleOnAuthenticated (SignInType) (at Assets/1 - Scripts/Services/Service_CloudSave.cs:21)\nService_Auth:<SignInAnonymously>b__3_0 (System.Threading.Tasks.Task) (at Assets/1 - Scripts/Services/Service_Auth.cs:44)\nSystem.Threading._ThreadPoolWaitCallback:PerformWaitCallback ()",
+  "tier": "complex",
+  "why": "main-thread violation in async CloudSave path, context marshalling",
+  "src": "real"
+ },
+ {
+  "id": "R131",
+  "ask": "This sounds basically perfect. Keep in mind I don't use Waybar right now And I don't reallyneed my Dunts to mess with But I like this ida of sticking with the GitHub Dark theme and extracting colors. I'm thinking maybe the accent colors should be actual colors from the GitHub Dark theme and we just round to the closest color in the background.",
+  "tier": "complex",
+  "why": "vague theming design, colour-matching approach undecided",
+  "src": "real"
+ },
+ {
+  "id": "R132",
+  "ask": "hey, I'm noticing in wofi that when I arrow down from the search bar, it skips the top result. I'd like for it to select the top result and highlight it and then let me arrow down further after that if I want.",
+  "tier": "medium",
+  "why": "wofi selection behaviour stated, localized config fix",
+  "src": "real"
+ },
+ {
+  "id": "R133",
+  "ask": "thank you, forget custom commands, is there a way to write rules for you? so that you always run commands in a tmux tab so I can watch what you run?",
+  "tier": "medium",
+  "why": "agent rules config question, small research plus setup",
+  "src": "real"
+ },
+ {
+  "id": "R134",
+  "ask": "I'd like to move toward releasing this complication + watchface combo, the watchface can be found at ~/Documents/Code/WatchFace. The watchface is just a blank WFF watchface with a fullscreen photo image complication slot, and the complication is a replacement for a watch face that includes dynamic calendar data that is fully custom. This is my workaround for Google killing the JetPack library on new wearos devices and forcing WFF. This seems to be the only way to do arbitrary code for a watch face now. I want to publish this as an alternative to Sectograph for people on new watches, since it's supposed to not work on the latest devices, though I have an older one so I haven't tested that. I did notice that Sectorgraph worked as a photo image complication, so I guess they've figured out the same trick, but the internet doesn't seem to have noticed that. I'm hoping I can sell my version to fill this \"hole\" in the market, even though there doesn't actually seem to be a hole because sectorgraph has figured out the same trick. Something I want to start with, is figuring out how to get this on device properly, without using adb/android studio. I need to bundle both the required blank watchface AND the calendarcomplication into one thing that can be installed from the play store. I would very much like for this blank watchface to default to showing the calendar complication without having to set that. Once I have figured out how to install this in a way that would be convenient for others, I'd like to move on to testing edge cases and making sure it's solid. I know I'm throwing a lot at you here. Lets just start with figuring out how to bundle and deploy.",
+  "tier": "complex",
+  "why": "bundle and ship watchface+complication, packaging design decisions",
+  "src": "real"
+ },
+ {
+  "id": "R135",
+  "ask": "my fault, check again",
+  "tier": "simple",
+  "why": "re-run the previous check, no judgement",
+  "src": "real"
+ },
+ {
+  "id": "R136",
+  "ask": "change of plan, just run session dispensary when I start a new tmux server",
+  "tier": "medium",
+  "why": "hook script to new tmux server start, mechanism choice",
+  "src": "real"
+ },
+ {
+  "id": "R137",
+  "ask": "Why do I hear people talking about the speed of the shells, it sounds like it doesn't matter",
+  "tier": "simple",
+  "why": "general conceptual question, no lookup or edit",
+  "src": "real"
+ },
+ {
+  "id": "R138",
+  "ask": "no, use cargo install, dork",
+  "tier": "simple",
+  "why": "one-word correction, swap to cargo install",
+  "src": "real"
+ },
+ {
+  "id": "R139",
+  "ask": "Move the Waybar installation to a new module file called Large Screen. In that module file, create a script that starts Waybar. Make that script an executable that is only compiled if the large screen module is enabled. Set large screen to be disabled by default, then enable it in the local modules.nix file. Then in autostart.conf start this compile executable from the script.This should only exist if that module is enabled and will fail the run otherwise.",
+  "tier": "complex",
+  "why": "new gated module, derivation, option plumbing, several files",
+  "src": "real"
+ },
+ {
+  "id": "R140",
+  "ask": "still doing it",
+  "tier": "complex",
+  "why": "bug persists, cause still unknown",
+  "src": "real"
+ },
+ {
+  "id": "R141",
+  "ask": "okay, integrate these two module selector scripts into the main install script. do this by turning both of these scripts into functions in the main file, then by calling them and writing their output to the proper locations. For the system config, there is already a place where a configuration.nix file is being written. I want you to instead run the function for the system module selector script and write it's output. Also, store it's output in a var before you write it, so that later when the system config is pulled again as a git repo you can write it back to disk.",
+  "tier": "medium",
+  "why": "well-specified script merge into functions, output captured",
+  "src": "real"
+ },
+ {
+  "id": "R142",
+  "ask": "hey, I'm noticing that my sleep event, which runs from 9p to 5a, says 3 hours left, even though it runs for 8, only 3 hours of it are rendered, but I want the full duration of the actual calendar event indicated under the clock, not just the duration that fits on the watch",
+  "tier": "medium",
+  "why": "show full event duration, localized and clearly specified",
+  "src": "real"
+ },
+ {
+  "id": "R143",
+  "ask": "can you also make it sit behind windows? I rarely have things in fullscreen, when I do I want the bar hidden",
+  "tier": "medium",
+  "why": "bar layering plus fullscreen hide, small config change",
+  "src": "real"
+ },
+ {
+  "id": "R144",
+  "ask": "got a weird output cd failed: ~/Documents/Code/\n4% 1:20=0s ~/Documents/Code/ https://github.com/gusjengis/pLife.git ~/Documents/Code/ https://github.com/gusjengis/Platformer.git                                                                                                                                                \ncd failed: ~/Documents/Code/\n9% 2:19=0s ~/Documents/Code/ https://github.com/gusjengis/pLife.git ~/Documents/Code/ https://github.com/gusjengis/Platformer.git                                                                                                                                                \ncd failed: ~/Documents/Code/\n14% 3:18=0s ~/Documents/Code/ https://github.com/gusjengis/pLife.git ~/Documents/Code/ https://github.com/gusjengis/Platformer.git                                                                                                                                               \ncd failed: ~/Documents/Code/\n19% 4:17=0s ~/Documents/Code/ https://github.com/gusjengis/pLife.git ~/Documents/Code/ https://github.com/gusjengis/Platformer.git                                                                                                                                               \ncd failed: ~/Documents/Code/\n23% 5:16=0s ~/Documents/Code/ https://github.com/gusjengis/pLife.git ~/Documents/Code/ https://github.com/gusjengis/Platformer.git                                                                                                                                               \ncd failed: ~/Documents/Code/\n28% 6:15=0s ~/Documents/Code/ https://github.com/gusjengis/lsp-servers.git ~/Documents/Code/ https://github.com/gusjengis/lsp-servers-cli.git                                                                                                                                    \ncd failed: ~/Documents/Code/\n33% 7:14=0s ~/Documents/Code/ https://github.com/gusjengis/lsp-servers.git ~/Documents/Code/ https://github.com/gusjengis/lsp-servers-cli.git                                                                                                                                    \ncd failed: ~/Documents/Code/\n38% 8:13=0s ~/Documents/Code/ https://github.com/gusjengis/lsp-servers.git ~/Documents/Code/ https://github.com/gusjengis/lsp-servers-cli.git                                                                                                                                    \ncd failed: ~/Documents/Code/\n42% 9:12=0s ~/Documents/Code/ https://github.com/gusjengis/Resume.git ~/Documents/Code/ https://github.com/agreenweb/timeline.git                                                                                                                                                \ncd failed: ~/Documents/Code/\n47% 10:11=0s ~/Documents/Code/ https://github.com/gusjengis/Resume.git ~/Documents/Code/ https://github.com/agreenweb/timeline.git                                                                                                                                               \ncd failed: ~/Documents/Code/\n52% 11:10=0s ~/Documents/Code/ https://github.com/gusjengis/WatchFace.git ~/Documents/Code/ https://github.com/gusjengis/CalendarComplication.git                                                                                                                                \ncd failed: ~/Documents/Code/\n57% 12:9=0s ~/Documents/Code/ https://github.com/gusjengis/nixpkgs ~/Documents/Code/ ssh://aur@aur.archlinux.org/hyprlog.git                                                                                                                                                     \ncd failed: ~/Documents/Code/\n61% 13:8=0s ~/.config/ https://github.com/gusjengis/nvim.git ~/.config/ https://github.com/gusjengis/secrets.git                                                                                                                                                                 \ncd failed: ~/Documents/Code/\n66% 14:7=0s ~/Documents/Code/Plinth/ https://github.com/gusjengis/Plinth-Core.git ~/Documents/Code/Plinth/ https://github.com/gusjengis/Plinth-Util.git                                                                                                                          \ncd failed: ~/Documents/Code/\n71% 15:6=0s ~/Documents/Code/Plinth/ https://github.com/gusjengis/Plinth-Web.git ~/Documents/Code/Plinth/ https://github.com/gusjengis/Plinth-Web-Build.git                                                                                                                      \ncd failed: ~/.config/\n76% 16:5=0s ~/Documents/Code/Plinth/ https://github.com/gusjengis/Plinth-Hello-World.git ~/Documents/Code/Mosaic/ https://github.com/gusjengis/Mosaic-Backend.git                                                                                                                \ncd failed: ~/Documents/Code/Plinth/\n80% 17:4=0s ~/Documents/Code/Mosaic/ https://github.com/gusjengis/Mosaic-Model.git ~/Documents/Code/Mosaic/ https://github.com/gusjengis/Mosaic-Hub.git                                                                                                                          \ncd failed: ~/Documents/Code/Plinth/\n85% 18:3=0s ~/Documents/Code/Mosaic/ https://github.com/gusjengis/Mosaic-Model.git ~/Documents/Code/Mosaic/ https://github.com/gusjengis/Mosaic-Hub.git                                                                                                                          \ncd failed: ~/Documents/Code/Plinth/\n90% 19:2=0s ~/Documents/Code/Mosaic/ https://github.com/gusjengis/Mosaic-Android.git ~/Documents/Code/Mosaic/ https://github.com/gusjengis/Mosaic-Snitch.git                                                                                                                     \ncd failed: ~/Documents/Code/Mosaic/\n95% 20:1=0s ~/Documents/Code/Mosaic/ https://github.com/gusjengis/Mosaic-Android.git ~/Documents/Code/Mosaic/ https://github.com/gusjengis/Mosaic-Snitch.git                                                                                                                     \ncd failed: ~/Documents/Code/Mosaic/\n100% 21:0=0s ~/Documents/Code/Mosaic/ https://github.com/gusjengis/Mosaic-Android.git ~/Documents/Code/Mosaic/ https://github.com/gusjengis/Mosaic-Snitch.git",
+  "tier": "medium",
+  "why": "cd failure shown with path, localized script bug",
+  "src": "real"
+ },
+ {
+  "id": "R145",
+  "ask": "I want the date string to remain exactly as it is visually. Go ahead and implement.",
+  "tier": "medium",
+  "why": "approval to implement unseen plan with one constraint",
+  "src": "real"
+ },
+ {
+  "id": "R146",
+  "ask": "my bad, not exactly the same, the error is now \"id: OpenClaw: no such user\"",
+  "tier": "medium",
+  "why": "missing user named by error, declare it in config",
+  "src": "real"
+ },
+ {
+  "id": "R147",
+  "ask": "WOAH, not good, you got rid of the whole radial text thing, I want what I had before, with the text aligned raidally, but with it aligned/anchored to the ring instead of being centered on the mid point between the center of the screen and the ring",
+  "tier": "medium",
+  "why": "restore radial text, anchor to ring, behaviour stated",
+  "src": "real"
+ },
+ {
+  "id": "R148",
+  "ask": "why is my android studio failing to pair with my phone using wireless debugging? It just doesn't find devices on the network.",
+  "tier": "reasoning",
+  "why": "environment-dependent network discovery failure, unknown cause",
+  "src": "real"
+ },
+ {
+  "id": "R149",
+  "ask": "these outputs look correct, can you split this into two sub-scripts, one for home-manager and one for the system config?",
+  "tier": "medium",
+  "why": "split script along stated home-manager/system boundary",
+  "src": "real"
+ }
+]

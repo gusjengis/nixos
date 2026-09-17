@@ -18,6 +18,7 @@
     ./desktop_env/bedtime_lockout.nix
     ./software/nvim.nix
     ./software/git.nix
+    ./software/ollama.nix
     ./software/vial.nix
     ./software/tailscale.nix
     ./software/office_network_drives.nix
