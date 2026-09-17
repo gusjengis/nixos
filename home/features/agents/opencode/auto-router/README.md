@@ -16,13 +16,13 @@ model is choosing its own thinking budget.
 
 ## Tiers
 
-| Tier        | For                                                       | Default models                                |
+| Tier        | For                                                       | Model pool (ordered by intelligence)          |
 | ----------- | --------------------------------------------------------- | --------------------------------------------- |
-| `trivial`   | greetings, acknowledgements, trivia — turns asking for nothing | OpenCode Zen free models                  |
-| `simple`    | small, well-specified edits and lookups                    | Claude Haiku 4.5 · GPT-5.6 Luna Fast          |
-| `medium`    | ordinary feature work                                      | Claude Sonnet 4.5 · GPT-5.6 Sol Fast          |
-| `complex`   | multi-file work, restructuring, non-obvious debugging      | Claude Sonnet 5 · GPT-5.6 Terra               |
-| `reasoning` | architecture, concurrency, security, root-cause analysis   | Claude Opus 5 · GPT-5.6 Sol                   |
+| `trivial`   | greetings, acknowledgements, trivia — turns asking for nothing | Nemotron 3 Ultra · Nemotron 3.5 Lightning (free) |
+| `simple`    | small, well-specified edits and lookups                    | GPT-5.6 Luna (16) · Claude Haiku 4.5 (15)    |
+| `medium`    | ordinary feature work                                      | GPT-5.6 Sol (34) · Claude Sonnet 5 (25)      |
+| `complex`   | multi-file work, restructuring, non-obvious debugging      | GPT-5.6 Sol (39) · Claude Sonnet 5 (38)      |
+| `reasoning` | architecture, concurrency, security, root-cause analysis   | Claude Opus 5 (48) · GPT-5.6 Sol (42)        |
 
 `trivial` is free but deliberately narrow: a turn only lands there if it is
 short, has no attachments, and asks for no work on the repository. Those turns
@@ -41,6 +41,12 @@ conversational markers, build intent, multi-step structure, question complexity
 — is cut into tiers by `boundaries`. Keyword rules run first and can only
 escalate, except where the scorer found nothing to say.
 
+Once a tier is chosen, models within that tier are ranked by:
+1. **Intelligence score** (primary) — higher benchmark intelligence wins, to prioritize output quality
+2. **Proven track record** — models that have answered in this session before
+3. **Subscription headroom** — models with more remaining usage budget
+4. **Stable hash** — ties broken predictably per session, so cache stays warm
+
 The design follows [LiteLLM's complexity
 router](https://docs.litellm.ai/docs/proxy/auto_routing), including scoring the
 last real human ask rather than the whole payload, stripping `<system-reminder>`
@@ -51,7 +57,13 @@ would mean swapping the Anthropic and ChatGPT subscription logins for metered
 API keys — turning a flat monthly cost into per-token billing, which is the
 opposite of the point.
 
-Stability rules that matter more than raw accuracy:
+## Model selection within a tier
+
+Within each tier's pool, models are ranked by intelligence score (Artificial Analysis Intelligence Index v4.3, Sept 2026) rather than subscription headroom. This prioritizes output quality over cost distribution. Headroom still matters, but only to break ties between models with similar intelligence, or when the primary model is exhausted.
+
+**Why intelligence-first?** Your router exists to save token spend by routing cheap turns away from expensive models. But cheap turns still need quality output — a weak model's wrong answer costs more in re-asks than running the right model would. Intelligence score therefore comes first to ensure every tier gets the smartest model available, with provider diversity maintained only as a fallback.
+
+Stability rules that matter alongside intelligence prioritization:
 
 - **Approvals inherit.** "yes, do it" runs at the tier that proposed the work.
 - **Acknowledgements run free** and do not move the session's tier, so "thanks"
@@ -59,7 +71,8 @@ Stability rules that matter more than raw accuracy:
 - **De-escalation drops one tier per turn.** Switching models throws away the
   provider-side prompt cache, and a cache rewrite can cost more than the cheaper
   rate saves.
-- **Pool choice is sticky per session**, for the same reason.
+- **Top-quality pool choices are sticky per session**, for the same reason. A
+  lower-scoring fallback is replaced when the preferred model becomes usable.
 - **State survives a restart** via the status file, so a resumed session keeps
   its tier instead of silently falling to the bottom.
 

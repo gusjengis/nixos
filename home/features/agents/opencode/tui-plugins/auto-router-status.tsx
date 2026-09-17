@@ -5,14 +5,15 @@
 // It renders into `session_prompt_right`, the right-hand end of the prompt's
 // meta row, so a routed session reads:
 //
-//   Build · Claude Sonnet 5 Anthropic                Auto · complex · auto
+//   Build · Claude Sonnet 5 Anthropic                Auto ModelName (complex) · effort
 //
 // The left half is OpenCode's own model indicator. It shows the concrete model
 // rather than "Auto" on purpose: the TUI re-reads the model from the last user
 // message when a session comes into view, so once the router has rewritten a
 // turn, the selection genuinely is that model and the router keeps routing from
-// there (see auto-router.js). This half says which tier the router chose and at
-// what effort - `auto` meaning the model picks its own thinking budget.
+// there (see auto-router.js). This half shows the tier in parentheses after the
+// model name, then effort - `default` or `auto` meaning the model picks its own
+// thinking budget.
 //
 // Decisions are read from the file the server-side plugin writes on every
 // routed prompt. Polling a small local file keeps this independent of the
@@ -74,7 +75,10 @@ const tui = async (api, options) => {
             {entry() ? (
               <>
                 <text fg={entry().free ? theme()?.success : theme()?.textMuted}>Auto</text>
-                <text fg={theme()?.text}>{entry().modelName ?? entry().modelID}</text>
+                <text fg={theme()?.text}>
+                  {entry().modelName ?? entry().modelID}
+                  <span fg={theme()?.textMuted}> ({entry().tier})</span>
+                </text>
                 <text fg={theme()?.textMuted}>{"\u00b7"}</text>
                 <text>
                   <span style={{ fg: theme()?.warning, bold: true }}>{entry().effort ?? "default"}</span>

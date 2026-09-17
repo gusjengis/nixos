@@ -42,18 +42,21 @@ const DEFAULTS = {
   enabled: true,
 
   // Tier -> a model id or a pool of them. Pools exist to spread load across
-  // both subscriptions; the member is chosen by remaining headroom, then kept
-  // for the rest of the session so a live conversation does not bounce between
-  // models and throw away its prompt cache.
+  // both subscriptions; the member is chosen by intelligence score first, then
+  // remaining headroom, then a stable hash. Top-quality picks stay sticky for
+  // the session so live conversations preserve their prompt cache.
+  //
+  // Intelligence scores are from Artificial Analysis Intelligence Index v4.3 (Sept 2026).
+  // Models are ordered by intelligence descending within each tier.
   //
   // `trivial` is free (OpenCode Zen). It only ever sees turns that are short,
   // attachment-free and carry no code, so a weaker model there costs nothing
   // worse than a re-ask.
   tiers: {
     trivial: ["opencode/nemotron-3-ultra-free", "opencode/nemotron-3.5-lightning-free"],
-    simple: ["anthropic/claude-haiku-4-5", "openai/gpt-5.6-luna-fast"],
-    medium: ["anthropic/claude-sonnet-4-5", "openai/gpt-5.6-sol-fast"],
-    complex: ["anthropic/claude-sonnet-5", "openai/gpt-5.6-terra"],
+    simple: ["openai/gpt-5.6-luna-fast", "anthropic/claude-haiku-4-5"],
+    medium: ["openai/gpt-5.6-sol-fast", "anthropic/claude-sonnet-5"],
+    complex: ["openai/gpt-5.6-sol", "anthropic/claude-sonnet-5"],
     reasoning: ["anthropic/claude-opus-5", "openai/gpt-5.6-sol"],
   },
 
@@ -81,7 +84,7 @@ const DEFAULTS = {
     reasoning: "high",
   },
 
-  fallback: "anthropic/claude-sonnet-4-5",
+  fallback: "anthropic/claude-sonnet-5",
 
   // Models never to route to, whatever the catalog advertises. For models that
   // are listed but permanently unusable on this machine's credentials.
@@ -214,6 +217,36 @@ const DEFAULTS = {
   log: true,
 }
 
+// Artificial Analysis Intelligence Index v4.3 scores (Sept 2026), matched to
+// each tier's configured effort where a directly comparable result exists.
+// Tier-aware scores matter because one model can run at different effort levels.
+const MODEL_INTELLIGENCE = {
+  trivial: {
+    "opencode/nemotron-3-ultra-free": 23,
+    "opencode/nemotron-3.5-lightning-free": 14,
+  },
+  simple: {
+    "openai/gpt-5.6-luna-fast": 16, // non-reasoning
+    "anthropic/claude-haiku-4-5": 15, // non-reasoning
+  },
+  medium: {
+    "openai/gpt-5.6-sol-fast": 34, // low
+    "anthropic/claude-sonnet-5": 25, // low
+  },
+  complex: {
+    "openai/gpt-5.6-sol": 39, // medium
+    "anthropic/claude-sonnet-5": 38, // adaptive; max score used as upper bound
+  },
+  reasoning: {
+    "anthropic/claude-opus-5": 48, // high reference for adaptive mode
+    "openai/gpt-5.6-sol": 42, // high
+  },
+}
+
+function intelligence(tier, id) {
+  return MODEL_INTELLIGENCE[tier]?.[id] ?? 0
+}
+
 function deepMerge(base, override) {
   if (!override || typeof override !== "object" || Array.isArray(override)) return override ?? base
   const out = Array.isArray(base) ? [...base] : { ...base }
@@ -342,6 +375,15 @@ export const AutoRouterPlugin = async ({ client }) => {
     client.app.log({ body: { service: SERVICE, level, message, extra } }).catch(() => {})
   }
 
+  for (const [tier, configured] of Object.entries(config.tiers ?? {})) {
+    const pool = Array.isArray(configured) ? configured : [configured]
+    for (const id of pool.filter(Boolean)) {
+      if (!MODEL_INTELLIGENCE[tier]?.[id]) {
+        log("warn", "configured model has no intelligence score", { tier, model: id })
+      }
+    }
+  }
+
   // Account switching only takes effect on a provider OpenCode has not
   // initialised yet, so it is attempted once, here, before any model is used.
   if (usage) {
@@ -458,17 +500,33 @@ export const AutoRouterPlugin = async ({ client }) => {
     // mid-conversation and invalidate the provider-side prompt cache.
     const state = sessions.get(sessionID)
     const sticky = state?.picks?.[tier]
-    let picked = sticky && candidates.includes(sticky) ? sticky : undefined
+    const bestIntelligence = Math.max(...candidates.map((id) => intelligence(tier, id)))
+    // Keep cache affinity only when it does not preserve a lower-quality pick
+    // after a better model becomes available or the tier configuration changes.
+    let picked =
+      sticky && candidates.includes(sticky) && intelligence(tier, sticky) === bestIntelligence ? sticky : undefined
 
     if (!picked) {
-      // Proven models first, then most headroom, then a stable hash so two
-      // sessions with nothing to choose between still spread out.
+      // Rank by intelligence first (higher is better), then proven status,
+      // then most headroom, then a stable hash so two sessions with nothing
+      // to choose between still spread out. This prioritizes output quality
+      // over provider diversity or cost.
       const ranked = [...candidates].sort((a, b) => {
+        // Intelligence score (descending: higher wins)
+        const intelA = intelligence(tier, a)
+        const intelB = intelligence(tier, b)
+        if (intelA !== intelB) return intelB - intelA
+
+        // Then proven models (lower trust score = better, so reverse)
         const trusted = trust(a) - trust(b)
         if (trusted !== 0) return trusted
+
+        // Then most headroom
         const left = usage?.headroom(a.slice(0, a.indexOf("/"))) ?? 100
         const right = usage?.headroom(b.slice(0, b.indexOf("/"))) ?? 100
         if (right !== left) return right - left
+
+        // Finally stable hash for session diversity
         return hashString(sessionID + a) - hashString(sessionID + b)
       })
       picked = ranked[0]
@@ -830,6 +888,7 @@ export const AutoRouterPlugin = async ({ client }) => {
         providerName: target.providerName,
         effort: target.effortLabel,
         variant: target.variant ?? null,
+        intelligence: intelligence(target.tier, target.id) || null,
         free: target.providerID === "opencode" || target.providerID === "lmstudio",
         headroom: usage?.headroom(target.providerID) ?? null,
         avoided: target.exhausted ?? null,
