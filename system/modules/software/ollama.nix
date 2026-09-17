@@ -110,7 +110,13 @@ in
       description = "Hold ${cfg.preload} resident in VRAM";
       after = [ "ollama.service" ];
       wants = [ "ollama.service" ];
-      wantedBy = [ "multi-user.target" ];
+      # Also pulled in by ollama.service itself, so a daemon restart - which a
+      # `rebuild` performs - re-warms immediately instead of leaving the model
+      # cold until the next timer tick.
+      wantedBy = [
+        "multi-user.target"
+        "ollama.service"
+      ];
       serviceConfig = {
         Type = "oneshot";
         Restart = "on-failure";
@@ -128,14 +134,30 @@ in
           if ${pkgs.curl}/bin/curl -fsS --max-time 5 "$url/api/tags" \
             | ${pkgs.jq}/bin/jq -e --arg m ${lib.escapeShellArg cfg.preload} \
               'any(.models[]?; .name == $m or .model == $m)' >/dev/null 2>&1; then
-            # An empty message list is Ollama's documented way to load a model
-            # without generating anything.
+            # Deliberately a real generation rather than the empty-message form
+            # that merely loads the weights. Loading is not warming: the first
+            # request to actually decode a token pays for the compute graph and
+            # the sampler on top, which measured at three seconds against two
+            # hundred milliseconds once warm. A caller on a sub-second budget
+            # treats that as a failure and falls back, so the warm-up has to
+            # happen here and not on somebody's prompt.
             exec ${pkgs.curl}/bin/curl -fsS --max-time 900 "$url/api/chat" \
+              -H 'content-type: application/json' \
               -d ${
                 lib.escapeShellArg (builtins.toJSON {
                   model = cfg.preload;
-                  messages = [ ];
+                  stream = false;
                   keep_alive = -1;
+                  messages = [
+                    {
+                      role = "user";
+                      content = "warmup";
+                    }
+                  ];
+                  options = {
+                    temperature = 0;
+                    num_predict = 1;
+                  };
                 })
               } >/dev/null
           fi
