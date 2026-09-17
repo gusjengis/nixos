@@ -204,7 +204,10 @@ To rule a model out permanently, put it in `blocked` in `auto-router.json`.
 
 Headroom is read from the usage cache `quickshell-ai-usage` already maintains
 for the bar widget. Within a tier the provider with more left wins, and a
-provider under `avoidBelowHeadroom` percent is skipped entirely.
+provider under `avoidBelowHeadroom` percent is skipped when another candidate
+has more room. A provider at zero is always excluded; if every subscription in
+the pool is low, a non-zero candidate is used rather than restoring an exhausted
+one.
 
 If the active ChatGPT account is spent and the other saved account has
 meaningfully more left, the router runs `quickshell-ai-account select` at

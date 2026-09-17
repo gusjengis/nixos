@@ -464,15 +464,25 @@ export const AutoRouterPlugin = async ({ client }) => {
     }
     if (!candidates.length) return undefined
 
-    // Drop providers that have nothing left, unless that empties the pool.
+    // Never send a request to a subscription known to be exhausted. Low but
+    // non-zero headroom remains an emergency option when every candidate is
+    // below the normal avoidance threshold.
     let exhausted
     if (usage) {
+      const available = candidates.filter((id) => {
+        const left = usage.headroom(id.slice(0, id.indexOf("/")))
+        return left === undefined || left > 0
+      })
+      exhausted = candidates.filter((id) => !available.includes(id))
+      if (!available.length) return undefined
+      candidates = available
+
       const withRoom = candidates.filter((id) => {
         const left = usage.headroom(id.slice(0, id.indexOf("/")))
         return left === undefined || left > config.usage.avoidBelowHeadroom
       })
       if (withRoom.length && withRoom.length !== candidates.length) {
-        exhausted = candidates.filter((id) => !withRoom.includes(id))
+        exhausted.push(...candidates.filter((id) => !withRoom.includes(id)))
       }
       if (withRoom.length) candidates = withRoom
     }
