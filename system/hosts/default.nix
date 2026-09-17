@@ -19,47 +19,121 @@
     system = "x86_64-linux";
     machineId = "10f140e2392c421688f344d480811453";
     description = "Main desktop. Gaming, game development, 3D printing, Windows VM host.";
+    services = [
+      {
+        unit = "libvirtd.service";
+        label = "Windows VM host";
+      }
+      {
+        unit = "docker.service";
+        label = "Container runtime";
+      }
+    ];
   };
 
   alpha = {
     system = "x86_64-linux";
     machineId = "e2f2e88b69d940289236f4f94cd5ca0e";
     description = "Headless desktop server.";
+    services = [
+      {
+        unit = "nfs-server.service";
+        label = "Fleet data drive";
+      }
+      {
+        unit = "immich-server.service";
+        label = "Immich photo library";
+      }
+      {
+        unit = "phpfpm-nextcloud.service";
+        label = "Nextcloud";
+      }
+      {
+        unit = "parakeet-asr.service";
+        label = "GPU speech recognition";
+      }
+      {
+        unit = "ultrabridge.service";
+        label = "UltraBridge device sync";
+      }
+    ];
   };
 
   omega = {
     system = "x86_64-linux";
     machineId = "fb413463bebc495a99fbc054919df029";
     description = "Headless desktop server.";
+    services = [
+      {
+        unit = "docker.service";
+        label = "Container runtime";
+      }
+    ];
   };
 
   legion = {
     system = "x86_64-linux";
     machineId = "48ba9a9b1d98407d9f5acaf278031404";
     description = "Laptop with the full desktop.";
+    services = [
+      {
+        unit = "docker.service";
+        label = "Container runtime";
+      }
+    ];
   };
 
   mac = {
     system = "aarch64-linux";
     machineId = "7d57a3a0f7874971985e76c02c53f04c";
     description = "Apple Silicon laptop running Asahi, with the full desktop.";
+    services = [
+      {
+        unit = "tailscale-advertise-routes.service";
+        label = "Office network gateway";
+      }
+    ];
   };
 
   t480s = {
     system = "x86_64-linux";
     machineId = "87a658853ef94b7fa356ad0a4e4b8314";
     description = "ThinkPad T480s with the full desktop.";
+    services = [ ];
   };
 
   t470 = {
     system = "x86_64-linux";
     machineId = "a7a69f62a9af4589ad7115acf38e7c6f";
     description = "ThinkPad T470, headless.";
+    services = [
+      {
+        unit = "podman-homeassistant.service";
+        label = "Home Assistant";
+      }
+      {
+        unit = "musicassistant.service";
+        label = "Music Assistant";
+      }
+      {
+        unit = "podman-ble-scale-sync.service";
+        label = "BLE scale sync";
+      }
+      {
+        unit = "podman-zone-configurator.service";
+        label = "Zone configurator";
+      }
+      {
+        unit = "joshs-mass.service";
+        label = "Josh's Music Assistant";
+      }
+    ];
   };
 
   zombie = {
     system = "x86_64-linux";
     machineId = "6def610e410e44d480b8234c7cd5b671";
     description = "Headless laptop.";
+    services = [ ];
   };
 }

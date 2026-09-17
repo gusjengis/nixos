@@ -21,6 +21,7 @@
     ./software/ollama.nix
     ./software/vial.nix
     ./software/tailscale.nix
+    ./software/fleet-monitor.nix
     ./software/office_network_drives.nix
     ./software/vms.nix
     ./software/data_drive_client.nix
