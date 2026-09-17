@@ -298,7 +298,20 @@ const DEFAULTS = {
   // configured model is under 1.4s, so this is roughly double the worst
   // observed case and well short of being noticed.
   timeoutMs: 3000,
-  numCtx: 8192,
+  // Deliberately unset, and changing that is a trap.
+  //
+  // Ollama keys the loaded runner partly on the context length, so a request
+  // whose `num_ctx` differs from the one the model was loaded under evicts the
+  // runner and reloads it - measured at 2.4s, against 300ms for a request that
+  // matches. The server-side warm-up and a classifier disagreeing by one number
+  // is enough to make every alternate request pay that, which is exactly the
+  // shape of a timeout that only happens sometimes.
+  //
+  // The context length belongs to the server, where OLLAMA_CONTEXT_LENGTH sets
+  // it once for everything. What is sent here is bounded by headChars and
+  // tailChars anyway: about 1200 tokens of prompt on top of a 1500-token
+  // preamble, which fits even Ollama's smallest 4096 default.
+  numCtx: null,
   // Enough for {"rule":"unfamiliar_integration","difficulty":"7"} and nothing else.
   numPredict: 32,
   topLogprobs: 10,
@@ -391,8 +404,9 @@ export function createClassifier({ config: overrides, log = () => {}, fetch: fet
           options: {
             temperature: 0,
             seed: 0,
-            num_ctx: config.numCtx,
             num_predict: config.numPredict,
+            // Only ever sent when explicitly configured. See numCtx above.
+            ...(config.numCtx ? { num_ctx: config.numCtx } : {}),
           },
         }),
       })

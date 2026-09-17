@@ -109,10 +109,17 @@ is too thin to cover. Both graded against `RUBRIC.md`. Reproduce with
 | | exact | balanced exact | within one tier | off by two or more | bias |
 | --- | --- | --- | --- | --- | --- |
 | keyword scorer | 30.0% | 33.9% | 79.5% | 20.5% | −0.68 tiers |
-| `qwen3:4b-instruct-2507-q8_0` | 58.4% | 60.5% | 93.7% | 6.3% | +0.08 tiers |
+| `qwen3:4b-instruct-2507-q8_0` | 58.9% | 60.6% | 94.2% | 5.8% | +0.07 tiers |
 
 `balanced exact` averages per gold tier instead of per prompt, so the rare tiers
-count as much as `medium` does. Median added latency is 616 ms, p90 689 ms.
+count as much as `medium` does. Median added latency is 609 ms, p90 791 ms,
+p99 1005 ms.
+
+One deployment detail is load-bearing: the classifier must not send `num_ctx`.
+Ollama keys the loaded runner on the context length, so a request that disagrees
+with the length the model was loaded under evicts and reloads it — 2.4 s against
+300 ms. The context window is set once, server-side, by
+`OLLAMA_CONTEXT_LENGTH` in `ollama.nix`.
 
 `bias` is the mean signed tier error. The keyword scorer is not merely
 inaccurate, it is *consistently cheap* — it under-graded by two thirds of a tier
