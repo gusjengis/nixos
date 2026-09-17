@@ -31,8 +31,6 @@
 
   hardware.asahi.enable = true;
 
-  bedtimeLockout.enable = false;
-
   environment.systemPackages = with pkgs; [
     iwd
   ];

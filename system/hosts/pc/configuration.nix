@@ -5,7 +5,6 @@
 {
   imports = [ ./windows-vm.nix ];
 
-  bedtimeLockout.enable = false;
   nvidia.enable = true;
   virtual-machines.enable = true;
   programs.steam.enable = true;

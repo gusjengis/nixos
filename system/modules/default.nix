@@ -30,7 +30,8 @@
     grub.enable = lib.mkDefault true;
     nvidia.enable = lib.mkDefault false;
     hyprland.enable = lib.mkDefault true;
-    bedtimeLockout.enable = lib.mkDefault config.hyprland.enable;
+    # Keep lockout enabled on every managed machine, including headless hosts.
+    bedtimeLockout.enable = lib.mkDefault true;
     nvim.enable = lib.mkDefault true;
     git.enable = lib.mkDefault true;
     vial.enable = lib.mkDefault true;

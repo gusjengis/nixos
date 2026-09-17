@@ -5,7 +5,6 @@
     ./hardware-configuration.nix
   ];
 
-  bedtimeLockout.enable = false;
   services.keyd = {
     enable = true;
     keyboards = {
