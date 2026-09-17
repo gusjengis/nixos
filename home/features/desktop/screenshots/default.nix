@@ -9,9 +9,11 @@ let
     name = "take-screenshot";
     runtimeInputs = with pkgs; [
       grim
+      imagemagick
       jq
       libnotify
       slurp
+      swappy
       wl-clipboard
     ];
     text = builtins.readFile ./take-screenshot.sh;

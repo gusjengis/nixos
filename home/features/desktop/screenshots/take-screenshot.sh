@@ -53,4 +53,39 @@ else
 fi
 
 wl-copy --type image/png <"$outfile"
-notify-send "Screenshot saved" "$outfile"
+
+(
+  action="$(
+    notify-send \
+      --action=default=Edit \
+      --icon="$outfile" \
+      "Screenshot saved" \
+      "Click to edit: $outfile"
+  )" || exit 0
+
+  [[ $action == default ]] || exit 0
+
+  edited="${outfile%.png} edited.png"
+  swappy --file "$outfile" --output-file "$edited"
+
+  if [[ -s $edited ]]; then
+    comparison_status=0
+    magick compare -metric AE "$outfile" "$edited" null: 2>/dev/null || comparison_status=$?
+
+    case $comparison_status in
+      0)
+        rm "$edited"
+        exit 0
+        ;;
+      1) ;;
+      *)
+        rm "$edited"
+        notify-send "Screenshot edit failed" "Could not compare edited image"
+        exit 1
+        ;;
+    esac
+
+    wl-copy --type image/png <"$edited"
+    notify-send --icon="$edited" "Edited screenshot saved" "$edited"
+  fi
+) >/dev/null 2>&1 &
