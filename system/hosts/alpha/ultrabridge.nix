@@ -46,6 +46,19 @@ let
       hash = "sha256-ZX/1sJga+SEcty6qsSoHyxL3Ijer94t4bEuyP1ozX1k=";
     };
 
+    # Fixes internal/notestore's rel_path staleness: previously cached once at
+    # insert time and never refreshed, so it went stale after a notes_path
+    # config change (every existing note silently vanished from the file
+    # browser — rel_path retained the old root prefix) or after a note was
+    # moved/renamed into a device-side folder (RenameFile intentionally left
+    # rel_path untouched). Scan() now reconciles rel_path against the current
+    # notes_path on every pass (without spuriously re-queueing OCR), and
+    # RenameFile recomputes it from the new path. See
+    # patches/ultrabridge-rel-path-fix.patch for the full diff and new
+    # regression tests (TestScan_ReconcilesStaleRelPath,
+    # TestRenameFile_RecomputesRelPath).
+    patches = [ ./patches/ultrabridge-rel-path-fix.patch ];
+
     # Route the go-sn dependency to our patched copy before vendoring runs
     # (buildGoModule shares postPatch between the vendor-fetching derivation
     # and the main build, so this replace is picked up by `go mod vendor`).
