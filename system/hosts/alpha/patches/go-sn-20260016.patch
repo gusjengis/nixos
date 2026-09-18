@@ -1,0 +1,158 @@
+diff -ru a/note/parse.go b/note/parse.go
+--- a/note/parse.go	2026-03-21 20:38:13.000000000 -0700
++++ b/note/parse.go	2026-09-17 21:44:31.017661289 -0700
+@@ -21,6 +21,17 @@
+ 
+ const magic = "noteSN_FILE_VER_20230015"
+ 
++// magicV20260016 is the file signature introduced with Chauvet firmware 3.28.42
++// (Manta/N5). Outer framing (header/footer/page/block layout) is unchanged from
++// magic; only new header fields (e.g. APPLY_EQUIPMENT=N5) and richer stroke/pen
++// features were added. See docs/format-20260016.md for the investigation notes.
++const magicV20260016 = "noteSN_FILE_VER_20260016"
++
++func isSupportedMagic(b []byte) bool {
++	s := string(b)
++	return s == magic || s == magicV20260016
++}
++
+ var tagRE = regexp.MustCompile(`<([^:<>]+):(.*?)>`)
+ 
+ // Note represents a parsed .note file.
+@@ -28,6 +39,7 @@
+ 	Header Tags
+ 	Pages  []*Page
+ 	raw    []byte
++	magic  string
+ }
+ 
+ // Page represents one page of a note.
+@@ -53,7 +65,7 @@
+ 	if len(raw) < 32 {
+ 		return nil, fmt.Errorf("file too short")
+ 	}
+-	if string(raw[:24]) != magic {
++	if !isSupportedMagic(raw[:24]) {
+ 		return nil, fmt.Errorf("bad magic: %q", string(raw[:24]))
+ 	}
+ 
+@@ -78,7 +90,7 @@
+ 	}
+ 	footer := parseTags(raw[footerOff+4 : footerOff+4+footerLen])
+ 
+-	n := &Note{Header: hdr, raw: raw}
++	n := &Note{Header: hdr, raw: raw, magic: string(raw[:24])}
+ 
+ 	// Collect pages: PAGE1, PAGE2, ... from footer
+ 	for i := 1; ; i++ {
+@@ -245,7 +257,7 @@
+ 
+ func devicePortraitWidth(equipment string) int {
+ 	switch equipment {
+-	case "Manta":
++	case "Manta", "N5": // N5 is the internal equipment code used by newer Manta firmware.
+ 		return 1920
+ 	default: // N6, A5X, etc.
+ 		return 1404
+@@ -254,7 +266,7 @@
+ 
+ func devicePortraitHeight(equipment string) int {
+ 	switch equipment {
+-	case "Manta":
++	case "Manta", "N5":
+ 		return 2560
+ 	default:
+ 		return 1872
+@@ -277,7 +289,7 @@
+ // Unknown equipment strings fall back to Nomad (N6) dimensions.
+ func devicePhysicalMM(equipment string) (widthMM, heightMM float64) {
+ 	switch equipment {
+-	case "Manta":
++	case "Manta", "N5":
+ 		// 10.67" diagonal, 1920×2560 pixels
+ 		return physicalFromDiag(10.67, 1920, 2560)
+ 	case "A5X", "A5_X":
+diff -ru a/note/relocate.go b/note/relocate.go
+--- a/note/relocate.go	2026-03-21 20:38:13.000000000 -0700
++++ b/note/relocate.go	2026-09-17 21:44:55.018974622 -0700
+@@ -70,14 +70,17 @@
+ 		}
+ 		pageMetaLen := int(binary.LittleEndian.Uint32(n.raw[pageOff:]))
+ 		pageMeta := parseTags(n.raw[pageOff+4 : pageOff+4+pageMetaLen])
+-		for _, tag := range []string{"MAINLAYER", "BGLAYER", "TOTALPATH", "RECOGNTEXT", "RECOGNFILE"} {
++		for _, tag := range []string{
++			"MAINLAYER", "BGLAYER", "LAYER1", "LAYER2", "LAYER3",
++			"TOTALPATH", "RECOGNTEXT", "RECOGNFILE", "IDTABLE",
++		} {
+ 			off, ok := parseInt(pageMeta[tag])
+ 			if !ok {
+ 				continue
+ 			}
+ 			add(off)
+ 			// Collect LAYERBITMAP inside layer blocks that are themselves past insertionPoint.
+-			if (tag == "MAINLAYER" || tag == "BGLAYER") && off > insertionPoint {
++			if isLayerTag(tag) && off > insertionPoint {
+ 				if block, err := n.BlockAt(off); err == nil {
+ 					tags := parseTags(block)
+ 					if bOff, ok2 := parseInt(tags["LAYERBITMAP"]); ok2 {
+@@ -95,6 +98,17 @@
+ 	return result
+ }
+ 
++// isLayerTag reports whether tag names a layer-block field that may itself
++// contain a nested LAYERBITMAP offset (MAINLAYER, BGLAYER, LAYER1-3).
++func isLayerTag(tag string) bool {
++	switch tag {
++	case "MAINLAYER", "BGLAYER", "LAYER1", "LAYER2", "LAYER3":
++		return true
++	default:
++		return false
++	}
++}
++
+ // computeShift computes the final total byte shift caused by inserting a block
+ // of baseShift bytes at insertionPoint. affectedOffsets is the list returned by
+ // collectOffsets. The extra bytes arise from decimal digit-width growth: when
+@@ -173,7 +187,7 @@
+ 		s[pageOff] = true
+ 		pageMetaLen := int(binary.LittleEndian.Uint32(n.raw[pageOff:]))
+ 		pageMeta := parseTags(n.raw[pageOff+4 : pageOff+4+pageMetaLen])
+-		for _, tag := range []string{"MAINLAYER", "BGLAYER"} {
++		for _, tag := range []string{"MAINLAYER", "BGLAYER", "LAYER1", "LAYER2", "LAYER3", "IDTABLE"} {
+ 			off, ok := parseInt(pageMeta[tag])
+ 			if !ok {
+ 				continue
+diff -ru a/note/write.go b/note/write.go
+--- a/note/write.go	2026-03-21 20:38:13.000000000 -0700
++++ b/note/write.go	2026-09-17 21:45:12.715199460 -0700
+@@ -187,7 +187,10 @@
+ 		}
+ 		pmLen := int(binary.LittleEndian.Uint32(n.raw[pageOff:]))
+ 		pm := parseTags(n.raw[pageOff+4 : pageOff+4+pmLen])
+-		for _, tag := range []string{"MAINLAYER", "BGLAYER", "TOTALPATH"} {
++		for _, tag := range []string{
++			"MAINLAYER", "BGLAYER", "LAYER1", "LAYER2", "LAYER3",
++			"TOTALPATH", "IDTABLE",
++		} {
+ 			val := pm[tag]
+ 			if val == "" || val == "0" {
+ 				continue
+@@ -405,13 +408,16 @@
+ 		}
+ 		pageMetaLen := int(binary.LittleEndian.Uint32(n.raw[pageOff:]))
+ 		pageMeta := parseTags(n.raw[pageOff+4 : pageOff+4+pageMetaLen])
+-		for _, tag := range []string{"MAINLAYER", "BGLAYER", "TOTALPATH", "RECOGNTEXT", "RECOGNFILE"} {
++		for _, tag := range []string{
++			"MAINLAYER", "BGLAYER", "LAYER1", "LAYER2", "LAYER3",
++			"TOTALPATH", "RECOGNTEXT", "RECOGNFILE", "IDTABLE",
++		} {
+ 			val := pageMeta[tag]
+ 			off, ok := parseInt(val)
+ 			if ok && off > insertionPoint && off < footerOff {
+ 				seen[off] = true
+ 				// Collect LAYERBITMAP offset from inside layer blocks.
+-				if tag == "MAINLAYER" || tag == "BGLAYER" {
++				if isLayerTag(tag) {
+ 					if block, err := n.BlockAt(off); err == nil {
+ 						layerTags := parseTags(block)
+ 						if bOff, ok2 := parseInt(layerTags["LAYERBITMAP"]); ok2 {

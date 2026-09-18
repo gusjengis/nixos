@@ -11,6 +11,30 @@ let
   fileRoot = "/data/Supernote";
   adminPasswordFile = "${stateDir}/admin-password";
 
+  # jdkruzr/go-sn, patched to accept the "noteSN_FILE_VER_20260016" file
+  # signature introduced by Chauvet firmware 3.28.42 (Manta/N5), and to
+  # relocate IDTABLE/LAYER1-3 offsets during multi-page RECOGNTEXT injection
+  # (the upstream relocation code omitted these tags, which could corrupt
+  # notes with more than one page on write). Read-only parsing of the new
+  # format was verified structurally sound against all local .note files;
+  # see patches/go-sn-20260016.patch for details and upstream references.
+  #
+  # Pinned to the same commit as ultrabridge's go.mod dependency
+  # (github.com/jdkruzr/go-sn v0.0.0-20260322033813-b2a5f8c9e7e4) so the
+  # patch stays a minimal diff. Bump both together when ultrabridge updates
+  # its go-sn dependency, and drop this override once upstream go-sn gains
+  # native 20260016 support.
+  goSnPatched = pkgs.applyPatches {
+    name = "go-sn-20260016-patched";
+    src = pkgs.fetchFromGitHub {
+      owner = "jdkruzr";
+      repo = "go-sn";
+      rev = "b2a5f8c9e7e42dcd0a89f23bb4db72a31c3db2b3";
+      hash = "sha256-/ghBySVfhkCSZStxGyaS6YvSvFfXc6NxdUdxMk5OkFY=";
+    };
+    patches = [ ./patches/go-sn-20260016.patch ];
+  };
+
   package = pkgs.buildGoModule rec {
     pname = "ultrabridge";
     version = "0-unstable-2026-08-30";
@@ -22,7 +46,16 @@ let
       hash = "sha256-ZX/1sJga+SEcty6qsSoHyxL3Ijer94t4bEuyP1ozX1k=";
     };
 
-    vendorHash = "sha256-O0AnTdLy+fpinzmTXKO4HDQftnzayATYuNxDqFhzV/A=";
+    # Route the go-sn dependency to our patched copy before vendoring runs
+    # (buildGoModule shares postPatch between the vendor-fetching derivation
+    # and the main build, so this replace is picked up by `go mod vendor`).
+    postPatch = ''
+      rm -rf ./.go-sn-patched
+      cp -r --no-preserve=mode ${goSnPatched} ./.go-sn-patched
+      go mod edit -replace github.com/jdkruzr/go-sn=./.go-sn-patched
+    '';
+
+    vendorHash = "sha256-WcChE96oJGW5bu21cF/Hi0vlXJIS3OSPejdmo6WwOEk=";
     subPackages = [ "cmd/ultrabridge" ];
 
     nativeBuildInputs = [ pkgs.makeWrapper ];
