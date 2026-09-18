@@ -1,6 +1,6 @@
 import QtQuick
 import QtQuick.Controls
-import QtQuick.Shapes
+import QtQuick.Effects
 import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Io
@@ -338,18 +338,25 @@ PanelWindow {
         Item {
             id: caption
             anchors.bottom: parent.bottom
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.leftMargin: 24
-            anchors.rightMargin: 24
-            height: 44
+            anchors.horizontalCenter: parent.horizontalCenter
+            width: Math.min(560, stage.width * 0.6)
+            height: 52
             visible: picker.selected !== null
+
+            Rectangle {
+                anchors.fill: parent
+                color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, 0.88)
+                border.color: Theme.border
+                border.width: 1
+                radius: 10
+            }
 
             Text {
                 id: captionTitle
                 anchors.top: parent.top
+                anchors.topMargin: 7
                 anchors.horizontalCenter: parent.horizontalCenter
-                width: parent.width
+                width: parent.width - 24
                 horizontalAlignment: Text.AlignHCenter
                 elide: Text.ElideRight
                 text: picker.selected ? picker.selected.title : ""
@@ -363,17 +370,11 @@ PanelWindow {
                 anchors.top: captionTitle.bottom
                 anchors.topMargin: 2
                 anchors.horizontalCenter: parent.horizontalCenter
-                width: parent.width
+                width: parent.width - 24
                 horizontalAlignment: Text.AlignHCenter
                 elide: Text.ElideRight
                 visible: text !== ""
-                text: {
-                    if (!picker.selected)
-                        return "";
-                    const tags = picker.selected.tags.slice(0, 6).join(" · ");
-                    const date = picker.selected.date;
-                    return date !== "" && tags !== "" ? date + "  ·  " + tags : date + tags;
-                }
+                text: picker.selected ? picker.selected.date : ""
                 color: Theme.muted
                 font.family: Theme.fontFamily
                 font.pixelSize: 11
@@ -413,10 +414,13 @@ PanelWindow {
                     readonly property real absoluteDistance: Math.abs(distance)
                     readonly property real centerProgress: Math.sin(Math.max(0, 1 - Math.min(1, absoluteDistance)) * Math.PI / 2)
                     readonly property bool centered: absoluteDistance < 0.5
-                    readonly property real cardWidth: carousel.width * (0.05 + centerProgress * 0.43)
+                    readonly property real sideWidth: carousel.width * 0.05
+                    readonly property real centerWidth: carousel.height * 0.88 * 16 / 9
+                    readonly property real stepGap: (centerWidth + sideWidth) / 2 * 1.02
+                    readonly property real cardWidth: sideWidth + centerProgress * (centerWidth - sideWidth)
                     readonly property real step: absoluteDistance <= 1
-                        ? distance * carousel.width * 0.3
-                        : (distance < 0 ? -1 : 1) * carousel.width * (0.3 + (absoluteDistance - 1) * 0.055)
+                        ? distance * stepGap
+                        : (distance < 0 ? -1 : 1) * (stepGap + (absoluteDistance - 1) * carousel.width * 0.055)
 
                     width: cardWidth
                     height: carousel.height * 0.88
@@ -427,61 +431,39 @@ PanelWindow {
                     // The last clause stops a short result set from repeating across every card.
                     visible: count > 0 && opacity > 0 && absoluteDistance < Math.max(0.5, count / 2)
 
-                    transform: Matrix4x4 {
-                        matrix: Qt.matrix4x4(
-                            1, -0.16, 0, 0,
-                            0, 1, 0, 0,
-                            0, 0, 1, 0,
-                            0, 0, 0, 1
-                        )
+                    Rectangle {
+                        id: cardMask
+                        anchors.fill: parent
+                        radius: Theme.radius
+                        visible: false
+                        // layer.enabled forces an off-screen render even though the item
+                        // itself is invisible, which is what MultiEffect samples as a mask.
+                        layer.enabled: true
+                    }
+
+                    Image {
+                        id: cardArt
+                        anchors.fill: parent
+                        source: card.wallpaper ? "file://" + card.wallpaper.path : ""
+                        sourceSize.width: 1200
+                        sourceSize.height: 700
+                        fillMode: Image.PreserveAspectCrop
+                        asynchronous: true
+                        cache: true
+
+                        layer.enabled: true
+                        layer.effect: MultiEffect {
+                            maskEnabled: true
+                            maskSource: cardMask
+                        }
                     }
 
                     Rectangle {
-                        id: cardSource
                         anchors.fill: parent
-                        color: Theme.background
-                        visible: false
-                        layer.enabled: true
-                        layer.smooth: true
-
-                        Image {
-                            x: -height * 0.16
-                            anchors.top: parent.top
-                            anchors.bottom: parent.bottom
-                            width: parent.width + height * 0.16
-                            source: card.wallpaper ? "file://" + card.wallpaper.path : ""
-                            sourceSize.width: 1200
-                            sourceSize.height: 700
-                            fillMode: Image.PreserveAspectCrop
-                            asynchronous: true
-                            cache: true
-
-                            // Counter-transform image pixels while the shape keeps slanted edges.
-                            transform: Matrix4x4 {
-                                matrix: Qt.matrix4x4(
-                                    1, 0.16, 0, 0,
-                                    0, 1, 0, 0,
-                                    0, 0, 1, 0,
-                                    0, 0, 0, 1
-                                )
-                            }
-                        }
-                    }
-
-                    Shape {
-                        anchors.fill: parent
-                        preferredRendererType: Shape.CurveRenderer
-
-                        ShapePath {
-                            strokeWidth: -1
-                            fillItem: cardSource
-                            pathHints: ShapePath.PathLinear | ShapePath.PathConvex | ShapePath.PathSolid
-
-                            PathRectangle {
-                                width: card.width
-                                height: card.height
-                            }
-                        }
+                        radius: Theme.radius
+                        color: "transparent"
+                        border.width: card.centered ? 2 : 1
+                        border.color: card.centered ? Theme.accentStrong : Theme.border
                     }
 
                     MouseArea {

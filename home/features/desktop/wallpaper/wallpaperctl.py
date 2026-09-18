@@ -8,9 +8,12 @@ import sys
 import time
 from pathlib import Path
 
+import palette
 
 WALLPAPER_DIR = Path.home() / "Wallpapers"
-STATE_DIR = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local/state")) / "wallpaper"
+STATE_DIR = (
+    Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local/state")) / "wallpaper"
+)
 METADATA_FILE = WALLPAPER_DIR / "metadata.json"
 CURRENT_FILE = STATE_DIR / "current"
 ORDER_FILE = STATE_DIR / "order.json"
@@ -24,14 +27,19 @@ def wallpapers():
     return sorted(
         path.resolve()
         for path in WALLPAPER_DIR.rglob("*")
-        if path.is_file() and not path.name.startswith(".") and path.suffix.lower() in EXTENSIONS
+        if path.is_file()
+        and not path.name.startswith(".")
+        and path.suffix.lower() in EXTENSIONS
+        and not any(part.startswith(".") for part in path.relative_to(WALLPAPER_DIR).parts[:-1])
     )
 
 
 def save_order(available):
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     temporary = ORDER_FILE.with_suffix(".tmp")
-    temporary.write_text(json.dumps([str(path) for path in available]), encoding="utf-8")
+    temporary.write_text(
+        json.dumps([str(path) for path in available]), encoding="utf-8"
+    )
     temporary.replace(ORDER_FILE)
 
 
@@ -60,7 +68,12 @@ def current():
 
 
 def ensure_daemon():
-    if subprocess.run(["awww", "query"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0:
+    if (
+        subprocess.run(
+            ["awww", "query"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        ).returncode
+        == 0
+    ):
         return
 
     subprocess.Popen(
@@ -71,45 +84,14 @@ def ensure_daemon():
     )
     for _ in range(40):
         time.sleep(0.05)
-        if subprocess.run(["awww", "query"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0:
+        if (
+            subprocess.run(
+                ["awww", "query"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            ).returncode
+            == 0
+        ):
             return
     raise RuntimeError("awww-daemon did not become ready")
-
-
-def generate_colors(path):
-    result = subprocess.run(
-        [
-            "matugen",
-            "--mode", "dark",
-            "--type", "scheme-tonal-spot",
-            "--source-color-index", "0",
-            "--dry-run",
-            "--json", "hex",
-            "image", str(path),
-        ],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    generated = json.loads(result.stdout)
-    colors = generated["colors"]
-    palettes = generated["palettes"]
-
-    def color(name):
-        return colors[name]["dark"]["color"]
-
-    return {
-        "background": color("background"),
-        "surface": color("surface_container"),
-        "surfaceHover": color("surface_container_high"),
-        "text": color("on_surface"),
-        "muted": color("on_surface_variant"),
-        "accent": color("primary"),
-        "accentStrong": palettes["primary"]["70"]["color"],
-        "warning": color("tertiary"),
-        "danger": color("error"),
-        "border": color("outline_variant"),
-    }
 
 
 def write_colors(colors):
@@ -131,21 +113,32 @@ def set_wallpaper(raw_path, immediate=False, persist=True):
     path = Path(raw_path).expanduser().resolve()
     available = wallpapers()
     if path not in available:
-        raise ValueError(f"wallpaper is not a supported image under {WALLPAPER_DIR}: {path}")
+        raise ValueError(
+            f"wallpaper is not a supported image under {WALLPAPER_DIR}: {path}"
+        )
 
-    colors = generate_colors(path)
+    # Swap the image first so the screen updates without waiting on matugen.
+    # Colors are cached in metadata.json (see palette.py); a cache hit is a
+    # dict lookup, so this only blocks on matugen for a wallpaper seen for
+    # the first time ever.
     ensure_daemon()
     command = ["awww", "img", str(path), "--resize", "crop"]
     if immediate:
         command.extend(["--transition-type", "none"])
     else:
-        command.extend([
-            "--transition-type", "fade",
-            "--transition-duration", "0.35",
-            "--transition-fps", "60",
-        ])
+        command.extend(
+            [
+                "--transition-type",
+                "none",
+                "--transition-duration",
+                "0.0",
+                "--transition-fps",
+                "60",
+            ]
+        )
     subprocess.run(command, check=True)
 
+    colors = palette.get_or_compute(path)
     if persist:
         write_state(path, colors)
     else:
@@ -164,19 +157,25 @@ def main():
     active = current()
 
     if command == "catalog":
-        print(json.dumps({
-            "current": str(active) if active else "",
-            "metadataFile": str(METADATA_FILE) if METADATA_FILE.is_file() else "",
-            "wallpapers": [
+        print(
+            json.dumps(
                 {
-                    "name": path.stem,
-                    "file": path.name,
-                    "path": str(path),
-                    "extension": path.suffix[1:].upper(),
+                    "current": str(active) if active else "",
+                    "metadataFile": str(METADATA_FILE)
+                    if METADATA_FILE.is_file()
+                    else "",
+                    "wallpapers": [
+                        {
+                            "name": path.stem,
+                            "file": path.name,
+                            "path": str(path),
+                            "extension": path.suffix[1:].upper(),
+                        }
+                        for path in available
+                    ],
                 }
-                for path in available
-            ],
-        }))
+            )
+        )
         return
     if command == "current":
         print(active or "")
@@ -185,7 +184,10 @@ def main():
         print(set_wallpaper(sys.argv[2]))
         return
     if command == "preview" and len(sys.argv) == 3:
-        print(set_wallpaper(sys.argv[2], persist=False))
+        # Immediate transition: scrolling through the picker fires many of
+        # these in quick succession, and a 0.35s fade per hop is most of
+        # the perceived lag when scrubbing fast.
+        print(set_wallpaper(sys.argv[2], immediate=True, persist=False))
         return
     if command == "random":
         if available:
@@ -202,13 +204,23 @@ def main():
             print(set_wallpaper(choose_next(available, None), immediate=True))
         return
 
-    print("usage: wallpaperctl {catalog|current|set PATH|preview PATH|random|next|restore}", file=sys.stderr)
+    print(
+        "usage: wallpaperctl {catalog|current|set PATH|preview PATH|random|next|restore}",
+        file=sys.stderr,
+    )
     raise SystemExit(2)
 
 
 if __name__ == "__main__":
     try:
         main()
-    except (json.JSONDecodeError, KeyError, OSError, subprocess.CalledProcessError, RuntimeError, ValueError) as error:
+    except (
+        json.JSONDecodeError,
+        KeyError,
+        OSError,
+        subprocess.CalledProcessError,
+        RuntimeError,
+        ValueError,
+    ) as error:
         print(f"wallpaperctl: {error}", file=sys.stderr)
         raise SystemExit(1)
