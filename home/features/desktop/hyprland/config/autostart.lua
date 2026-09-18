@@ -4,7 +4,7 @@ hl.on("hyprland.start", function()
 	hl.exec_cmd("systemctl --user start --no-block thunar.service")
 	hl.exec_cmd("hyprsunset")
 	hl.exec_cmd("hypridle")
-	hl.exec_cmd("awww-daemon --quiet")
+	hl.exec_cmd("hyprpaper")
 
 	-- NOT REPRODUCIBLE: hyprlogd and timeline-hyprfocusd-snitch are installed by
 	-- hand with `cargo install` into ~/.cargo/bin, so they only run where that

@@ -7,3 +7,4 @@ home/features/desktop/hyprland/config/platform-variables.lua
 result
 home/features/repo-sync/repos/local.list
 .direnv/
+target/

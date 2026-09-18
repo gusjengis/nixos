@@ -12,17 +12,48 @@ let
   hyprlandPackages = inputs.hyprland.packages.${pkgs.stdenv.hostPlatform.system};
   hyprpickerPackage = inputs.hyprpicker.packages.${pkgs.stdenv.hostPlatform.system}.hyprpicker;
   configRoot = "${repoRoot}/home/features/desktop/quickshell/config";
-  wallpaperController = "${repoRoot}/home/features/desktop/wallpaper/wallpaperctl.py";
+  wallpaperDir = "${repoRoot}/home/features/desktop/wallpaper";
   python = pkgs.python3.withPackages (ps: [ ps.pygobject3 ]);
-  wallpaperctl = pkgs.writeShellApplication {
-    name = "wallpaperctl";
+  # The hot path (catalog/current/set/preview/random/next/restore) is a
+  # compiled binary: it runs on every scroll step in the wallpaper picker, and
+  # a Python interpreter plus a double directory scan was most of its latency.
+  # Palette lookup here is cache-only (reads metadata.json); matugen itself is
+  # only ever invoked by wallpaper-generate-palettes, run manually.
+  wallpaperctl = pkgs.rustPlatform.buildRustPackage {
+    pname = "wallpaperctl";
+    version = "0.1.0";
+    src = lib.fileset.toSource {
+      root = ./../wallpaper;
+      fileset = lib.fileset.unions [
+        ./../wallpaper/Cargo.toml
+        ./../wallpaper/Cargo.lock
+        ./../wallpaper/src
+      ];
+    };
+    cargoLock.lockFile = ./../wallpaper/Cargo.lock;
+    nativeBuildInputs = [ pkgs.makeWrapper ];
+    postFixup = ''
+      wrapProgram $out/bin/wallpaperctl \
+        --prefix PATH : ${
+          lib.makeBinPath [
+            hyprlandPackages.hyprland
+            pkgs.hyprpaper
+          ]
+        }
+    '';
+  };
+  # Manual/periodic: backfills matugen palettes into metadata.json so
+  # wallpaperctl's cache-only lookup has something to find. Not on the hot
+  # path, so it stays Python; wrapped the same way as the other scripts here
+  # purely so it's runnable without hand-prefixing PATH with matugen.
+  wallpaperGeneratePalettes = pkgs.writeShellApplication {
+    name = "wallpaper-generate-palettes";
     runtimeInputs = [
-      pkgs.awww
       pkgs.matugen
       pkgs.python3
     ];
     text = ''
-      exec python3 "${wallpaperController}" "$@"
+      exec python3 "${wallpaperDir}/generate-palettes.py" "$@"
     '';
   };
   aiUsage = pkgs.writeShellApplication {
@@ -109,6 +140,7 @@ in
       pkgs.quickshell
       remoteApps
       wallpaperctl
+      wallpaperGeneratePalettes
       aiUsage
       aiAccount
       universalSearch

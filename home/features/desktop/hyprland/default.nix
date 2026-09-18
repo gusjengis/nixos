@@ -45,7 +45,7 @@ in
       # local.nix, so it was missing on every host but the desktop.
       hyprsunset
       libnotify
-      awww
+      hyprpaper
       font-awesome
       nerd-fonts.iosevka
       nerd-fonts.symbols-only

@@ -1,11 +1,9 @@
 """Matugen palette generation, cached in ~/Wallpapers/metadata.json.
 
-Running matugen against a full-resolution image takes ~0.2-0.3s, which used
-to sit directly in the hot path every time a wallpaper was previewed or set.
-Palettes almost never change for a given image, so they are cached in the
-same metadata.json used for Peapix titles/tags, keyed by file name. A cache
-hit is a plain dict lookup; only a never-before-seen wallpaper pays the
-matugen cost, and that result is persisted for next time.
+Running matugen against a full-resolution image takes ~0.2-0.3s. wallpaperctl
+(Rust) never pays that cost: it only ever reads the "palette" field cached
+here, keyed by file name. This module is used by generate-palettes.py, the
+manual/periodic script that actually calls matugen and backfills the cache.
 """
 
 import json
@@ -73,25 +71,8 @@ def save_metadata(metadata):
     temporary.replace(METADATA_FILE)
 
 
-def cached(filename):
-    """Return the cached palette for filename, or None on a cache miss."""
-    entry = load_metadata()["entries"].get(filename)
-    return entry.get("palette") if entry else None
-
-
 def store(filename, colors):
     """Persist a computed palette into metadata.json, preserving other fields."""
     metadata = load_metadata()
     metadata["entries"].setdefault(filename, {})["palette"] = colors
     save_metadata(metadata)
-
-
-def get_or_compute(path):
-    """Cache-first palette lookup; falls back to matugen and persists the result."""
-    filename = Path(path).name
-    colors = cached(filename)
-    if colors is not None:
-        return colors
-    colors = compute(path)
-    store(filename, colors)
-    return colors
