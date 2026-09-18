@@ -22,39 +22,11 @@
     '';
     bashrcExtra = ''
       export PATH="$HOME/.cargo/bin:$PATH"
-      TS_NAME=""
-      if command -v tailscale >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
-        TS_NAME="$(tailscale status --json 2>/dev/null | jq -r '.Self.DNSName')"
-        if [ -n "$TS_NAME" ] && [ "$TS_NAME" != "null" ]; then
-          TS_NAME="$(printf '%s' "$TS_NAME" | cut -d. -f1)"
-        else
-          TS_NAME=""
-        fi
-      fi
-
-      if [ -n "$TS_NAME" ]; then
-        export PS1=" \033[1;35m\]\u\[\033[0m\]@\033[1;31m\]''${TS_NAME}\[\033[0m\] \033[1;32m\]\w\[\033[0m\] "
-      else
-        export PS1=" \033[1;35m\]\u\[\033[0m\] \033[1;32m\]\w\[\033[0m\] "
-      fi
+      export PS1=" \033[1;35m\]\u\[\033[0m\]@\033[1;31m\]\h\[\033[0m\] \033[1;32m\]\w\[\033[0m\] "
     '';
     profileExtra = ''
       export PATH="$HOME/.cargo/bin:$PATH"
-      TS_NAME=""
-      if command -v tailscale >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
-        TS_NAME="$(tailscale status --json 2>/dev/null | jq -r '.Self.DNSName')"
-        if [ -n "$TS_NAME" ] && [ "$TS_NAME" != "null" ]; then
-          TS_NAME="$(printf '%s' "$TS_NAME" | cut -d. -f1)"
-        else
-          TS_NAME=""
-        fi
-      fi
-
-      if [ -n "$TS_NAME" ]; then
-        export PS1=" \033[1;35m\]\u\[\033[0m\]@\033[1;31m\]''${TS_NAME}\[\033[0m\] \033[1;32m\]\w\[\033[0m\] "
-      else
-        export PS1=" \033[1;35m\]\u\[\033[0m\] \033[1;32m\]\w\[\033[0m\] "
-      fi
+      export PS1=" \033[1;35m\]\u\[\033[0m\]@\033[1;31m\]\h\[\033[0m\] \033[1;32m\]\w\[\033[0m\] "
     '';
     shellAliases = {
       venv = ". .venv/bin/activate";

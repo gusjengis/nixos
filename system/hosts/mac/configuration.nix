@@ -6,6 +6,20 @@
   ...
 }:
 
+let
+  asahiFirmware = pkgs.requireFile {
+    name = "firmware.cpio";
+    hash = "sha256-GZ/dZgjZHgRxGf9XJjXX/JFVcRYN/+Z+FcwrEkvsH2A=";
+    message = ''
+      Seed this Mac's Asahi firmware before building:
+        nix-store --add-fixed sha256 /boot/vendorfw/firmware.cpio
+    '';
+  };
+  asahiFirmwareDirectory = pkgs.runCommandLocal "asahi-peripheral-firmware-source" { } ''
+    mkdir -p "$out"
+    ln -s ${asahiFirmware} "$out/firmware.cpio"
+  '';
+in
 {
   imports = [
     ./hardware-configuration.nix
@@ -30,6 +44,7 @@
   };
 
   hardware.asahi.enable = true;
+  hardware.asahi.peripheralFirmwareDirectory = asahiFirmwareDirectory;
 
   environment.systemPackages = with pkgs; [
     iwd

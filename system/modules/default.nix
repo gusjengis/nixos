@@ -1,5 +1,6 @@
 {
   config,
+  hostName,
   lib,
   inputs,
   pkgs,
@@ -46,6 +47,8 @@
       "flakes"
     ];
     nix.settings.warn-dirty = false;
+
+    networking.hostName = hostName;
 
     services.getty.autologinUser = "gusjengis";
     services.gvfs.enable = true;

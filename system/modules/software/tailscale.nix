@@ -1,5 +1,6 @@
 {
   config,
+  hostName,
   lib,
   pkgs,
   ...
@@ -64,7 +65,7 @@
           status="$(${tailscale}/bin/tailscale status -json 2>/dev/null | ${jq}/bin/jq -r .BackendState 2>/dev/null || true)"
           case "$status" in
             Running)
-              ${tailscale}/bin/tailscale set --accept-routes=true
+              ${tailscale}/bin/tailscale set --hostname=${lib.escapeShellArg hostName} --accept-routes=true
               exit 0
               ;;
             NeedsLogin)
@@ -85,32 +86,29 @@
         fi
 
 
-        TS_AUTHKEY="$TAILSCALE_AUTH_KEY" ${tailscale}/bin/tailscale up --reset --accept-routes=true
+        TS_AUTHKEY="$TAILSCALE_AUTH_KEY" ${tailscale}/bin/tailscale up --reset \
+          --hostname=${lib.escapeShellArg hostName} --accept-routes=true
         # --ssh --accept-dns=true
       '';
     };
 
     # single writer for --advertise-routes; consumers append to
     # tailscale.advertiseRoutes instead of running `tailscale set` themselves
-    systemd.services.tailscale-advertise-routes =
-      lib.mkIf (config.tailscale.advertiseRoutes != [ ])
-        {
-          description = "Advertise subnet routes to the tailnet";
-          after = [
-            "tailscaled.service"
-            "tailscale-autoconnect.service"
-          ];
-          requires = [ "tailscaled.service" ];
-          wantedBy = [ "multi-user.target" ];
-          serviceConfig = {
-            Type = "oneshot";
-            ExecStart = "${pkgs.tailscale}/bin/tailscale set --advertise-routes=${
-              lib.concatStringsSep "," config.tailscale.advertiseRoutes
-            }";
-            Restart = "on-failure";
-            RestartSec = 10;
-          };
-        };
+    systemd.services.tailscale-advertise-routes = lib.mkIf (config.tailscale.advertiseRoutes != [ ]) {
+      description = "Advertise subnet routes to the tailnet";
+      after = [
+        "tailscaled.service"
+        "tailscale-autoconnect.service"
+      ];
+      requires = [ "tailscaled.service" ];
+      wantedBy = [ "multi-user.target" ];
+      serviceConfig = {
+        Type = "oneshot";
+        ExecStart = "${pkgs.tailscale}/bin/tailscale set --advertise-routes=${lib.concatStringsSep "," config.tailscale.advertiseRoutes}";
+        Restart = "on-failure";
+        RestartSec = 10;
+      };
+    };
 
     # turn on ssh!
     services.openssh = {
