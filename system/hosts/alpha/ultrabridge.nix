@@ -131,7 +131,7 @@ in
         UB_SPC_FILE_ROOT = fileRoot;
         UB_OCR_ENABLED = "true";
         UB_OCR_API_URL = "http://omega:11434";
-        UB_OCR_MODEL = "qwen3.6:35b-a3b";
+        UB_OCR_MODEL = "qwen3.6:35b-a3b-q4_K_M";
         UB_OCR_FORMAT = "openai";
         UB_EMBED_ENABLED = "false";
         UB_CHAT_ENABLED = "false";
