@@ -122,6 +122,9 @@
             system = host.system;
           };
           modules = [
+            {
+              hardware.facter.reportPath = ./system/hosts/${hostName}/facter.json;
+            }
             (./system/hosts + "/${hostName}/hardware-configuration.nix")
             (./system/hosts + "/${hostName}/configuration.nix")
             ./system/modules

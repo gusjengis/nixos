@@ -13,6 +13,7 @@
   };
 
   imports = [
+    ./hardware/facter-policy.nix
     ./hardware/gpu_drivers.nix
     ./hardware/grub.nix
     ./desktop_env/hyprland.nix

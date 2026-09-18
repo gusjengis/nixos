@@ -19,6 +19,8 @@ in
   ];
 
   hyprland.enable = false;
+  # GTX 1080 uses the host-specific legacy 580 configuration below.
+  nvidia.enable = false;
   vial.enable = false;
 
   # this machine hosts the shared /data drive for the tailnet

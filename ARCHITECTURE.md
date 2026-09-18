@@ -63,10 +63,27 @@ without authorized access.
 | `rebuild` | Activate this machine's NixOS output from `/etc/nixos` |
 | `sync-repos` | Sync repositories selected by this machine's feature roles |
 | `update` | Fast-forward `/etc/nixos`, sync repositories, rebuild, then rehome |
+| `refresh-hardware` | Re-probe this machine's hardware and overwrite its `facter.json` |
 
 `update` uses a deployment revision marker so failed deployments retry.
 It also shares a lock with Home Manager activation, preventing activation from
 starting another activation through the user update service.
+
+## Hardware Detection
+
+Each host's `system/hosts/<host>/facter.json` is a committed snapshot from
+`nixos-facter`, not something generated during evaluation. `system/modules/hardware/facter-policy.nix`
+reads that snapshot at eval time to set `lib.mkDefault` values (GPU vendor,
+microcode, Bluetooth, fingerprint reader, laptop battery support, and so on),
+so it reacts immediately to policy changes but has no way to know the
+snapshot itself is stale.
+
+**Nothing regenerates this automatically.** A rebuild only re-evaluates
+whatever report is already committed; it cannot probe live hardware, both
+because Nix evaluation is pure and because the probe needs root. After any
+hardware change (new GPU, added/removed drive, dock/undock, new USB
+peripheral you want detected), run `refresh-hardware [host]` yourself, review
+the diff it prints, then `rebuild`.
 
 The updater never pulls a dirty `/etc/nixos` checkout. Application-written
 configuration therefore remains visible for review instead of being overwritten.
