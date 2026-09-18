@@ -96,7 +96,10 @@ in
         UB_SPC_MODE = "server";
         UB_SPC_LISTEN_ADDR = "127.0.0.1:8089";
         UB_SPC_FILE_ROOT = fileRoot;
-        UB_OCR_ENABLED = "false";
+        UB_OCR_ENABLED = "true";
+        UB_OCR_API_URL = "http://omega:11434";
+        UB_OCR_MODEL = "qwen3.6:35b-a3b";
+        UB_OCR_FORMAT = "openai";
         UB_EMBED_ENABLED = "false";
         UB_CHAT_ENABLED = "false";
       };
