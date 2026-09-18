@@ -9,6 +9,15 @@
 
 export const TIERS = ["trivial", "simple", "medium", "complex", "reasoning"]
 
+export const DEFAULT_KEYWORD_RULES = [
+  { keywords: ["hi", "hello", "thanks", "thank you"], tier: "trivial" },
+  { keywords: ["typo", "rename", "reformat", "add a comment"], tier: "simple" },
+  {
+    keywords: ["race condition", "deadlock", "memory leak", "security", "vulnerability", "architecture", "migrate", "migration", "redesign", "root cause"],
+    tier: "reasoning",
+  },
+]
+
 export function tierIndex(tier) {
   const index = TIERS.indexOf(tier)
   return index === -1 ? 2 : index
@@ -228,7 +237,8 @@ const APPROVAL_PATTERNS = [
 ]
 
 const ACKNOWLEDGEMENT_PATTERNS = [
-  /^(thanks|thank you|ty|cheers|nice|cool|great|awesome|perfect|beautiful|sweet|neat|got it|understood|makes sense|sounds good|no worries|np)\b[\s\S]{0,30}$/i,
+  /^(thanks|thank you|ty|cheers|nice|cool|great|awesome|perfect|beautiful|sweet|neat|got it|understood|makes sense|sounds good|no worries|np)[.!\s]*$/i,
+  /^(thanks|thank you)[,!\s]+(that|it)\s+(worked|works|did it|looks good|is good|is right)[.!\s]*$/i,
   /^(that|it)\s+(worked|works|did it|looks good|is good|is right)\W*$/i,
 ]
 
@@ -266,6 +276,11 @@ export function continuationKind(ask) {
   if (APPROVAL_PATTERNS.some((re) => re.test(trimmed))) return "approval"
   if (ACKNOWLEDGEMENT_PATTERNS.some((re) => re.test(trimmed))) return "acknowledgement"
   return undefined
+}
+
+export function retryRequested(ask) {
+  return /^(?:(?:it(?:'s| is)|this(?: is)?|that(?: is)?)\s+)?still (?:broken|failing|not working)\W*$/i.test(ask.trim()) ||
+    /^(?:please\s+)?(?:try again|retry|again|that didn't (?:work|fix it)|that did not (?:work|fix it))\W*$/i.test(ask.trim())
 }
 
 /**

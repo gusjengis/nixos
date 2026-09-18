@@ -31,6 +31,9 @@ class UsageNormalizationTests(unittest.TestCase):
         self.assertEqual(result["id"], "openai-personal")
         self.assertTrue(result["active"])
 
+    def test_missing_openai_limits_do_not_invent_headroom(self):
+        self.assertEqual(usage.normalize_openai({}, "personal")["windows"], [])
+
 
 class UnavailableTests(unittest.TestCase):
     def rate_limited(self):
@@ -132,6 +135,40 @@ class AccountProfileTests(unittest.TestCase):
             self.assertEqual(active["openai"]["accountId"], "business")
             self.assertEqual(active["anthropic"]["key"], "untouched")
             self.assertEqual(usage.read_profile(home, "personal")["access"], "new")
+
+    def test_status_reports_identity_without_tokens_or_refresh(self):
+        with tempfile.TemporaryDirectory() as directory, self.environment(directory):
+            home = Path(directory) / "home"
+            usage.store_profile(home, "personal", self.auth("personal"))
+            usage.store_profile(home, "business", self.auth("business"))
+            usage.write_private_json(usage.auth_path(home), {"openai": self.auth("business")})
+            with mock.patch.object(usage, "refresh_openai_auth", side_effect=AssertionError("must not refresh")):
+                self.assertEqual(usage.account_status(home), {
+                    "ok": True, "active": "business", "saved": ["personal", "business"],
+                })
+
+    def test_conditional_switch_does_not_undo_another_switch(self):
+        with tempfile.TemporaryDirectory() as directory, self.environment(directory):
+            home = Path(directory) / "home"
+            usage.store_profile(home, "personal", self.auth("personal"))
+            usage.store_profile(home, "business", self.auth("business"))
+            usage.write_private_json(usage.auth_path(home), {"openai": self.auth("business")})
+            with mock.patch.object(Path, "home", return_value=home), mock.patch.object(usage, "activate_profile") as activate:
+                result = usage.account_command(["select", "business", "personal"])
+                self.assertFalse(result["switched"])
+                self.assertEqual(result["active"], "business")
+                activate.assert_not_called()
+
+    def test_conditional_switch_returns_new_active_identity(self):
+        with tempfile.TemporaryDirectory() as directory, self.environment(directory):
+            home = Path(directory) / "home"
+            usage.store_profile(home, "personal", self.auth("personal"))
+            usage.store_profile(home, "business", self.auth("business"))
+            usage.write_private_json(usage.auth_path(home), {"openai": self.auth("personal")})
+            with mock.patch.object(Path, "home", return_value=home):
+                result = usage.account_command(["select", "business", "personal"])
+                self.assertTrue(result["switched"])
+                self.assertEqual(result["active"], "business")
 
     def test_profile_files_are_private(self):
         with tempfile.TemporaryDirectory() as directory, self.environment(directory):

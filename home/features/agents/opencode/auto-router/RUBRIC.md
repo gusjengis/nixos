@@ -4,7 +4,7 @@ The single definition of what each tier means. Three things read it and they
 must agree, or the router cannot be evaluated at all:
 
 - `classifier.js` renders it into the system prompt sent to the local model.
-- `eval/labels.json` was produced by grading real prompts against it.
+- `eval/gold_real.json` and `eval/gold_probes.json` contain prompts graded against it.
 - `classify.js`, the offline heuristic, approximates it with keywords.
 
 ## The question being answered
@@ -51,6 +51,10 @@ These exist because each one is a documented failure mode of LLM routers.
    `simple`. "It crashes sometimes and I don't know why" is at least `complex`,
    and `reasoning` if the symptom is intermittent, timing-dependent or
    environment-dependent.
+
+   A stack trace identifies where a failure appeared, not necessarily its cause.
+   Use `stated_fix` only when the cause and correction are established. Merely
+   pasting an error must not downgrade an investigation.
 
 6. **Ambiguity is difficulty.** If the turn can be read two reasonable ways and
    nothing in it decides between them, the agent has to choose, and choosing

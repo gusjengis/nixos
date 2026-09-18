@@ -80,7 +80,7 @@ export const RULES = [
   {
     id: "stated_fix",
     band: "3",
-    text: "A defect where the turn already points at the cause: an error message, compiler diagnostic, stack trace or log that names a file, line, symbol or missing value.",
+    text: "A defect with a demonstrated cause and an obvious correction, such as a misspelled symbol. An error location or stack trace alone is not a demonstrated cause.",
   },
   { id: "explain_code", band: "4-5", text: "Explain, summarise or review existing code or configuration." },
   {
@@ -107,7 +107,7 @@ export const RULES = [
   {
     id: "unknown_cause",
     band: "6-7",
-    text: "Something misbehaves and nothing in the turn points at where. There is no error text, or the error does not name the thing at fault.",
+    text: "Something misbehaves and the cause still needs investigation, even if a diagnostic or stack trace identifies where the failure appeared.",
   },
   {
     id: "ambiguous_requirements",
@@ -152,7 +152,7 @@ const SHOTS = [
   { ask: "hit it", rule: "continuation", difficulty: "5" },
   { ask: "please clean up the warnings", rule: "mechanical_edit", difficulty: "3" },
   {
-    ask: "rehome\nerror: … while evaluating a branch condition\n         at /nix/store/rcmh3p-source/lib/modules.nix:331:9:\n         error: attribute 'hyprland' missing",
+    ask: "Fix the misspelled call greetng() on line 12; the function is named greeting() and the error is ReferenceError: greetng is not defined.",
     rule: "stated_fix",
     difficulty: "3",
   },
@@ -197,7 +197,7 @@ How to grade:
 - Being about code is not difficulty. Most coding turns are 3 to 6.
 - Touching many files is not by itself hard. If the change is the same kind of edit in each place, or the turn says what to do in each place, it stays a 5 or a 6. What makes a turn a 7 is that somebody still has to decide something.
 - A cause that is already stated is easy. A cause that has to be found is hard. A cause that only appears sometimes is harder.
-- A pasted error message, stack trace or compiler diagnostic is a stated cause, not an unknown one, however long or unfamiliar it looks. Reading an error and fixing what it names is a 3 or a 4.
+- A pasted error message, stack trace or compiler diagnostic describes a symptom. Use stated_fix only when it also establishes the cause and an obvious correction; otherwise use unknown_cause or intermittent_defect.
 - Running commands and reporting what they say is easy even when there are several of them.
 - "sometimes", "occasionally", "every so often", "can't reproduce it", "it's unreliable" mean intermittent_defect, not unknown_cause. A fault that will not hold still is the hardest kind there is.
 - Deleting, overwriting, or rewriting anything that cannot be got back is correctness_critical even when the method is obvious. Getting it wrong is not recoverable by trying again.

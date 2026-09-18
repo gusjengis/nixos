@@ -23,8 +23,10 @@ import { fileURLToPath } from "node:url"
 import { classifierDefaults, createClassifier } from "./classifier.js"
 import {
   continuationKind,
+  DEFAULT_KEYWORD_RULES,
   directiveTier,
   keywordTier,
+  retryRequested,
   score,
   stripReminders,
   TIERS,
@@ -43,8 +45,8 @@ const DEFAULTS = {
   enabled: true,
 
   // Tier -> a model id or a pool of them. Pools exist to spread load across
-  // both subscriptions; the member is chosen by intelligence score first, then
-  // remaining headroom, then a stable hash. Top-quality picks stay sticky for
+  // both subscriptions; near-quality members are chosen by proven health and
+  // remaining headroom. Top-quality picks stay sticky for
   // the session so live conversations preserve their prompt cache.
   //
   // Intelligence scores are from Artificial Analysis Intelligence Index v4.3 (Sept 2026).
@@ -116,10 +118,10 @@ const DEFAULTS = {
   // member that works and only reaches for the other one when it has to.
   preferProven: true,
 
-  // Escalation is immediate; de-escalation drops at most one tier per turn.
-  // Bouncing between models mid-session throws away the prompt cache, and a
-  // cache rewrite can cost more than the cheaper rate saves.
-  maxDropPerTurn: 1,
+  // Keep the working tier until an explicit directive or a new session.
+  // A shorter follow-up is not evidence that a cold cheaper model saves usage.
+  maxDropPerTurn: 0,
+  intelligenceTolerance: 2,
 
   // A bare "continue" / "yes" is scored as the turn it continues, not on its
   // own four characters. With no previous turn to inherit from - a session
@@ -128,25 +130,7 @@ const DEFAULTS = {
   inheritOnContinuation: true,
   continuationFallback: "medium",
 
-  keywordRules: [
-    { keywords: ["hi", "hello", "thanks", "thank you"], tier: "trivial" },
-    { keywords: ["typo", "rename", "reformat", "add a comment"], tier: "simple" },
-    {
-      keywords: [
-        "race condition",
-        "deadlock",
-        "memory leak",
-        "security",
-        "vulnerability",
-        "architecture",
-        "migrate",
-        "migration",
-        "redesign",
-        "root cause",
-      ],
-      tier: "reasoning",
-    },
-  ],
+  keywordRules: DEFAULT_KEYWORD_RULES,
 
   technicalKeywords: [],
 
@@ -184,10 +168,6 @@ const DEFAULTS = {
     // Below this much remaining headroom a provider is skipped in favour of
     // another pool member.
     avoidBelowHeadroom: 8,
-    // When the active ChatGPT account is this spent and the other saved account
-    // has meaningfully more left, switch to it at startup.
-    switchOpenAIAbove: 90,
-    switchOpenAIMinGain: 20,
   },
 
 
@@ -340,12 +320,12 @@ function attachmentCount(parts) {
   return (parts ?? []).filter((part) => part?.type === "file" || part?.type === "agent").length
 }
 
-export const AutoRouterPlugin = async ({ client }) => {
-  const config = readConfig()
+export const AutoRouterPlugin = async ({ client }, overrides) => {
+  const config = deepMerge(readConfig(), overrides)
   if (!config.enabled) return {}
 
   const status = statusPath(config)
-  const usage = config.usage?.enabled ? createUsage({ maxAgeSeconds: config.usage.maxAgeSeconds }) : undefined
+  const usage = config.usage?.enabled ? createUsage(config.usage) : undefined
   const sessions = new Map()
   let catalog
 
@@ -363,21 +343,6 @@ export const AutoRouterPlugin = async ({ client }) => {
         log("warn", "configured model has no intelligence score", { tier, model: id })
       }
     }
-  }
-
-  // Account switching only takes effect on a provider OpenCode has not
-  // initialised yet, so it is attempted once, here, before any model is used.
-  if (usage) {
-    usage.poll()
-    usage
-      .maybeSwitchOpenAI({
-        threshold: config.usage.switchOpenAIAbove,
-        minGain: config.usage.switchOpenAIMinGain,
-      })
-      .then((profile) => {
-        if (profile) log("info", `switched ChatGPT account to ${profile}`, { profile })
-      })
-      .catch(() => {})
   }
 
   const loadCatalog = async () => {
@@ -400,7 +365,7 @@ export const AutoRouterPlugin = async ({ client }) => {
       catalog = { models }
     } catch (error) {
       log("warn", "provider catalog unavailable, routing without validation", { error: String(error) })
-      catalog = { models: new Map() }
+      return { models: new Map() }
     }
     return catalog
   }
@@ -444,8 +409,15 @@ export const AutoRouterPlugin = async ({ client }) => {
     // the alternative is refusing to answer because the cheap pool is down.
     let tier = requested
     let candidates = []
+    const exhausted = []
+    const hasUsage = (id) => {
+      const left = usage?.headroom(id.slice(0, id.indexOf("/")))
+      if (left !== 0) return true
+      exhausted.push(id)
+      return false
+    }
     for (let index = tierIndex(requested); index < TIERS.length; index++) {
-      const members = poolFor(TIERS[index], models)
+      const members = poolFor(TIERS[index], models).filter(hasUsage)
       if (!members.length) continue
       tier = TIERS[index]
       candidates = members
@@ -457,26 +429,14 @@ export const AutoRouterPlugin = async ({ client }) => {
 
     if (!candidates.length) {
       const fallback = [config.fallback].filter(Boolean)
-      candidates = fallback.filter((id) => !quarantined(id))
-      // Everything is quarantined. A model that might fail beats no model at
-      // all, so the last resort ignores the quarantine entirely.
-      if (!candidates.length) candidates = fallback
+      candidates = fallback.filter((id) => (!models.size || models.has(id)) && !quarantined(id) && hasUsage(id))
     }
     if (!candidates.length) return undefined
 
     // Never send a request to a subscription known to be exhausted. Low but
     // non-zero headroom remains an emergency option when every candidate is
     // below the normal avoidance threshold.
-    let exhausted
     if (usage) {
-      const available = candidates.filter((id) => {
-        const left = usage.headroom(id.slice(0, id.indexOf("/")))
-        return left === undefined || left > 0
-      })
-      exhausted = candidates.filter((id) => !available.includes(id))
-      if (!available.length) return undefined
-      candidates = available
-
       const withRoom = candidates.filter((id) => {
         const left = usage.headroom(id.slice(0, id.indexOf("/")))
         return left === undefined || left > config.usage.avoidBelowHeadroom
@@ -492,23 +452,16 @@ export const AutoRouterPlugin = async ({ client }) => {
     const state = sessions.get(sessionID)
     const sticky = state?.picks?.[tier]
     const bestIntelligence = Math.max(...candidates.map((id) => intelligence(tier, id)))
-    // Keep cache affinity only when it does not preserve a lower-quality pick
-    // after a better model becomes available or the tier configuration changes.
+    // Treat nearby benchmark scores as peers, not a reason to discard a cache.
+    candidates = candidates.filter((id) => intelligence(tier, id) >= bestIntelligence - config.intelligenceTolerance)
     let picked =
-      sticky && candidates.includes(sticky) && intelligence(tier, sticky) === bestIntelligence ? sticky : undefined
+      sticky && candidates.includes(sticky) ? sticky : undefined
 
     if (!picked) {
-      // Rank by intelligence first (higher is better), then proven status,
-      // then most headroom, then a stable hash so two sessions with nothing
-      // to choose between still spread out. This prioritizes output quality
-      // over provider diversity or cost.
+      // Among near-quality candidates, prefer health and available quota.
+      // Exact score and stable hash only break the remaining ties.
       const ranked = [...candidates].sort((a, b) => {
-        // Intelligence score (descending: higher wins)
-        const intelA = intelligence(tier, a)
-        const intelB = intelligence(tier, b)
-        if (intelA !== intelB) return intelB - intelA
-
-        // Then proven models (lower trust score = better, so reverse)
+        // Lower trust score means better evidence of successful responses.
         const trusted = trust(a) - trust(b)
         if (trusted !== 0) return trusted
 
@@ -516,6 +469,9 @@ export const AutoRouterPlugin = async ({ client }) => {
         const left = usage?.headroom(a.slice(0, a.indexOf("/"))) ?? 100
         const right = usage?.headroom(b.slice(0, b.indexOf("/"))) ?? 100
         if (right !== left) return right - left
+
+        const quality = intelligence(tier, b) - intelligence(tier, a)
+        if (quality) return quality
 
         // Finally stable hash for session diversity
         return hashString(sessionID + a) - hashString(sessionID + b)
@@ -701,7 +657,16 @@ export const AutoRouterPlugin = async ({ client }) => {
       }
     }
 
-    const continuation = config.inheritOnContinuation ? continuationKind(ask) : undefined
+    const attachments = attachmentCount(parts)
+    if (previous && retryRequested(ask)) {
+      return {
+        tier: tierAt(Math.max(tierIndex(previous) + 1, attachments ? tierIndex("medium") : 0)),
+        cause: "retry-escalation",
+        signals: ["previous attempt did not solve the task"],
+        score: null,
+      }
+    }
+    const continuation = config.inheritOnContinuation && !attachments ? continuationKind(ask) : undefined
 
     // An approval authorises work that was just proposed, so it inherits the
     // tier that proposed it.
@@ -714,15 +679,11 @@ export const AutoRouterPlugin = async ({ client }) => {
       }
     }
 
-    // An acknowledgement asks for nothing, so it runs free even at the end of a
-    // hard conversation - which is exactly where it is most worth doing, since
-    // by then the turn carries the whole accumulated context. It does not move
-    // the session's working tier, so the next real turn resumes where it was.
+    // Reuse the working model for acknowledgements rather than sending the
+    // entire accumulated conversation to a cold cheap model for one short reply.
     if (continuation === "acknowledgement") {
-      return { tier: "trivial", cause: "acknowledgement", signals: ["asks for nothing"], score: null, sticky: false }
+      return { tier: previous ?? "trivial", cause: "acknowledgement", signals: ["asks for nothing; preserves working tier"], score: null }
     }
-
-    const attachments = attachmentCount(parts)
 
     let tier
     let cause
@@ -796,7 +757,7 @@ export const AutoRouterPlugin = async ({ client }) => {
       signals.push(`attachments (${attachments})`)
     }
 
-    // Drop at most one tier per turn. Falling from `reasoning` straight to
+    // By default do not drop tiers without an explicit directive. Falling from `reasoning` straight to
     // `trivial` because a follow-up happened to be short is how a hard task
     // quietly loses the model that was solving it.
     if (previous && tierIndex(tier) < tierIndex(previous) - config.maxDropPerTurn) {
@@ -837,7 +798,8 @@ export const AutoRouterPlugin = async ({ client }) => {
         return
       }
 
-      usage?.poll()
+      const switched = await usage?.prepare()
+      if (switched) log("info", "switched exhausted ChatGPT account", { profile: switched })
 
       const ask = extractAsk(output.parts, config.reminderMarkers)
       const decision = await decide(sessionID, ask, output.parts, state?.tier)
@@ -849,8 +811,7 @@ export const AutoRouterPlugin = async ({ client }) => {
       const forcedEffort = isRouter && model.variant && model.variant !== "default" ? model.variant : undefined
       const target = await resolveTarget(decision.tier, sessionID, forcedEffort)
       if (!target) {
-        log("error", "no usable model for tier, leaving the request untouched", { tier: decision.tier })
-        return
+        throw new Error(`Auto router: no usable model for ${decision.tier}; subscriptions may be exhausted or models unavailable. Check usage or choose a model manually.`)
       }
 
       message.model = { providerID: target.providerID, modelID: target.modelID, variant: target.variant }
@@ -869,9 +830,8 @@ export const AutoRouterPlugin = async ({ client }) => {
 
       const picks = { ...(state?.picks ?? {}), [target.tier]: target.id }
 
-      // A non-sticky decision routes this one turn without moving the session's
-      // working tier.
-      const tier = decision.sticky === false ? (state?.tier ?? decision.tier) : decision.tier
+      // Preserve the actual working tier, including availability escalation.
+      const tier = target.tier
       sessions.set(sessionID, { tier, picks, last: target.id })
 
       const entry = {
@@ -898,6 +858,7 @@ export const AutoRouterPlugin = async ({ client }) => {
         intelligence: intelligence(target.tier, target.id) || null,
         free: target.providerID === "opencode" || target.providerID === "lmstudio",
         headroom: usage?.headroom(target.providerID) ?? null,
+        account: target.providerID === "openai" ? usage?.activeOpenAIProfile() ?? null : null,
         avoided: target.exhausted ?? null,
         time: Date.now(),
       }
@@ -919,13 +880,11 @@ export const AutoRouterPlugin = async ({ client }) => {
         return
       }
 
-      // A session that settles is the only evidence a plugin gets that the
-      // model it routed to actually answered. `session.error` is delivered
-      // before this, so a failed turn has already been quarantined and `proved`
-      // will refuse to mark it healthy.
+      // Only count idle as success when this turn did not report an error.
       if (event?.type === "session.idle") {
         const sessionID = event.properties?.sessionID
-        if (sessionID) proved(sessions.get(sessionID)?.last)
+        const state = sessions.get(sessionID)
+        if (state && !state.failed) proved(state.last)
         return
       }
 
@@ -940,8 +899,12 @@ export const AutoRouterPlugin = async ({ client }) => {
       const state = sessions.get(sessionID)
       const id = state?.last
       if (!id) return
+      state.failed = true
+      const error = event.properties?.error
+      const errorText = `${error?.data?.message ?? ""} ${error?.data?.responseBody ?? ""}`
+      if (id.startsWith("openai/") && /usage_limit|usage limit|quota|rate.limit|too many requests/i.test(errorText)) usage?.invalidate()
 
-      const fatal = fatalModelError(event.properties?.error)
+      const fatal = fatalModelError(error)
       if (!fatal) return
 
       const entry = punish(id, fatal.message)

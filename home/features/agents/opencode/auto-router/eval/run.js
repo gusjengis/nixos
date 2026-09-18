@@ -25,7 +25,7 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { createClassifier, classifierDefaults } from "../classifier.js"
-import { continuationKind, directiveTier, score, TIERS, tierIndex, wantsWork } from "../classify.js"
+import { continuationKind, DEFAULT_KEYWORD_RULES, directiveTier, keywordTier, score, TIERS, tierIndex, wantsWork } from "../classify.js"
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.join(HERE, "..")
@@ -57,7 +57,11 @@ function heuristicTier(ask) {
     tokenThresholds: routerConfig.tokenThresholds ?? { simple: 15, complex: 400 },
     technicalKeywords: routerConfig.technicalKeywords ?? [],
   })
-  return { tier: scored.tier, difficulty: null, rule: "heuristic", ms: 0 }
+  const keyword = keywordTier(ask, routerConfig.keywordRules ?? DEFAULT_KEYWORD_RULES)
+  let tier = scored.tier
+  if (keyword && (tierIndex(keyword.tier) > tierIndex(tier) || scored.signals.length <= 1)) tier = keyword.tier
+  if (tier === "trivial" && (scored.tokens > (routerConfig.tokenThresholds?.simple ?? 15) || wantsWork(ask))) tier = "simple"
+  return { tier, difficulty: null, rule: "heuristic", ms: 0 }
 }
 
 async function main() {
@@ -85,7 +89,7 @@ async function main() {
     config.failuresBeforeOpen = 1
     config.breakerMs = 0
     config.maxBreakerMs = 0
-    config.timeoutMs = Number(flag("timeout", 60_000))
+    config.timeoutMs = Number(flag("timeout", config.timeoutMs))
     label = `${config.model} @ ${config.endpoint}`
     const classifier = createClassifier({
       config,
@@ -97,12 +101,8 @@ async function main() {
   console.log(`\n${label}`)
   console.log(`${cases.length} graded prompts (${which})\n`)
 
-  // The classifier is one stage of the router, not the whole of it, and
-  // measuring it alone overstates its errors. A bare "hit it" reaches the model
-  // as four characters and is correctly graded as asking for nothing; in the
-  // running system it never gets that far, because an approval inherits the
-  // tier of the turn it approves before any model is consulted. Evaluating the
-  // stages that actually run is the only number that predicts behaviour.
+  // Apply the stateless gates too. These fixtures do not simulate session
+  // continuity, attachments, quota, model selection, or successful completion.
   const gated = predict
   predict = async (item) => {
     const directive = directiveTier(item.ask)

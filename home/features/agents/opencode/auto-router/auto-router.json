@@ -45,6 +45,8 @@
     "forgetAfterMinutes": 20160
   },
   "preferProven": true,
+  "maxDropPerTurn": 0,
+  "intelligenceTolerance": 2,
   "boundaries": {
     "trivial_simple": -0.11,
     "simple_medium": 0.02,
@@ -54,9 +56,7 @@
   "usage": {
     "enabled": true,
     "maxAgeSeconds": 900,
-    "avoidBelowHeadroom": 8,
-    "switchOpenAIAbove": 90,
-    "switchOpenAIMinGain": 20
+    "avoidBelowHeadroom": 8
   },
 
   "classifier": {

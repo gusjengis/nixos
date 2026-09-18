@@ -1,282 +1,309 @@
-# Auto model router
+# Auto Model Router
 
-Picks the model and reasoning effort per prompt, so routine turns stop running
-on the most expensive model available.
+## Abstract
 
-Select **Auto** in `/models` (it is also the default model). From then on every
-prompt is classified and sent to the cheapest model judged able to handle it.
+Auto chooses a model and reasoning effort for OpenCode without replacing your
+Anthropic or OpenAI subscription logins with paid API keys. A small local model
+estimates task difficulty; deterministic rules protect ongoing work, account
+quota, and failed models. Once a conversation needs a stronger model, Auto keeps
+that working tier instead of switching to a cheaper model for every short reply.
+When the active saved OpenAI account runs out, Auto can select the other saved
+account before the next routed turn. This uses the same account switch as the
+Quickshell widget and works without restarting OpenCode's normal HTTP transport.
+The goal is reliable work with less wasted usage. Actual net savings have not
+been measured; a paid A/B experiment is explicitly deferred.
 
+## Everyday Use
+
+Select **Auto** in `/models`. It is also the configured default.
+
+Start a new session for an unrelated task. Within a session, shorter prompts do
+not automatically mean easier work: "yes", "thanks", and a small follow-up stay
+at the working tier. Harder requests can raise it immediately.
+
+Use a directive when you deliberately want a different tier:
+
+| Directive | Effect |
+| --- | --- |
+| `!fast` or `!simple` | Lightweight work; explicitly lowers an expensive session |
+| `!medium` | Routine implementation or explanation |
+| `!complex` | Investigation, integration, or design decisions |
+| `!deep` or `!reasoning` | Hard or correctness-critical work |
+| `!trivial` | Smallest tier |
+
+The directive is removed before the model sees the prompt. It establishes the
+new working tier, not merely a one-turn discount. Legacy aliases `!cheap`,
+`!mid`, `!hard`, `!max`, and `!free` also work. **`!free` is not actually free**:
+the trivial pool uses subscriptions.
+
+Choosing a different concrete model turns Auto off for that session. Reselect
+Auto to enable it. Because OpenCode displays the last routed model, the plugin
+cannot distinguish deliberately selecting that *same* model from leaving Auto
+active. To disable routing unambiguously, select a different model or disable
+the plugin and restart.
+
+## Request Flow
+
+```text
+User submits a prompt with Auto active
+  -> read current account identity and subscription usage
+  -> if active OpenAI account is exhausted, await eligible account switch
+  -> recognize directive, retry, approval, or acknowledgement
+  -> otherwise ask local classifier; use keyword fallback if unavailable
+  -> apply attachment, work, and session-continuity safeguards
+  -> find an available model with usable subscription headroom
+  -> choose reasoning effort and rewrite the message's model
+  -> OpenCode sends the request using its normal provider integration
+  -> record the decision for logs and the TUI status label
 ```
-Build · Claude Sonnet 5 Anthropic                     Auto Claude Sonnet 5 · auto
-```
 
-The right-hand label is this router. `Auto` means routing is active, then the
-model the turn actually went to, its tier, then its effort. `auto` as an effort
-means the model is choosing its own thinking budget.
+This happens in OpenCode's `chat.message` hook, before the user message is
+persisted. The session loop reads the rewritten `message.model` afterward.
+`auto/auto` is a placeholder with an intentionally unusable endpoint, not a
+proxy. If no usable model remains, the plugin raises a clear error rather than
+letting that placeholder reach the network.
 
-A `?` after the tier — `(medium?)`, in warning colour — means the classifier was
-unreachable and the keyword fallback picked that tier. The router still routes,
-but it is guessing, and that should not look the same as knowing.
+## Difficulty And Models
 
-## Tiers
-
-| Tier        | For                                                       | Model pool (ordered by intelligence)          |
-| ----------- | --------------------------------------------------------- | --------------------------------------------- |
-| `trivial`   | greetings, acknowledgements, trivia — turns asking for nothing | Claude Haiku 4.5 (15) · GPT-5.6 Luna (16) |
-| `simple`    | small, well-specified edits and lookups                    | GPT-5.6 Luna (16) · Claude Haiku 4.5 (15)    |
-| `medium`    | ordinary feature work                                      | GPT-5.6 Sol (34) · Claude Sonnet 5 (25)      |
-| `complex`   | multi-file work, restructuring, non-obvious debugging      | GPT-5.6 Sol (39) · Claude Sonnet 5 (38)      |
-| `reasoning` | architecture, concurrency, security, root-cause analysis   | Claude Opus 5 (48) · GPT-5.6 Sol (42)        |
-
-`trivial` is deliberately narrow: a turn only lands there if it is
-short, has no attachments, and asks for no work on the repository. Those turns
-are not cheap ones — by the end of a long session they carry the whole
-accumulated context — but they are ones a lightweight model handles efficiently.
-
-Override a single prompt with `!free`, `!fast`, `!medium`, `!complex` or
-`!deep`. The directive is stripped before the model sees it.
-
-## How a tier is chosen
-
-A small model held resident on `omega`'s GPU grades every turn. `RUBRIC.md` is
-the definition of what the tiers mean; everything here implements it.
-
-The grader is asked for two things and nothing else:
-
-```json
-{ "rule": "unknown_cause", "difficulty": "7" }
-```
-
-Both fields are constrained by a JSON schema server-side, so the shape cannot
-drift. `rule` is one of seventeen named cases — `mechanical_edit`,
-`pattern_feature`, `unknown_cause`, `correctness_critical` and so on — each
-carrying the difficulty band it usually lands in. Naming the rule before the
-number is chain-of-thought with no prose in it: it costs four tokens rather
-than two hundred, it stops the model grading on vibes, and it makes every
-decision auditable afterwards.
-
-`difficulty` is read from its **logprobs**, not from the digit the sampler
-picked. The probability-weighted mean over all nine digits turns a coarse label
-into a continuous value, which is what makes the tier boundaries meaningful
-rather than cosmetic. Boundaries live in `auto-router.json`, so recalibrating
-the router is an edit, not a retrain.
-
-Each rule's band sits wholly inside one tier, so the boundaries are the
-midpoints between bands rather than numbers fitted to a sample:
-
-| difficulty | tier | rules in this band |
+| Tier | Typical work | Configured pool |
 | --- | --- | --- |
-| 1 | `trivial` | `no_work` |
-| 2-3 | `simple` | `direct_answer`, `mechanical_edit`, `run_command`, `stated_fix` |
-| 4-5 | `medium` | `explain_code`, `pattern_feature`, `research_gather`, `multi_file_change` |
-| 6-7 | `complex` | `new_component`, `unknown_cause`, `ambiguous_requirements`, `unfamiliar_integration` |
-| 8-9 | `reasoning` | `open_ended_design`, `intermittent_defect`, `correctness_critical` |
+| `trivial` | Greetings and standalone acknowledgements | Haiku 4.5, GPT-5.6 Luna-fast |
+| `simple` | Mechanical edits and bounded lookups | GPT-5.6 Luna-fast, Haiku 4.5 |
+| `medium` | Routine features and focused explanations | GPT-5.6 Sol-fast, Sonnet 5 |
+| `complex` | Unknown causes, new components, integrations | GPT-5.6 Sol, Sonnet 5 |
+| `reasoning` | Concurrency, security, difficult design | Opus 5, GPT-5.6 Sol |
 
-The prompt is built against the known failure modes of LLM judges rather than
-written from scratch. It says in as many words that length is not difficulty,
-that a pasted stack trace is a *stated* cause and therefore easy, that being
-about code is not difficulty, that touching many files is not by itself hard,
-and that tone is not difficulty. Long prompts get their middle cut out and only
-the ends sent, because volume reads as difficulty to a grader and the ask is
-almost always at one end or the other.
+Trivial and simple currently share models and effort. Their distinction is
+semantic, not a guaranteed difference in consumption.
 
-A turn the grader marks `continuation` — "hit it", "still doing it", "my bad,
-go ahead" — carries no difficulty of its own and inherits the session's tier
-instead. Grading those on their own four characters is how a hard task silently
-falls off the strong model on the word "yes".
+The local classifier is `qwen3:4b-instruct-2507-q8_0` on `omega:11434`. It sees
+the current user's text and attachment count, not the full conversation, file
+contents, or tool results. Long text keeps its first 3,000 and last 1,500
+characters. Synthetic text and complete system-reminder blocks are excluded.
 
-Prior art this follows, rather than a design invented here: NVIDIA NeMo
-Switchyard for the named-rule-then-number shape and for forecasting a number
-that a deterministic policy thresholds outside the model, RouteLLM for the same
-structure expressed as a win probability, and G-Eval for reading the score off
-the logprobs instead of the sampled token.
+It returns a named rule and difficulty from 1 to 9. When digit log-probabilities
+are available, the router computes a probability-weighted score. Otherwise it
+uses the emitted digit. This smooths grading; it is **not** a measured probability
+that a target model will solve the task.
 
-### When omega is unreachable
+Tier boundaries are 1.5, 3.5, 5.5, and 8.0. The rubric lives in `RUBRIC.md`.
+A stack trace is treated as a symptom, not automatically as proof of an easy
+fix. An established cause and obvious correction can still be simple.
 
-Then `classify.js` runs instead: the original weighted keyword score, no network
-call, no added latency. It is measurably worse, and the status line says so by
-appending `?` to the tier. Failures trip a breaker that backs off geometrically
-from 30 seconds to 10 minutes, so a laptop off the tailnet pays the connect
-timeout once rather than on every prompt.
+The classifier has a 3-second timeout, a 256-entry in-memory result cache, and
+a circuit breaker. Two transport failures open the breaker for 30 seconds;
+repeated failures increase that pause up to 10 minutes. While unavailable,
+weighted keywords choose the tier. No hosted classification call is made.
+Local inference still consumes hardware resources and adds latency.
 
-### Measured
+## Continuity And Selection
 
-190 graded prompts: 150 real turns sampled from this machine's own OpenCode
-history, stratified by length, plus 40 written for the corners that real traffic
-is too thin to cover. Both graded against `RUBRIC.md`. Reproduce with
-`node eval/run.js`.
+Safety rules run before or after grading as appropriate:
 
-| | exact | balanced exact | within one tier | off by two or more | bias |
-| --- | --- | --- | --- | --- | --- |
-| keyword scorer | 30.0% | 33.9% | 79.5% | 20.5% | −0.68 tiers |
-| `qwen3:4b-instruct-2507-q8_0` | 58.9% | 60.6% | 94.2% | 5.8% | +0.07 tiers |
+- Whole-message approvals inherit the working tier, or medium when no history exists.
+- Whole-message acknowledgements retain the working tier, or trivial in a new session.
+- "Thanks, fix the auth bug" is work, not an acknowledgement shortcut.
+- Attachments bypass acknowledgement/approval shortcuts and impose at least medium, unless explicitly overridden by a directive.
+- Recognized failed-work replies such as "try again" or "still broken" raise the prior tier by one, capped at reasoning.
+- Other short replies cannot lower the working tier by default: `maxDropPerTurn` is zero.
+- Explicit directives can lower the tier. Starting a new session also starts fresh.
 
-`balanced exact` averages per gold tier instead of per prompt, so the rare tiers
-count as much as `medium` does. Median added latency is 609 ms, p90 791 ms,
-p99 1005 ms.
+Preserving the model gives provider-side prompt caching a better chance to help.
+It does not guarantee a cache hit: expiry, account changes, prompt changes, and
+provider behavior still matter. Keeping a strong model also consumes its output
+and reasoning budget; this is a continuity policy, not a proven cost optimum.
 
-One deployment detail is load-bearing: the classifier must not send `num_ctx`.
-Ollama keys the loaded runner on the context length, so a request that disagrees
-with the length the model was loaded under evicts and reloads it — 2.4 s against
-300 ms. The context window is set once, server-side, by
-`OLLAMA_CONTEXT_LENGTH` in `ollama.nix`.
+Within the chosen tier, selection works as follows:
 
-`bias` is the mean signed tier error. The keyword scorer is not merely
-inaccurate, it is *consistently cheap* — it under-graded by two thirds of a tier
-on average, which is exactly the complaint that prompted this: a long, detailed
-prompt asking for a whole monitoring dashboard came out `medium`. It now comes
-out `reasoning`.
+1. Remove models absent from a successfully loaded catalog, blocked models,
+   quarantined models, and providers with known zero headroom.
+2. If none remain, search higher tiers. Finally try the configured Sonnet fallback
+   under the same eligibility checks. If that also fails, report an error.
+3. Prefer candidates above 8% headroom when available. A positive but low budget
+   remains usable if no better-budget candidate exists. Unknown quota is not zero.
+4. Keep models within `intelligenceTolerance` (currently two benchmark points)
+   of the best eligible model. Scores are static policy inputs, not task-specific proof.
+5. Keep the session's existing pick if still eligible within that group.
+6. Otherwise prefer proven health, then headroom, then exact score, then a stable tie-break.
 
-Two larger models were measured on the same set and rejected.
-`qwen3:30b-a3b-instruct-2507` graded 42 of 75 `medium` turns as `complex`, which
-would send routine work to expensive models. `granite4.2:8b` is a thinking model
-and spends its token budget reasoning before emitting the JSON, so it never
-produced a parseable verdict.
+Reasoning effort is none for trivial/simple and low for medium when supported.
+Complex/reasoning use adaptive defaults on detected adaptive Anthropic models;
+other models use medium/high respectively. Unsupported variants are omitted.
+A variant explicitly selected on the Auto entry overrides the tier for that turn.
 
-Once a tier is chosen, models within that tier are ranked by:
-1. **Intelligence score** (primary) — higher benchmark intelligence wins, to prioritize output quality
-2. **Proven track record** — models that have answered in this session before
-3. **Subscription headroom** — models with more remaining usage budget
-4. **Stable hash** — ties broken predictably per session, so cache stays warm
+## Both OpenAI Accounts
 
-The fallback scorer follows [LiteLLM's complexity
-router](https://docs.litellm.ai/docs/proxy/auto_routing), including scoring the
-last real human ask rather than the whole payload, stripping `<system-reminder>`
-blocks first, and escalating on two or more reasoning markers.
+The router uses the existing saved `personal` and `business` profiles. It does
+not create accounts, copy credentials into router state, or automatically save
+a new login. Save/reconnect profiles through the existing widget workflow.
 
-LiteLLM itself is not used. It is a proxy, and routing this machine through it
-would mean swapping the Anthropic and ChatGPT subscription logins for metered
-API keys — turning a flat monthly cost into per-token billing, which is the
-opposite of the point. The same argument is why the grader is local: a hosted
-judge is a per-turn charge on every prompt, and published deployments measure it
-at about a fifth of the whole routed bill. On owned hardware it is free, which
-is the only reason grading every single turn is affordable at all.
+Before every Auto-routed turn, `usage.js` asks `quickshell-ai-account status`
+which saved profile actually matches OpenCode's current credentials. This
+returns profile names only, not tokens. Cached widget `active` flags are not
+trusted as account identity.
 
-## Model selection within a tier
+Usage comes from `~/.local/state/quickshell/ai-usage.json`. Headroom is
+`100 - max(window usage)`: either the short or weekly window can exhaust an
+account. These are provider percentages, not token counts, and currently rounded
+by the helper. Missing, failed, too-old, or reset-expired observations are unknown.
+An elapsed reset does not invent a fresh 100% budget.
 
-Within each tier's pool, models are ranked by intelligence score (Artificial Analysis Intelligence Index v4.3, Sept 2026) rather than subscription headroom. This prioritizes output quality over cost distribution. Headroom still matters, but only to break ties between models with similar intelligence, or when the primary model is exhausted.
+Missing/stale observations trigger an awaited `quickshell-ai-usage` refresh,
+which polls both saved accounts and Anthropic. Ordinary unsuccessful refreshes
+are throttled to one attempt per minute per plugin instance. An OpenAI quota or
+rate-limit error requests a refresh before the next routed turn, bypassing that
+cooldown. It does not treat every rate-limit error as account exhaustion.
 
-**Why intelligence-first?** Your router exists to save token spend by routing cheap turns away from expensive models. But cheap turns still need quality output — a weak model's wrong answer costs more in re-asks than running the right model would. Intelligence score therefore comes first to ensure every tier gets the smartest model available, with provider diversity maintained only as a fallback.
+When active usage is 100% and another saved account has fresh positive headroom:
 
-Stability rules that matter alongside intelligence prioritization:
+1. Choose the alternate with the most remaining headroom.
+2. Await `quickshell-ai-account select <alternate> <expected-active>`.
+3. The helper checks the expected active profile under its existing account lock,
+   so a stale decision does not undo a widget or other helper switch.
+4. Use the returned active identity immediately for model selection, without
+   waiting for the widget cache to change its active flags.
 
-- **Approvals inherit.** "yes, do it" runs at the tier that proposed the work.
-- **Acknowledgements run free** and do not move the session's tier, so "thanks"
-  after a hard turn costs nothing and the next real turn resumes where it was.
-- **De-escalation drops one tier per turn.** Switching models throws away the
-  provider-side prompt cache, and a cache rewrite can cost more than the cheaper
-  rate saves.
-- **Top-quality pool choices are sticky per session**, for the same reason. A
-  lower-scoring fallback is replaced when the preferred model becomes usable.
-- **State survives a restart** via the status file, so a resumed session keeps
-  its tier instead of silently falling to the bottom.
+Even **1% remaining qualifies**. There is no 90%-used preemptive switch or
+20-point minimum gain anymore. If both accounts are exhausted, use an eligible
+Anthropic model or report no usable model. A failed selection is followed by
+an identity check rather than assuming it succeeded.
 
-## Broken models
+Normal turns use cached usage plus a local status command. An exceptional refresh
+can wait up to 45 seconds; selection up to 30 seconds; status up to 5 seconds.
+These are helper limits, separate from the classifier's 3-second budget.
 
-A model that answers a routed turn with a fatal error - gone, unsupported on
-these credentials, no such model - is quarantined: taken out of every pool for
-an hour, doubling on each repeat strike up to a week. The record is written to
-the status file, so it is shared by every running OpenCode and survives a
-restart. Transient failures are excluded on purpose: rate limits, overload,
-timeouts and auth problems say nothing about whether the model works.
+### Live Switching Limits
 
-If quarantine empties a tier, the turn routes *up* to the next tier rather than
-failing. A cheap turn on an expensive model is the right way to lose here.
+Installed OpenCode's OAuth HTTP transport rereads credentials for every request.
+Switching accounts therefore needs **no OpenCode restart**. Selection is global,
+just like the widget: another pane's next HTTP request can see the new account.
+The plugin does not establish a global idle barrier across running sessions.
 
-Ranking also prefers a model that has answered before, so an expiring
-quarantine does not immediately put a dead model back in front of a working
-one. Success is recorded when a routed session goes idle.
+The switch is attempted before a new routed prompt, not by replaying an in-flight
+turn or its tool actions. A failure occurring partway through a turn can still
+reach the user; the next routed turn can refresh quota and switch. Explicitly
+pinned agents/models bypass Auto's per-turn selection policy.
 
-This is worth having because OpenCode decides whether to retry by
-pattern-matching the error text, and OpenCode Zen reports an upstream 404 as
-`Provider returned error`, which matches its retryable patterns. A permanently
-dead model therefore burns the full five-attempt backoff - about seventy
-seconds - rather than failing once.
+Experimental persistent WebSocket transport and `OPENCODE_AUTH_CONTENT` are
+exceptions to normal live file-based switching. Existing authenticated sockets
+may retain an old account, and the auth environment override takes precedence
+over the file. Keep normal HTTP/file-backed OAuth for this setup.
 
-That first stall cannot be avoided from a plugin: `session.error` is only
-delivered after the retries are exhausted, the per-attempt events are internal
-to the TUI, and no hook can change the model of an in-flight turn. What the
-quarantine buys is that it happens once per model rather than once per prompt.
+The helper lock coordinates Quickshell commands, not OpenCode's own token refresh
+writes. It reduces helper races but is not full cross-process credential isolation.
+Widget cards refresh on their own polling/open workflow; an automatic switch
+need not immediately repaint an already-open card.
 
-To rule a model out permanently, put it in `blocked` in `auto-router.json`.
+## Errors And Visibility
 
-## Subscription awareness
+Fatal model errors can quarantine a model for one hour, doubling repeated strikes
+up to one week. Rate limits, network errors, and authentication problems do not
+prove a model is broken and are excluded. Blocked and quarantined models are not
+silently reinstated as a last resort. A turn reporting an error is not marked
+healthy merely because its session later becomes idle.
 
-Headroom is read from the usage cache `quickshell-ai-usage` already maintains
-for the bar widget. Within a tier the provider with more left wins, and a
-provider under `avoidBelowHeadroom` percent is skipped when another candidate
-has more room. A provider at zero is always excluded; if every subscription in
-the pool is low, a non-zero candidate is used rather than restoring an exhausted
-one.
+Quarantine applies to later turns. The plugin does not replace OpenCode's
+in-flight retry machinery. Successful idle without a reported error is only an
+operational health signal, not proof that an answer was correct.
 
-If the active ChatGPT account is spent and the other saved account has
-meaningfully more left, the router runs `quickshell-ai-account select` at
-startup. It only does this at startup because OpenCode's OpenAI provider reads
-`auth.json` once, in its auth loader, and then closes over that token for the
-life of the process — a mid-session swap would not take effect. After startup
-the router just stops routing to the exhausted provider, which works live.
+The TUI status label shows Auto, chosen model/tier, and effort. A question mark
+on heuristic-classified work indicates fallback grading. Decisions, including
+OpenAI profile when known, are logged and written to
+`~/.local/state/opencode/auto-router.json`. The file retains at most 64 recent
+session entries plus model health and quarantine. It is a current snapshot,
+not a complete usage ledger. Atomic replacement prevents partial JSON reads;
+independent processes can still race on whole-file updates.
 
-## Files
+## Other Agents
 
-| File                     | Role                                                        |
-| ------------------------ | ----------------------------------------------------------- |
-| `auto-router.js`         | Server plugin. Rewrites the model per turn.                 |
-| `classifier.js`          | The grader: rules, prompt, Ollama client, breaker.          |
-| `RUBRIC.md`              | What the tiers mean. The contract the rest is measured against. |
-| `classify.js`            | Offline keyword scorer. Fallback only. Pure, no I/O.        |
-| `usage.js`               | Headroom and ChatGPT account switching.                     |
-| `auto-router.json`       | Tunables. Merged over the defaults in `auto-router.js`.     |
-| `eval/run.js`            | Measures a model against the graded set.                    |
-| `eval/gold_*.json`       | The graded prompts.                                         |
-| `../tui-plugins/auto-router-status.tsx` | The status label.                            |
+`quick` is a read-only lookup agent pinned to GPT-5.6 Luna-fast. It cannot edit or
+run shell commands. It consumes OpenAI subscription quota; use direct reads when
+delegating would add more context than it saves. Title generation uses the same
+model. These replaced a free provider that rejected calls during review.
 
-The grader itself is deployed by `system/modules/software/ollama.nix`, enabled
-on `omega` only. It pins the model in VRAM with `keep_alive: -1`, re-warms it on
-a timer in case the daemon restarts, and opens port 11434 on the `tailscale0`
-interface alone — Ollama has no authentication, so it must never be reachable
-from the LAN.
+`deep` remains pinned to Opus 5 for bounded difficult subproblems. An explicit
+agent model is not another Auto tier. Delegation duplicates some context, so
+reserve it for useful isolation or genuine complexity.
 
-Re-measure after changing the prompt, the rules or the bands:
+## Files And Deployment
 
+| File | Responsibility |
+| --- | --- |
+| `auto-router.js` | Hook, tier safeguards, candidate selection, state and errors |
+| `auto-router.json` | Pools, effort, thresholds, quota and continuity settings |
+| `classifier.js` | Local grading prompt, Ollama request, cache and breaker |
+| `classify.js` | Pure text rules and offline heuristic |
+| `usage.js` | Usage freshness, active identity, awaited account failover |
+| `RUBRIC.md` | Intended difficulty categories |
+| `router.test.js`, `usage.test.js` | Offline regression tests with mocks |
+| `eval/run.js`, `eval/gold_*.json` | Classifier agreement evaluation |
+| `../opencode.json` | Auto placeholder and pinned agents |
+| `../tui-plugins/auto-router-status.tsx` | Status display |
+| `../../../desktop/quickshell/usage.py` | Shared usage/account helper |
+
+Home Manager links the plugin entrypoint and OpenCode configuration back into
+this repository. Its sibling modules load from here. Quickshell command wrappers
+also point at the repository's helper. These edits need no Nix rebuild on the
+already-linked machine. Restart OpenCode once to load changed plugin/config code;
+subsequent account switches do not require restarts.
+
+The local classifier is deployed by `system/modules/software/ollama.nix` on
+omega. Its context length is configured server-side; the client deliberately
+does not send `num_ctx`, avoiding runner reloads from mismatched context sizes.
+Ollama's unauthenticated port must remain restricted to the intended Tailnet.
+
+## Verification
+
+From `/etc/nixos`, offline tests do not call models, fetch quota, or switch real accounts:
+
+```bash
+node --test home/features/agents/opencode/auto-router/router.test.js home/features/agents/opencode/auto-router/usage.test.js
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s home/features/desktop/quickshell -p test_usage.py
 ```
-node eval/run.js                      # the configured model
-node eval/run.js --heuristic          # the fallback, for comparison
-node eval/run.js --model <tag> --tune # try another model, fit boundaries
+
+The classifier evaluation uses 150 historical prompts and 40 probes. It measures
+agreement with assigned tiers, not completed-task quality or subscription savings.
+Its `cost` statistic is weighted tier distance. Five-fold tuning holds out prompts
+for threshold fitting, but does not validate the whole routing system. Fixtures
+do not simulate conversation continuity, accounts, or actual target-model work.
+Historical accuracy numbers predate the revised diagnostic rules and are not
+current guarantees.
+
+These commands are optional, not automatic:
+
+```bash
+node home/features/agents/opencode/auto-router/eval/run.js --heuristic
+node home/features/agents/opencode/auto-router/eval/run.js
 ```
 
-`--tune` reports held-out numbers from five-fold cross-validation, because
-boundaries fitted and scored on the same prompts flatter themselves.
+The first is offline. The second calls the local classifier, not paid target
+models. Neither performs a paid-model A/B experiment.
 
-Routing state, the quarantine and per-model health are written to
-`~/.local/state/opencode/auto-router.json`. Every decision is logged with its
-score and signals:
+## Deferred Savings Study
 
-```
-rg 'routing decision|quarantined' ~/.local/share/opencode/log/opencode.log
-```
+Do not run a paid comparison without explicit approval. A future study could
+compare Auto with a fixed capable-model baseline on equivalent representative
+tasks, measuring correctness, corrective turns, total input/output/reasoning
+tokens, cache reads/writes, latency, and subscription consumption where exposed.
+Keep evaluation tasks separate from threshold tuning and count failed attempts
+and delegation overhead. Optimize usage per successfully completed task, not
+cheapness per individual turn. No such experiment is enabled or scheduled.
 
-Agent colours are pinned in `opencode.json` rather than left to OpenCode's
-defaults. An agent without an explicit `color` gets the theme colour at its
-index in the agent list, so defining `deep` and `quick` renamed every colour
-after them alphabetically and moved plan mode from yellow to blue - which the
-tmux status line mirrors.
+## Deferred Context-Aware Routing
 
-## Implementation note
+Potential future improvement: run a bounded, isolated read-only scout before
+final classification when the prompt lacks repository context. The scout could
+use Qwen on omega, inspect a few relevant files with glob/grep/read, and return
+paths, brief evidence, and uncertainties. The final classifier could then
+distinguish routine pattern work from unfamiliar integration or high-risk
+changes, while the selected model could reuse the evidence.
 
-`chat.message` fires after OpenCode builds the user message but before it
-persists it. The router classifies the prompt, picks a tier, selects the best
-model from that tier's pool, and rewrites `output.message.model` to redirect
-the turn. The session loop later reads this model from the persisted message.
-
-The TUI re-reads the model from the last user message when a session comes into
-view, so shortly after the first routed turn the visible selection stops saying
-"Auto" and starts naming the concrete model. Later prompts then arrive already
-bound to it. The router treats a prompt that arrives on exactly the model it last
-routed that session as still being in Auto, and keeps routing; anything else is
-read as a deliberate choice and turns routing off for that session. Re-select
-**Auto** in `/models` to turn it back on.
-
-## Turning it off
-
-Set `"enabled": false` in `auto-router.json`, or just pick a real model in
-`/models`.
+Do not make Qwen the active conversation model for scouting. Keep reconnaissance
+outside the conversation to avoid tool-call history, model handoff artifacts,
+unbounded investigation, and accidental edits. Skip scouting for directives,
+continuations, obvious mechanical requests, and prompts with sufficient context.
+Enforce read-only tools, strict call/output/time limits, and conservative
+fallback on timeout or uncertainty. Context must be structured evidence, not a
+large file dump. This idea needs separate latency, routing-quality, and total
+usage measurement before implementation; it is noted only and currently
+disabled.

@@ -1,185 +1,133 @@
-// Subscription headroom, read from the quickshell usage cache.
-//
-// `quickshell-ai-usage` already polls Anthropic and both ChatGPT accounts for
-// the bar widget and writes the result to
-// `$XDG_STATE_HOME/quickshell/ai-usage.json`. The router reuses that file
-// instead of polling the same endpoints again, and only shells out to refresh
-// it when the cache has gone stale.
-//
-// Live account switching has a hard limit worth knowing about: OpenCode's
-// OpenAI provider reads auth.json once, inside the auth loader, and then closes
-// over that token for the life of the process (see
-// packages/opencode/src/plugin/openai/codex.ts). Swapping profiles only takes
-// effect for a provider that has not been initialised yet, which is why the
-// switch is attempted at plugin startup. After that point the router stops
-// routing to the exhausted provider instead, which works without a restart.
-
+// Subscription usage comes from the same helper as the Quickshell widget.
+// OpenCode's OAuth HTTP transport rereads auth for each request, so selecting
+// another saved account works live. Selection is global, not session-local.
 import { execFile } from "node:child_process"
 import fs from "node:fs"
 import path from "node:path"
 
-const USAGE_BIN = "quickshell-ai-usage"
-const ACCOUNT_BIN = "quickshell-ai-account"
-
 function cachePath() {
-  const base =
-    process.env.XDG_STATE_HOME ??
-    (process.env.HOME ? path.join(process.env.HOME, ".local", "state") : undefined)
-  if (!base) return undefined
-  return path.join(base, "quickshell", "ai-usage.json")
+  const base = process.env.XDG_STATE_HOME ?? (process.env.HOME && path.join(process.env.HOME, ".local", "state"))
+  return base ? path.join(base, "quickshell", "ai-usage.json") : undefined
 }
 
 function run(bin, args, timeoutMs) {
   return new Promise((resolve) => {
-    let done = false
-    const child = execFile(bin, args, { timeout: timeoutMs }, (error, stdout) => {
-      if (done) return
-      done = true
-      resolve(error ? undefined : stdout)
-    })
-    child.on("error", () => {
-      if (done) return
-      done = true
-      resolve(undefined)
+    execFile(bin, args, { timeout: timeoutMs }, (error, stdout) => {
+      if (error) return resolve(undefined)
+      try {
+        resolve(JSON.parse(stdout))
+      } catch {
+        resolve(undefined)
+      }
     })
   })
 }
 
-function worstWindow(provider) {
-  const used = (provider?.windows ?? []).map((w) => Number(w?.used ?? 0)).filter((n) => Number.isFinite(n))
-  if (!used.length) return undefined
-  return Math.max(...used)
-}
-
 export function createUsage(options = {}) {
-  const file = cachePath()
-  const maxAgeMs = (options.maxAgeSeconds ?? 900) * 1000
-
-  let snapshot
-  let refreshing
-
-  const read = () => {
-    if (!file) return undefined
+  const command = options.run ?? run
+  const now = options.now ?? Date.now
+  const read = options.read ?? (() => {
     try {
-      const data = JSON.parse(fs.readFileSync(file, "utf8"))
-      const providers = new Map()
-      for (const provider of data?.providers ?? []) {
-        const id = provider?.id
-        if (!id) continue
-        providers.set(id, provider)
-      }
-      return providers.size ? providers : undefined
+      return JSON.parse(fs.readFileSync(cachePath(), "utf8"))
     } catch {
       return undefined
     }
-  }
+  })
+  const maxAgeMs = (options.maxAgeSeconds ?? 900) * 1000
+  let snapshot
+  let active
+  let preparing
+  let lastRefresh = -Infinity
+  let invalidated = false
 
-  const stalest = (providers) => {
-    let oldest = Infinity
-    for (const provider of providers.values()) {
-      const at = Number(provider?.fetched_at ?? 0) * 1000
-      if (at < oldest) oldest = at
+  const provider = (id) => snapshot?.providers?.find((entry) => entry.id === id)
+  const remaining = (entry) => {
+    if (!entry || entry.available === false || entry.stale || !entry.fetched_at) return undefined
+    if (now() - entry.fetched_at * 1000 > maxAgeMs) return undefined
+    const windows = entry.windows ?? []
+    if (!windows.length) return undefined
+    const values = []
+    let unknown = false
+    for (const window of windows) {
+      if (typeof window.used !== "number" || !Number.isFinite(window.used)) {
+        unknown = true
+        continue
+      }
+      const reset = typeof window.reset === "number" ? window.reset * 1000 : Date.parse(window.reset)
+      // An elapsed reset needs a new observation, not an invented 100% budget.
+      if (Number.isFinite(reset) && reset <= now()) {
+        unknown = true
+        continue
+      }
+      values.push(window.used)
     }
-    return oldest
-  }
-
-  const refresh = async () => {
-    if (refreshing) return refreshing
-    refreshing = run(USAGE_BIN, [], 20000)
-      .then(() => {
-        snapshot = read()
-      })
-      .finally(() => {
-        refreshing = undefined
-      })
-    return refreshing
-  }
-
-  const load = () => {
-    if (!snapshot) snapshot = read()
-    return snapshot
+    // One still-current exhausted window is enough to block the account,
+    // even if another window has reset and needs a fresh observation.
+    if (values.some((used) => used >= 100)) return 0
+    if (unknown) return undefined
+    return Math.max(0, Math.min(100, 100 - Math.max(...values)))
   }
 
   return {
-    /** Reload from disk; refresh in the background when the cache is stale. */
-    poll() {
-      snapshot = read() ?? snapshot
-      const providers = snapshot
-      if (!providers) return undefined
-      if (Date.now() - stalest(providers) > maxAgeMs) void refresh()
-      return providers
+    // Coalesce simultaneous turns in this plugin instance. The helper also
+    // serializes account writes across processes and compares expected identity.
+    async prepare() {
+      if (preparing) return preparing
+      preparing = (async () => {
+        const cached = read()
+        if (cached?.providers) {
+          cached.providers = cached.providers.map((entry) => {
+            const previous = provider(entry.id)
+            // A failed helper refresh can leave an older last-good disk entry.
+            // Do not forget its stale flag until a newer observation arrives.
+            return previous?.stale && (previous.fetched_at ?? 0) >= (entry.fetched_at ?? 0) ? previous : entry
+          })
+        }
+        snapshot = cached
+        let status = await command("quickshell-ai-account", ["status"], 5000)
+        active = status?.ok ? status.active : undefined
+        const ids = ["anthropic", ...(status?.saved ?? []).map((id) => `openai-${id}`)]
+        if (invalidated || (ids.some((id) => remaining(provider(id)) === undefined) && now() - lastRefresh >= 60_000)) {
+          lastRefresh = now()
+          invalidated = false
+          // The helper polls both accounts; stdout retains failure/stale flags
+          // that the widget's last-good disk cache intentionally omits.
+          const fresh = await command("quickshell-ai-usage", [], 45_000)
+          if (fresh?.providers) snapshot = fresh
+          // Refresh can wait for other helper processes; honor widget changes
+          // that happened while waiting instead of relying on cache flags.
+          status = await command("quickshell-ai-account", ["status"], 5000)
+          active = status?.ok ? status.active : undefined
+        }
+        if (!active || remaining(provider(`openai-${active}`)) !== 0) return undefined
+        const alternatives = (status?.saved ?? [])
+          .filter((id) => id !== active && provider(`openai-${id}`)?.saved)
+          .map((id) => ({ id, left: remaining(provider(`openai-${id}`)) }))
+          .filter((entry) => entry.left > 0)
+          .sort((a, b) => b.left - a.left)
+        if (!alternatives.length) return undefined
+        const selected = await command("quickshell-ai-account", ["select", alternatives[0].id, active], 30_000)
+        // Confirm actual identity even after a timeout: the helper might have
+        // completed its write just before its parent observed failure.
+        const confirmed = selected?.ok ? selected : await command("quickshell-ai-account", ["status"], 5000)
+        active = confirmed?.ok ? confirmed.active : undefined
+        return selected?.switched ? active : undefined
+      })().finally(() => { preparing = undefined })
+      return preparing
     },
 
-    refresh,
+    invalidate() {
+      invalidated = true
+    },
 
     activeOpenAIProfile() {
-      const providers = load()
-      if (!providers) return undefined
-      for (const [id, provider] of providers) {
-        if (id.startsWith("openai-") && provider.active) return provider.profile ?? id.slice("openai-".length)
-      }
-      return undefined
+      return active
     },
 
-    /**
-     * Remaining percentage for the subscription behind a provider id, or
-     * `undefined` when there is no usage data. OpenAI resolves to whichever
-     * account is currently active, since that is the one a request would spend.
-     */
     headroom(providerID) {
-      const providers = load()
-      if (!providers) return undefined
-      let provider
-      if (providerID.startsWith("anthropic")) {
-        provider = providers.get("anthropic")
-      } else if (providerID.startsWith("openai")) {
-        const active = this.activeOpenAIProfile()
-        provider = active ? providers.get(`openai-${active}`) : undefined
-      } else {
-        // Free and local providers have no subscription to exhaust.
-        return 100
-      }
-      if (!provider || provider.available === false) return undefined
-      const used = worstWindow(provider)
-      return used === undefined ? undefined : Math.max(0, 100 - used)
-    },
-
-    /**
-     * Pick the OpenAI account with the most headroom, when the active one is
-     * spent and the other is saved and meaningfully fresher. Returns the
-     * profile switched to, or undefined.
-     */
-    async maybeSwitchOpenAI({ threshold = 90, minGain = 20 } = {}) {
-      const providers = load()
-      if (!providers) return undefined
-
-      const accounts = []
-      for (const [id, provider] of providers) {
-        if (!id.startsWith("openai-")) continue
-        if (!provider.saved) continue
-        if (provider.available === false) continue
-        const used = worstWindow(provider)
-        if (used === undefined) continue
-        accounts.push({ profile: provider.profile ?? id.slice("openai-".length), used, active: !!provider.active })
-      }
-      if (accounts.length < 2) return undefined
-
-      const active = accounts.find((account) => account.active)
-      if (!active || active.used < threshold) return undefined
-
-      const best = accounts.filter((a) => !a.active).sort((a, b) => a.used - b.used)[0]
-      if (!best || active.used - best.used < minGain) return undefined
-
-      const out = await run(ACCOUNT_BIN, ["select", best.profile], 30000)
-      if (!out) return undefined
-      try {
-        if (JSON.parse(out)?.ok !== true) return undefined
-      } catch {
-        return undefined
-      }
-      snapshot = undefined
-      void refresh()
-      return best.profile
+      if (providerID.startsWith("anthropic")) return remaining(provider("anthropic"))
+      if (providerID.startsWith("openai")) return active ? remaining(provider(`openai-${active}`)) : undefined
+      return 100
     },
   }
 }

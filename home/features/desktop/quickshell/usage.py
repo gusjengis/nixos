@@ -102,11 +102,7 @@ def write_cache(path, providers, cached=None):
     if not fresh:
         return
     try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = path.with_suffix(".tmp")
-        with temporary.open("w", encoding="utf-8") as file:
-            json.dump({"providers": fresh}, file, separators=(",", ":"))
-        temporary.replace(path)
+        write_private_json(path, {"providers": fresh})
     except OSError:
         pass
 
@@ -160,8 +156,9 @@ def normalize_openai(data, profile, active=False):
         **openai_identity(profile, True, active),
         "available": True,
         "windows": [
-            window("5h", primary.get("used_percent"), primary.get("reset_at")),
-            window("7d", secondary.get("used_percent"), secondary.get("reset_at")),
+            window(label, value["used_percent"], value.get("reset_at"))
+            for label, value in (("5h", primary), ("7d", secondary))
+            if value.get("used_percent") is not None
         ],
     }
 
@@ -254,6 +251,25 @@ def refresh_openai_auth(auth):
 
 def current_openai_auth(home):
     return validate_openai_auth(read_json(auth_path(home))["openai"])
+
+
+def account_status(home):
+    """Return identity metadata only; never expose tokens or refresh a login."""
+    try:
+        current = current_openai_auth(home)["accountId"]
+    except (KeyError, OSError, ValueError, AccountError):
+        current = None
+    profiles = []
+    active = None
+    for profile in OPENAI_PROFILES:
+        try:
+            saved = read_profile(home, profile)
+        except (KeyError, OSError, ValueError, AccountError):
+            continue
+        profiles.append(profile)
+        if saved["accountId"] == current:
+            active = profile
+    return {"ok": True, "active": active, "saved": profiles}
 
 
 def store_profile(home, profile, auth):
@@ -387,16 +403,24 @@ def collect_usage(home):
 
 
 def account_command(args):
-    if len(args) != 2 or args[0] not in ("save", "select"):
-        raise AccountError("usage: quickshell-ai-account <save|select> <personal|business>")
-    action, profile = args
     home = Path.home()
+    if args == ["status"]:
+        with account_lock(home):
+            return account_status(home)
+    if not (len(args) == 2 and args[0] in ("save", "select") or
+            len(args) == 3 and args[0] == "select"):
+        raise AccountError("usage: quickshell-ai-account status | <save|select> <personal|business> [expected-active]")
+    action, profile = args[:2]
     with account_lock(home):
+        # Router selections are conditional; do not undo a switch made by
+        # another pane or the widget while this caller waited for the lock.
+        if len(args) == 3 and account_status(home)["active"] != args[2]:
+            return {**account_status(home), "action": "select", "switched": False}
         if action == "save":
             save_profile(home, profile)
         else:
             activate_profile(home, profile)
-    return {"ok": True, "profile": profile, "action": action}
+        return {**account_status(home), "profile": profile, "action": action, "switched": action == "select"}
 
 
 def main():

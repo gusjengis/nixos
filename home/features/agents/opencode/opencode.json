@@ -18,13 +18,13 @@
       "color": "success"
     },
     "title": {
-      "model": "opencode/nemotron-3.5-lightning-free"
+      "model": "openai/gpt-5.6-luna-fast"
     },
     "quick": {
-      "description": "Free, read-only lookup agent. Use it for anything mechanical: finding files, searching for symbols, tracing call sites, reading and summarising files, answering narrow factual questions about the codebase. It costs no subscription usage, so prefer it over reading files yourself, and call several at once for independent lookups. It cannot edit, cannot run commands, and is not smart - give it one narrow, verifiable question each.",
+      "description": "Lightweight, read-only lookup agent. Use for bounded mechanical lookups: finding files, searching for symbols, tracing call sites, or answering narrow factual questions about the codebase. It uses OpenAI subscription quota. It cannot edit or run commands; give it one narrow, verifiable question. Prefer direct reads when delegation would add more context than it saves.",
       "mode": "subagent",
       "color": "info",
-      "model": "opencode/nemotron-3.5-lightning-free",
+      "model": "openai/gpt-5.6-luna-fast",
       "temperature": 0,
       "steps": 12,
       "permission": {
