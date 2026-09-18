@@ -27,14 +27,18 @@ work from implicitly upgrading the operating system.
 
 ## Machine Identity
 
-Each roster key is the machine's NixOS hostname and Tailscale node name.
-`rehome` and `rebuild` use that hostname to select the flake output and also
-accept an explicit host name for fresh installations:
+Every machine reports hostname `nixos`, so `/etc/machine-id` selects its flake
+output. `system/hosts/default.nix` maps each ID to a host name, architecture,
+and description. `rehome` and `rebuild` perform this lookup and also accept an
+explicit host name for fresh installations:
 
 ```bash
 rehome t480s
 rebuild t480s
 ```
+
+A reinstall changes machine-id. Use an explicit host until the roster is
+updated.
 
 ## Outputs
 
