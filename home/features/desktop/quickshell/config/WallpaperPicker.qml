@@ -7,6 +7,7 @@ import Quickshell.Io
 import Quickshell.Wayland
 import "state"
 import "theme"
+import "widgets"
 
 PanelWindow {
     id: picker
@@ -15,23 +16,36 @@ PanelWindow {
     focusable: true
     exclusionMode: ExclusionMode.Ignore
     implicitWidth: screen.width * 0.5
-    implicitHeight: screen.height / 3
+    implicitHeight: screen.height / 3 + 108
     color: "transparent"
     WlrLayershell.namespace: "quickshell-wallpaper-picker"
 
+    // Every wallpaper in the persisted random order, decorated with metadata.
+    property var allWallpapers: []
+    // The subset currently shown by the carousel; equals allWallpapers when the query is empty.
     property var wallpapers: []
+    property var catalogEntries: []
+    property var metadata: ({})
+    property string metadataPath: ""
     property real animatedIndex: 0
     property string originalWallpaper: ""
     property bool ready: false
+    property bool armed: false
+    readonly property string query: search.text.trim()
+    readonly property bool filtering: query !== ""
     readonly property int selectedIndex: {
         if (wallpapers.length === 0)
             return 0;
         const index = Math.round(animatedIndex) % wallpapers.length;
         return index < 0 ? index + wallpapers.length : index;
     }
+    readonly property var selected: wallpapers.length === 0 ? null : wallpapers[selectedIndex]
+    readonly property string selectedPath: selected ? selected.path : ""
 
     function show() {
         ready = false;
+        armed = false;
+        search.text = "";
         const focusedMonitor = Hyprland.focusedMonitor;
         if (focusedMonitor) {
             for (let index = 0; index < Quickshell.screens.length; index++) {
@@ -71,13 +85,15 @@ PanelWindow {
         animatedIndex = Math.round(animatedIndex) + offset;
     }
 
+    // Applying writes the wallpaper to the state file, which is also what anchors the
+    // random cycle, so the next open lands on this wallpaper's slot in the random order.
     function applySelected() {
-        if (wallpapers.length === 0) {
+        if (selectedPath === "") {
             visible = false;
             return;
         }
         previewTimer.stop();
-        Quickshell.execDetached(["wallpaperctl", "set", wallpapers[selectedIndex].path]);
+        Quickshell.execDetached(["wallpaperctl", "set", selectedPath]);
         visible = false;
     }
 
@@ -87,16 +103,107 @@ PanelWindow {
         animatedIndex = Math.floor(Math.random() * wallpapers.length);
     }
 
-    onSelectedIndexChanged: {
-        if (!visible || !ready || wallpapers.length === 0)
+    function normalizeText(value) {
+        return (value || "").toLowerCase().replace(/[^0-9a-z\u00c0-\u024f]+/g, " ").trim();
+    }
+
+    function loadMetadata() {
+        try {
+            const parsed = JSON.parse(metadataView.text());
+            metadata = parsed.entries || {};
+        } catch (error) {
+            console.warn("Cannot load wallpaper metadata:", error);
+            metadata = ({});
+        }
+        rebuild();
+    }
+
+    // Joins the catalog with the Peapix metadata and precomputes the search haystacks
+    // once per open so filtering stays cheap on every keystroke.
+    function rebuild() {
+        const entries = [];
+        for (let index = 0; index < catalogEntries.length; index++) {
+            const item = catalogEntries[index];
+            const record = metadata[item.file] || null;
+            const tags = record && record.tags ? record.tags : [];
+            const title = record && record.title ? record.title : item.name;
+            const headline = record && record.headline ? record.headline : "";
+            const description = record && record.description ? record.description : "";
+            const date = record && record.date ? record.date : "";
+            entries.push({
+                "path": item.path,
+                "file": item.file,
+                "name": item.name,
+                "extension": item.extension,
+                "order": index,
+                "title": title,
+                "headline": headline,
+                "date": date,
+                "tags": tags,
+                "titleText": normalizeText(title),
+                "tagText": normalizeText(tags.join(" ")),
+                "bodyText": normalizeText([headline, description, item.name, date].join(" "))
+            });
+        }
+        allWallpapers = entries;
+        applyFilter(armed ? selectedPath : originalWallpaper);
+    }
+
+    function matchScore(entry, terms) {
+        let score = 0;
+        for (let index = 0; index < terms.length; index++) {
+            const term = terms[index];
+            let best = -1;
+            if (entry.titleText.indexOf(term) >= 0)
+                best = entry.titleText.startsWith(term) || entry.titleText.indexOf(" " + term) >= 0 ? 120 : 90;
+            if (entry.tagText.indexOf(term) >= 0)
+                best = Math.max(best, 70);
+            if (entry.bodyText.indexOf(term) >= 0)
+                best = Math.max(best, 20);
+            if (best < 0)
+                return -1;
+            score += best;
+        }
+        return score;
+    }
+
+    // Narrows the carousel to the query, keeping the previously centered wallpaper
+    // centered whenever it survives the filter.
+    function applyFilter(preferredPath) {
+        const keep = preferredPath !== undefined && preferredPath !== "" ? preferredPath : selectedPath;
+        const terms = normalizeText(query).split(" ").filter(term => term !== "");
+
+        let results;
+        if (terms.length === 0) {
+            results = allWallpapers;
+        } else {
+            results = allWallpapers.map(entry => ({
+                        "entry": entry,
+                        "score": matchScore(entry, terms)
+                    })).filter(result => result.score >= 0).sort((left, right) => right.score - left.score || left.entry.order - right.entry.order).map(result => result.entry);
+        }
+
+        ready = false;
+        wallpapers = results;
+        const target = results.findIndex(entry => entry.path === keep);
+        animatedIndex = target >= 0 ? target : 0;
+        Qt.callLater(() => picker.ready = true);
+    }
+
+    function previewSelected() {
+        if (!armed || !visible || selectedPath === "")
             return;
-        previewTimer.path = wallpapers[selectedIndex].path;
+        previewTimer.path = selectedPath;
         previewTimer.restart();
     }
 
+    onSelectedPathChanged: previewSelected()
+
     onVisibleChanged: {
         if (visible)
-            keyHandler.forceActiveFocus();
+            search.forceActiveFocus();
+        else
+            previewTimer.stop();
     }
 
     HyprlandFocusGrab {
@@ -123,15 +230,30 @@ PanelWindow {
                 return;
             try {
                 const result = JSON.parse(catalogOutput.text);
-                picker.wallpapers = result.wallpapers || [];
+                picker.catalogEntries = result.wallpapers || [];
                 picker.originalWallpaper = result.current || "";
-                let activeIndex = picker.wallpapers.findIndex(item => item.path === picker.originalWallpaper);
-                picker.animatedIndex = activeIndex >= 0 ? activeIndex : 0;
-                Qt.callLater(() => picker.ready = true);
+                picker.metadataPath = result.metadataFile || "";
+                picker.rebuild();
+                if (picker.metadataPath !== "" && Object.keys(picker.metadata).length === 0)
+                    metadataView.reload();
+                Qt.callLater(() => {
+                    picker.ready = true;
+                    picker.armed = true;
+                });
             } catch (error) {
                 console.warn("Cannot load wallpaper catalog:", error);
             }
         }
+    }
+
+    FileView {
+        id: metadataView
+        path: picker.metadataPath
+        preload: true
+        watchChanges: true
+        printErrors: false
+        onFileChanged: reload()
+        onLoaded: picker.loadMetadata()
     }
 
     Timer {
@@ -149,40 +271,132 @@ PanelWindow {
         NumberAnimation { duration: 190; easing.type: Easing.OutCubic }
     }
 
-    Shortcut { sequence: "Left"; enabled: picker.visible; onActivated: picker.select(-1) }
-    Shortcut { sequence: "Right"; enabled: picker.visible; onActivated: picker.select(1) }
-    Shortcut { sequence: "H"; enabled: picker.visible; onActivated: picker.select(-1) }
-    Shortcut { sequence: "L"; enabled: picker.visible; onActivated: picker.select(1) }
-    Shortcut { sequence: "A"; enabled: picker.visible; onActivated: picker.select(-1) }
-    Shortcut { sequence: "D"; enabled: picker.visible; onActivated: picker.select(1) }
-    Shortcut { sequence: "R"; enabled: picker.visible; onActivated: picker.selectRandom() }
-    Shortcut { sequence: "Return"; enabled: picker.visible; onActivated: picker.applySelected() }
-    Shortcut { sequence: "Space"; enabled: picker.visible; onActivated: picker.applySelected() }
-    Shortcut { sequence: "Escape"; enabled: picker.visible; onActivated: picker.applySelected() }
-    Shortcut { sequence: "Q"; enabled: picker.visible; onActivated: picker.applySelected() }
-    Shortcut { sequence: "Backspace"; enabled: picker.visible; onActivated: picker.restoreOriginal() }
-
-    Item {
-        id: keyHandler
-        anchors.fill: parent
-        focus: true
-    }
-
     Item {
         id: stage
         anchors.fill: parent
 
+        Item {
+            id: searchRow
+            anchors.top: parent.top
+            anchors.horizontalCenter: parent.horizontalCenter
+            width: Math.min(560, stage.width * 0.6)
+            height: 36
+
+            ThemedTextField {
+                id: search
+                anchors.fill: parent
+                focus: true
+                placeholderText: "Search wallpapers"
+                font.pixelSize: 14
+                rightPadding: resultCount.width + 24
+                onTextChanged: filterTimer.restart()
+
+                // Handled here rather than with Shortcut so typing a query never triggers navigation.
+                Keys.onPressed: event => {
+                    if (event.key === Qt.Key_Left || event.key === Qt.Key_Up) {
+                        picker.select(-1);
+                        event.accepted = true;
+                    } else if (event.key === Qt.Key_Right || event.key === Qt.Key_Down) {
+                        picker.select(1);
+                        event.accepted = true;
+                    } else if (event.key === Qt.Key_Escape) {
+                        if (search.text !== "")
+                            search.text = "";
+                        else
+                            picker.applySelected();
+                        event.accepted = true;
+                    } else if (event.key === Qt.Key_Backspace && search.text === "") {
+                        picker.restoreOriginal();
+                        event.accepted = true;
+                    } else if (event.key === Qt.Key_R && (event.modifiers & Qt.ControlModifier)) {
+                        picker.selectRandom();
+                        event.accepted = true;
+                    }
+                }
+                onAccepted: picker.applySelected()
+            }
+
+            Text {
+                id: resultCount
+                anchors.right: parent.right
+                anchors.rightMargin: 14
+                anchors.verticalCenter: parent.verticalCenter
+                visible: picker.filtering
+                text: picker.wallpapers.length + "/" + picker.allWallpapers.length
+                color: picker.wallpapers.length === 0 ? Theme.danger : Theme.muted
+                font.family: Theme.fontFamily
+                font.pixelSize: 11
+            }
+        }
+
+        Timer {
+            id: filterTimer
+            interval: 90
+            onTriggered: picker.applyFilter()
+        }
+
+        Item {
+            id: caption
+            anchors.bottom: parent.bottom
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.leftMargin: 24
+            anchors.rightMargin: 24
+            height: 44
+            visible: picker.selected !== null
+
+            Text {
+                id: captionTitle
+                anchors.top: parent.top
+                anchors.horizontalCenter: parent.horizontalCenter
+                width: parent.width
+                horizontalAlignment: Text.AlignHCenter
+                elide: Text.ElideRight
+                text: picker.selected ? picker.selected.title : ""
+                color: Theme.text
+                font.family: Theme.fontFamily
+                font.pixelSize: 15
+                font.bold: true
+            }
+
+            Text {
+                anchors.top: captionTitle.bottom
+                anchors.topMargin: 2
+                anchors.horizontalCenter: parent.horizontalCenter
+                width: parent.width
+                horizontalAlignment: Text.AlignHCenter
+                elide: Text.ElideRight
+                visible: text !== ""
+                text: {
+                    if (!picker.selected)
+                        return "";
+                    const tags = picker.selected.tags.slice(0, 6).join(" · ");
+                    const date = picker.selected.date;
+                    return date !== "" && tags !== "" ? date + "  ·  " + tags : date + tags;
+                }
+                color: Theme.muted
+                font.family: Theme.fontFamily
+                font.pixelSize: 11
+            }
+        }
+
         Text {
             anchors.centerIn: parent
             visible: picker.wallpapers.length === 0
-            text: catalog.running ? "Loading wallpapers..." : "No wallpapers found in ~/Wallpapers"
+            text: picker.filtering ? "No wallpapers match \"" + picker.query + "\"" : catalog.running ? "Loading wallpapers..." : "No wallpapers found in ~/Wallpapers"
             color: Theme.muted
+            font.family: Theme.fontFamily
             font.pixelSize: 14
         }
 
         Item {
             id: carousel
-            anchors.fill: parent
+            anchors.top: searchRow.bottom
+            anchors.topMargin: 8
+            anchors.bottom: caption.top
+            anchors.bottomMargin: 4
+            anchors.left: parent.left
+            anchors.right: parent.right
             clip: true
 
             Repeater {
@@ -210,7 +424,8 @@ PanelWindow {
                     y: carousel.height / 2 - height / 2
                     z: 100 - Math.round(absoluteDistance * 10)
                     opacity: Math.max(0, 1 - absoluteDistance / 5.5)
-                    visible: count > 0 && opacity > 0
+                    // The last clause stops a short result set from repeating across every card.
+                    visible: count > 0 && opacity > 0 && absoluteDistance < Math.max(0.5, count / 2)
 
                     transform: Matrix4x4 {
                         matrix: Qt.matrix4x4(

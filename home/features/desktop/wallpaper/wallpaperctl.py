@@ -11,6 +11,7 @@ from pathlib import Path
 
 WALLPAPER_DIR = Path.home() / "Wallpapers"
 STATE_DIR = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local/state")) / "wallpaper"
+METADATA_FILE = WALLPAPER_DIR / "metadata.json"
 CURRENT_FILE = STATE_DIR / "current"
 ORDER_FILE = STATE_DIR / "order.json"
 COLORS_FILE = STATE_DIR / "colors.json"
@@ -165,8 +166,14 @@ def main():
     if command == "catalog":
         print(json.dumps({
             "current": str(active) if active else "",
+            "metadataFile": str(METADATA_FILE) if METADATA_FILE.is_file() else "",
             "wallpapers": [
-                {"name": path.stem, "path": str(path), "extension": path.suffix[1:].upper()}
+                {
+                    "name": path.stem,
+                    "file": path.name,
+                    "path": str(path),
+                    "extension": path.suffix[1:].upper(),
+                }
                 for path in available
             ],
         }))
