@@ -5,6 +5,10 @@
     nixpkgs.url = "nixpkgs/nixpkgs-unstable";
     # Keep system and Home Manager package sets independent during migration.
     nixpkgs-system.url = "github:NixOS/nixpkgs/nixos-unstable";
+    disko = {
+      url = "github:nix-community/disko";
+      inputs.nixpkgs.follows = "nixpkgs-system";
+    };
     apple-silicon.url = "github:nix-community/nixos-apple-silicon";
     home-manager.url = "github:nix-community/home-manager";
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
@@ -122,9 +126,11 @@
             system = host.system;
           };
           modules = [
+            inputs.disko.nixosModules.disko
             {
               hardware.facter.reportPath = ./system/hosts/${hostName}/facter.json;
             }
+            (./system/hosts + "/${hostName}/disk.nix")
             (./system/hosts + "/${hostName}/hardware-configuration.nix")
             (./system/hosts + "/${hostName}/configuration.nix")
             ./system/modules

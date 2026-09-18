@@ -124,20 +124,27 @@ without an evaluated replacement.
 
 ### 3. Phase 3: Disko
 
-- [ ] Add `nix-community/disko` as a flake input and NixOS module.
-- [ ] Capture `lsblk --json` and `sfdisk --dump` from every host before writing
+- [x] Add `nix-community/disko` as a flake input and NixOS module.
+- [x] Capture `lsblk --json` and `sfdisk --dump` from every host before writing
   disk configuration.
-- [ ] Write `system/hosts/<host>/disk.nix` for existing hosts with
+- [x] Write `system/hosts/<host>/disk.nix` for existing hosts with
   `disko.enableConfig = false`. These files document exact recovery layouts but
   must not change current `fileSystems` values.
-- [ ] Prove each existing host's system derivation is unchanged before and
+- [x] Prove each existing host's system derivation is unchanged before and
   after adding its disabled Disko description.
-- [ ] Enable Disko ownership only for new installations initially.
-- [ ] Exclude Mac/Asahi from generic destructive partitioning. It needs a
+- [x] Enable Disko ownership only for new installations initially.
+- [x] Exclude Mac/Asahi from generic destructive partitioning. It needs a
   separate flow coordinated with the Asahi installer.
-- [ ] Treat multi-disk systems carefully. `pc` has five disks; only `nvme0n1`
+- [x] Treat multi-disk systems carefully. `pc` has five disks; only `nvme1n1`
   contains NixOS. Windows and data disks must never enter a destructive Disko
   layout.
+
+Completed 2026-09-18. Live inventory was collected from all eight hosts before
+writing sector-exact layouts. Every existing host keeps
+`disko.enableConfig = false`; all eight system derivation paths were identical
+before and after integration. Disko scripts build for every x86 host; the Mac
+script evaluates but cannot be built on an x86 machine. Its file records the
+mixed APFS/Asahi map for recovery only and is not a generic install target.
 
 Stop condition: installer can declaratively partition a new x86 host, while
 adding Disko changes no existing host's boot or filesystem configuration.
