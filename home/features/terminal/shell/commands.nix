@@ -2,6 +2,7 @@
   pkgs,
   lib,
   hosts,
+  hostName,
   repoRoot,
   ...
 }:
@@ -48,7 +49,9 @@ let
     text = ''
       repo=${repoRoot}
       command_name="rebuild"
-      host="''${NIXOS_HOST:-''${HM_HOST:-}}"
+      host=${lib.escapeShellArg hostName}
+      host="''${HM_HOST:-$host}"
+      host="''${NIXOS_HOST:-$host}"
       ${resolveHost}
 
       echo "rebuild: building $host"
@@ -60,11 +63,11 @@ let
   rehomeCmd = pkgs.writeShellApplication {
     name = "rehome";
     text = ''
-      # The NixOS hostname normally selects the configuration. Pass a name
-      # explicitly to override it during installation or recovery.
+      # The installed Home Manager configuration identifies this machine even
+      # when the runtime hostname is stale during installation or recovery.
       repo=${repoRoot}
       command_name="rehome"
-      host="''${HM_HOST:-}"
+      host="''${HM_HOST:-${lib.escapeShellArg hostName}}"
       ${resolveHost}
 
       echo "rehome: building $host"
@@ -84,7 +87,9 @@ let
       # the diff, then commit and rebuild yourself.
       repo=${repoRoot}
       command_name="refresh-hardware"
-      host="''${NIXOS_HOST:-''${HM_HOST:-}}"
+      host=${lib.escapeShellArg hostName}
+      host="''${HM_HOST:-$host}"
+      host="''${NIXOS_HOST:-$host}"
       ${resolveHost}
 
       target="$repo/system/hosts/$host/facter.json"

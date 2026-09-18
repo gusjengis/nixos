@@ -70,6 +70,12 @@ sha256-GZ/dZgjZHgRxGf9XJjXX/JFVcRYN/+Z+FcwrEkvsH2A=
   yet been tested through a reboot.
 - [ ] Confirm `rebuild` and `rehome` select the correct output without an
   explicit host on at least one desktop, one headless host, and Mac.
+- [ ] Revisit host selection after installer work lands. Commands currently
+  embed the Home Manager configuration's roster key, which avoids stale
+  runtime hostnames but means an incorrectly bootstrapped Home Manager profile
+  preserves the wrong identity. Decide whether installed systems should return
+  to selecting from `hostname`, and document how the installer seeds the first
+  NixOS and Home Manager selections without circular discovery.
 - [x] Remove temporary `/tmp/nixos-phase1` trees from remote hosts.
 
 ### 2. Phase 2: NixOS Facter

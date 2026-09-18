@@ -54,8 +54,8 @@
       lib = nixpkgs.lib;
       repoRoot = "/etc/nixos";
 
-      # Every machine this configuration is deployed to, with the machine-id
-      # `rehome` uses to pick one automatically.
+      # Every machine this configuration is deployed to. Generated management
+      # commands retain their roster key so runtime hostname drift is harmless.
       hosts = import ./system/hosts;
 
       systemHosts = lib.filterAttrs (_: host: host.systemManaged or true) hosts;
