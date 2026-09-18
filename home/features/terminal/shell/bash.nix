@@ -60,7 +60,7 @@
       venv = ". .venv/bin/activate";
       vim = "nvim";
       clean = "nix-collect-garbage -d && sudo nix-collect-garbage -d && nix store optimise && sudo nix store optimise";
-      nd = "nix develop --impure";
+      nd = "nix develop";
       remote = "waypipe --no-gpu --xwls ssh";
     };
   };

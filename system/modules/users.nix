@@ -5,7 +5,7 @@
 }:
 
 let
-  sharedKeyPath = "/home/gusjengis/.config/secrets/ssh/shared_ed25519.pub";
+  sharedKeyPath = "${toString ./../keys/shared_ed25519.pub}";
 in
 {
   # Define a user account. Don't forget to set a password with ‘passwd’.

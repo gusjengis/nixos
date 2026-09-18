@@ -69,7 +69,7 @@ let
 
       echo "rebuild: building $host"
       exec /run/wrappers/bin/sudo /run/current-system/sw/bin/nixos-rebuild switch \
-        --impure --flake "$repo#$host" "$@"
+        --flake "$repo#$host" "$@"
     '';
   };
 

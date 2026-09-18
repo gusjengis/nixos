@@ -6,7 +6,7 @@
 }:
 
 let
-  sharedKeyPath = "/home/gusjengis/.config/secrets/ssh/shared_ed25519.pub";
+  sharedKeyPath = "${toString ./../../keys/shared_ed25519.pub}";
 in
 {
   imports = [

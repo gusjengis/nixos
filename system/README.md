@@ -5,12 +5,10 @@ directory contains that machine's NixOS and hardware configuration, while
 `system/modules` contains shared modules.
 
 `flake.nix` exposes `nixosConfigurations.<host>` for every roster entry whose
-`systemManaged` value is not false. Evaluation currently needs `--impure`
-because `modules/users.nix` reads the existing public SSH key from the private
-secrets checkout:
+`systemManaged` value is not false.
 
 ```bash
-nix eval --impure --raw ".#nixosConfigurations.pc.config.system.build.toplevel.drvPath"
+nix eval --raw ".#nixosConfigurations.pc.config.system.build.toplevel.drvPath"
 ```
 
 Use `rebuild` for normal activation. Roll back through an older NixOS generation

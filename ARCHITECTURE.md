@@ -51,9 +51,9 @@ Home Manager imports `home/features`, then `home/hosts/<host>`. Host files set
 role switches such as `desktopEnv.enable`, `dev.enable`, `laptop.enable`,
 `gaming.enable`, `gameDev.enable`, `bambu.enable`, and `windowsVm.enable`.
 
-System evaluation uses `--impure` because `system/modules/users.nix` reads the
-fleet's public SSH key from `~/.config/secrets`. A missing key must not silently
-produce a remote system without authorized access.
+System evaluation is pure. Public SSH keys are committed to `system/keys/` and
+read at evaluation time. A missing key must not silently produce a remote system
+without authorized access.
 
 ## Commands
 
