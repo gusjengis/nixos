@@ -28,6 +28,11 @@ bind(
 	hl.dsp.exec_cmd("bash " .. repo .. "/home/features/desktop/wallpaper/next-wallpaper.sh"),
 	"Next Wallpaper"
 )
+bind(
+	"SUPER + SHIFT + P",
+	hl.dsp.exec_cmd("bash " .. repo .. "/home/features/desktop/wallpaper/previous-wallpaper.sh"),
+	"Previous Wallpaper"
+)
 bind("SUPER + J", hl.dsp.layout("togglesplit"), "Rotate Split")
 
 bind("code:202", hl.dsp.exec_cmd("handy --toggle-transcription"), "Dictate")
@@ -67,7 +72,7 @@ for _, direction in ipairs({ "left", "right", "up", "down" }) do
 	)
 end
 
-hl.bind("SUPER + SHIFT + P", hl.dsp.window.pin({ action = "enable" }))
+-- hl.bind("SUPER + SHIFT + P", hl.dsp.window.pin({ action = "enable" }))
 
 local function monitor_workspace(workspace)
 	local monitor = hl.get_active_monitor()
@@ -125,9 +130,7 @@ bind(
 	"SUPER + H",
 	hl.dsp.exec_cmd(
 		"pkill wl-kbptr || ("
-			.. preserve_quickshell_focus(
-				"wl-kbptr -c " .. repo .. "/home/features/desktop/cursor/wl-kbptr.conf"
-			)
+			.. preserve_quickshell_focus("wl-kbptr -c " .. repo .. "/home/features/desktop/cursor/wl-kbptr.conf")
 			.. ")"
 	),
 	"Hop"

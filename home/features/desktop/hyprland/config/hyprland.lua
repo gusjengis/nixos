@@ -18,6 +18,7 @@ hl.config({
 	misc = {
 		force_default_wallpaper = 0,
 		disable_hyprland_logo = true, -- If true disables the random hyprland logo / anime girl background. :(
+		disable_splash_rendering = true, -- If true disables the splash screen.
 		focus_on_activate = true,
 		initial_workspace_tracking = 0,
 	},

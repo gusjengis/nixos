@@ -275,6 +275,17 @@ fn choose_next(available: &[PathBuf], active: Option<&PathBuf>) -> Option<PathBu
     Some(available[index].clone())
 }
 
+fn choose_previous(available: &[PathBuf], active: Option<&PathBuf>) -> Option<PathBuf> {
+    if available.is_empty() {
+        return None;
+    }
+    let index = active
+        .and_then(|a| available.iter().position(|p| p == a))
+        .map(|i| (i + available.len() - 1) % available.len())
+        .unwrap_or(available.len() - 1);
+    Some(available[index].clone())
+}
+
 fn print_catalog(paths: &Paths, available: &[PathBuf], active: Option<&PathBuf>) {
     #[derive(Serialize)]
     struct Entry {
@@ -327,7 +338,7 @@ fn print_catalog(paths: &Paths, available: &[PathBuf], active: Option<&PathBuf>)
 }
 
 fn usage_and_exit() -> ! {
-    eprintln!("usage: wallpaperctl {{catalog|current|set PATH|preview PATH|random|next|restore}}");
+    eprintln!("usage: wallpaperctl {{catalog|current|set PATH|preview PATH|random|next|previous|restore}}");
     std::process::exit(2);
 }
 
@@ -358,6 +369,14 @@ fn main() {
         },
         "random" | "next" => {
             if let Some(target) = choose_next(&available, active.as_ref()) {
+                match set_wallpaper(&paths, &available, &target.to_string_lossy(), true) {
+                    Ok(path) => println!("{}", path.display()),
+                    Err(e) => fail(&e),
+                }
+            }
+        }
+        "previous" => {
+            if let Some(target) = choose_previous(&available, active.as_ref()) {
                 match set_wallpaper(&paths, &available, &target.to_string_lossy(), true) {
                     Ok(path) => println!("{}", path.display()),
                     Err(e) => fail(&e),
