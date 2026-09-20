@@ -400,6 +400,7 @@ PanelWindow {
                 selectedTextColor: Theme.background
                 leftPadding: 16
                 rightPadding: 16
+                font.family: Theme.fontFamily
                 font.pixelSize: 16
                 focus: true
                 background: Rectangle {
@@ -446,6 +447,7 @@ PanelWindow {
                     text: launcher.error || launcher.providerError || "No matches"
                     color: launcher.error !== "" || launcher.providerError !== "" ? Theme.danger : Theme.muted
                     wrapMode: Text.Wrap
+                    font.family: Theme.fontFamily
                 }
             }
 
@@ -497,6 +499,7 @@ PanelWindow {
                                 visible: modelData.kind !== "app" && modelData.kind !== "remote" && modelData.kind !== "tool"
                                 text: modelData.kind === "project" ? "/" : ">"
                                 color: modelData.kind === "web" ? Theme.accent : Theme.muted
+                                font.family: Theme.fontFamily
                                 font.pixelSize: 18
                                 font.bold: true
                             }
@@ -511,6 +514,7 @@ PanelWindow {
                                 text: modelData.name
                                 textFormat: Text.PlainText
                                 color: Theme.text
+                                font.family: Theme.fontFamily
                                 font.pixelSize: 14
                                 font.bold: resultRow.ListView.isCurrentItem
                                 elide: Text.ElideRight
@@ -521,6 +525,7 @@ PanelWindow {
                                 text: modelData.description || ""
                                 textFormat: Text.PlainText
                                 color: Theme.muted
+                                font.family: Theme.fontFamily
                                 font.pixelSize: 11
                                 elide: Text.ElideRight
                             }
@@ -529,6 +534,7 @@ PanelWindow {
                         Text {
                             text: modelData.kind.toUpperCase()
                             color: modelData.kind === "web" ? Theme.accent : Theme.muted
+                            font.family: Theme.fontFamily
                             font.pixelSize: 9
                             font.bold: true
                         }

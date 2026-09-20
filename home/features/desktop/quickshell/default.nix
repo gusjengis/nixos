@@ -14,6 +14,35 @@ let
   configRoot = "${repoRoot}/home/features/desktop/quickshell/config";
   wallpaperDir = "${repoRoot}/home/features/desktop/wallpaper";
   python = pkgs.python3.withPackages (ps: [ ps.pygobject3 ]);
+  sfPro = pkgs.stdenvNoCC.mkDerivation {
+    pname = "sf-pro";
+    version = "2026-09-11";
+    src = pkgs.fetchurl {
+      url = "https://devimages-cdn.apple.com/design/resources/download/SF-Pro.dmg";
+      hash = "sha256-loqzuLH5LC2K9h6waA9cIiTE541ZuYa/AEUCp/wBKRg=";
+    };
+    nativeBuildInputs = [
+      pkgs.libarchive
+      pkgs.p7zip
+    ];
+    unpackPhase = ''
+      runHook preUnpack
+      7z x -y "$src"
+      bsdtar -xf Payload~
+      runHook postUnpack
+    '';
+    installPhase = ''
+      runHook preInstall
+      install -Dm644 Library/Fonts/* -t "$out/share/fonts/opentype"
+      runHook postInstall
+    '';
+    meta = {
+      description = "Apple SF Pro typeface";
+      homepage = "https://developer.apple.com/fonts/";
+      license = lib.licenses.unfree;
+      platforms = lib.platforms.all;
+    };
+  };
   # The hot path (catalog/current/set/preview/random/next/restore) is a
   # compiled binary: it runs on every scroll step in the wallpaper picker, and
   # a Python interpreter plus a double directory scan was most of its latency.
@@ -138,6 +167,7 @@ in
     # Waypipe starts its remote server before the metadata helper's wrapper runs.
     home.packages = [
       pkgs.quickshell
+      sfPro
       remoteApps
       wallpaperctl
       wallpaperGeneratePalettes
