@@ -16,3 +16,7 @@ require("monitor-modes").configure({
 		margins = { top = 200, right = 747, bottom = 200, left = 747 },
 	},
 })
+
+--                                                               🤷        🤷
+-- probably a better way to organize this... if it ain't broke    ¯\_(ツ)_/¯
+hl.exec_cmd("easyeffects --gapplication-service")
