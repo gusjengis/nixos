@@ -41,8 +41,8 @@ GuardedPopupWindow {
             && date.getDate() === today.getDate();
     }
 
-    // Centered under the trigger instead of right-aligned: the clock sits mid-bar.
-    anchor.rect.x: ((anchor.item ? anchor.item.width : 0) - width) / 2
+    // Keep the popup inside the screen beneath the right-edge clock.
+    anchor.rect.x: (anchor.item ? anchor.item.width : 0) - width
     anchor.rect.y: Theme.barPopupY(anchor.item)
     implicitWidth: content.implicitWidth + 28
     implicitHeight: content.implicitHeight + 28

@@ -23,7 +23,7 @@ RowLayout {
 
             IconImage {
                 anchors.centerIn: parent
-                implicitSize: 18
+                implicitSize: 20
                 source: parent.modelData.icon
             }
 

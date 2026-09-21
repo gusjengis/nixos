@@ -8,6 +8,7 @@ Rectangle {
     id: root
 
     required property var notificationService
+    required property Item popupAnchor
     readonly property var history: notificationService ? notificationService.history : []
 
     implicitWidth: content.implicitWidth + 14
@@ -29,7 +30,7 @@ Rectangle {
         Text {
             text: root.history.length.toString()
             color: root.history.length > 0 ? Theme.accent : Theme.muted
-            font { family: Theme.fontFamily; pixelSize: Theme.fontSize - 1; bold: true }
+            font { family: Theme.fontFamily; pixelSize: Theme.fontSize - 1; weight: Font.DemiBold }
         }
     }
 
@@ -37,22 +38,24 @@ Rectangle {
         id: mouse
         anchors.fill: parent
         hoverEnabled: true
-        onClicked: popup.toggle(root)
+        onClicked: popup.toggle()
     }
 
     GuardedPopupWindow {
         id: popup
 
-        function toggle(anchorItem) {
+        function toggle() {
             if (visible) {
                 visible = false;
                 return;
             }
-            anchor.item = anchorItem;
+            anchor.item = root;
             visible = true;
         }
 
-        anchor.rect.x: (anchor.item ? anchor.item.width : 0) - width
+        anchor.rect.x: root.popupAnchor.width
+            - root.mapToItem(root.popupAnchor, 0, 0).x
+            - width - 10
         anchor.rect.y: Theme.barPopupY(anchor.item)
         implicitWidth: 420
         implicitHeight: 520

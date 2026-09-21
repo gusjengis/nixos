@@ -23,10 +23,21 @@ QtObject {
     readonly property color border: wallpaperColors.border || "#344052"
 
     readonly property int barHeight: 40
+    // The bar's tint does not stop at its exclusive zone: BarScrim.qml continues
+    // the same ramp below it on the bottom layer, where windows paint over it, so
+    // the long fade is only ever visible against the wallpaper. Both surfaces
+    // read these, so the seam between them stays invisible.
+    // Distance the bar's tint keeps fading past its content. Drawn on the bar's
+    // own surface, unreserved and click-through, so it costs no space.
+    readonly property int barScrimFade: 56
+    readonly property real barScrimPeak: 1.3
+    // Where the content ends as a fraction of the whole gradient, so the stops
+    // stay put if either height changes.
+    readonly property real barScrimContentStop: barHeight / (barHeight + barScrimFade)
     readonly property int popupGap: 4
     readonly property int radius: 8
     readonly property int spacing: 8
-    readonly property int fontSize: 13
+    readonly property int fontSize: 15
     readonly property string fontFamily: "SF Pro"
     readonly property string iconFontFamily: "Symbols Nerd Font Mono"
 
@@ -36,6 +47,12 @@ QtObject {
 
     function withBackgroundOpacity(color) {
         return Qt.rgba(color.r, color.g, color.b, backgroundOpacity);
+    }
+
+    // Black source-over compositing only scales destination RGB, preserving hue.
+    // Strength remains tied to backgroundOpacity so one knob drives the scrim.
+    function scrimColor(factor) {
+        return Qt.rgba(0, 0, 0, Math.min(1, backgroundOpacity * factor));
     }
 
     function barPopupY(anchorItem) {
@@ -54,8 +71,7 @@ QtObject {
 
     property var colorsFile: FileView {
         id: colorsFile
-        path: (Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state")
-            + "/wallpaper/colors.json"
+        path: (Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state") + "/wallpaper/colors.json"
         preload: true
         watchChanges: true
         printErrors: false
@@ -75,7 +91,9 @@ QtObject {
     property var borderWidthRequest: Process {
         id: borderWidthRequest
         command: ["hyprctl", "-j", "getoption", "general:border_size"]
-        stdout: StdioCollector { id: borderWidthOutput }
+        stdout: StdioCollector {
+            id: borderWidthOutput
+        }
         onExited: (code, status) => {
             if (code === 0 && status === 0)
                 windowBorderWidth = JSON.parse(borderWidthOutput.text).int;
@@ -85,7 +103,9 @@ QtObject {
     property var radiusRequest: Process {
         id: radiusRequest
         command: ["hyprctl", "-j", "getoption", "decoration:rounding"]
-        stdout: StdioCollector { id: radiusOutput }
+        stdout: StdioCollector {
+            id: radiusOutput
+        }
         onExited: (code, status) => {
             if (code === 0 && status === 0)
                 windowRadius = JSON.parse(radiusOutput.text).int;
@@ -95,7 +115,9 @@ QtObject {
     property var borderColorRequest: Process {
         id: borderColorRequest
         command: ["hyprctl", "-j", "getoption", "general:col.inactive_border"]
-        stdout: StdioCollector { id: borderColorOutput }
+        stdout: StdioCollector {
+            id: borderColorOutput
+        }
         onExited: (code, status) => {
             if (code !== 0 || status !== 0)
                 return;

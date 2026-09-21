@@ -21,7 +21,7 @@ Rectangle {
         anchors.centerIn: parent
         text: "AI"
         color: Theme.accent
-        font { family: Theme.fontFamily; pixelSize: 11; bold: true }
+        font { family: Theme.fontFamily; pixelSize: Theme.fontSize; weight: Font.DemiBold }
     }
 
     MouseArea {

@@ -119,7 +119,7 @@ PanelWindow {
     function rankedApps() {
         const query = search.text.trim();
         return apps.map(app => {
-            const description = app.description || "";
+            const description = app.description || app.comment || app.genericName || "";
             const key = appKey(app);
             const frequency = mode === "local" ? launcher.usage.apps[key] || {} : {};
             return {
@@ -483,9 +483,7 @@ PanelWindow {
                             implicitWidth: 42
                             implicitHeight: 42
                             radius: Theme.radius
-                            color: Theme.surface
-                            border.width: 1
-                            border.color: Theme.border
+                            color: "transparent"
 
                             IconImage {
                                 anchors.centerIn: parent
@@ -505,30 +503,15 @@ PanelWindow {
                             }
                         }
 
-                        ColumnLayout {
+                        Text {
                             Layout.fillWidth: true
-                            spacing: 2
-
-                            Text {
-                                Layout.fillWidth: true
-                                text: modelData.name
-                                textFormat: Text.PlainText
-                                color: Theme.text
-                                font.family: Theme.fontFamily
-                                font.pixelSize: 14
-                                font.bold: resultRow.ListView.isCurrentItem
-                                elide: Text.ElideRight
-                            }
-
-                            Text {
-                                Layout.fillWidth: true
-                                text: modelData.description || ""
-                                textFormat: Text.PlainText
-                                color: Theme.muted
-                                font.family: Theme.fontFamily
-                                font.pixelSize: 11
-                                elide: Text.ElideRight
-                            }
+                            text: modelData.name
+                            textFormat: Text.PlainText
+                            color: Theme.text
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 14
+                            font.weight: Font.DemiBold
+                            elide: Text.ElideRight
                         }
 
                         Text {
