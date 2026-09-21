@@ -24,6 +24,7 @@
     # over ssh instead. The previous boot is kept as .1.
     initExtra = lib.optionalString config.desktopEnv.enable ''
       if [ -z "$WAYLAND_DISPLAY" ] && [ "x$XDG_VTNR" = "x1" ]; then
+        export HYPRLAND_NO_RT=1
         if command -v start-hyprland >/dev/null 2>&1; then
           hyprLogDir="''${XDG_STATE_HOME:-$HOME/.local/state}/hyprland"
           hyprLog="$hyprLogDir/start-hyprland.log"
