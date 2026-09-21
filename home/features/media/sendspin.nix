@@ -85,6 +85,17 @@ let
 
   sendspinPkg = python.pkgs.toPythonApplication python.pkgs.sendspin;
 
+  sendspinWithNotifications = pkgs.writeShellApplication {
+    name = "sendspin-with-notifications";
+    runtimeInputs = [
+      pkgs.libnotify
+      pkgs.wl-clipboard
+    ];
+    text = ''
+      exec bash "${./sendspin-notify.sh}" "${lib.getExe' sendspinPkg "sendspin"}" "$@"
+    '';
+  };
+
   # t470 runs the Music Assistant server (system/hosts/t470/music_assistant.nix),
   # reachable over the tailnet. Sendspin's protocol port is separate from the
   # 8095 web UI port and is not discoverable over mDNS across Tailscale, so
@@ -102,10 +113,8 @@ in
     # playerctl-driven media keys keep controlling it without any custom
     # keybind changes.
     #
-    # First connection to a new server needs manual pairing: watch
-    # `journalctl --user -u sendspin -f` for the "Pairing required: enter
-    # PIN ..." line, then approve it from the Music Assistant player setup
-    # screen.
+    # First connection to a new server needs manual pairing. The wrapper turns
+    # Sendspin's logged PIN into a clickable notification that copies the PIN.
     systemd.user.services.sendspin = {
       Unit = {
         Description = "Sendspin audio player (Music Assistant playback target)";
@@ -114,7 +123,7 @@ in
       };
       Service = {
         Type = "simple";
-        ExecStart = "${lib.getExe' sendspinPkg "sendspin"} daemon --url ${massSendspinUrl}";
+        ExecStart = "${lib.getExe sendspinWithNotifications} daemon --url ${massSendspinUrl}";
         Restart = "on-failure";
         RestartSec = 5;
       };
