@@ -46,6 +46,12 @@ struct Palette {
     border: String,
 }
 
+#[derive(Debug, Deserialize)]
+struct HyprlandInstance {
+    instance: String,
+    wl_socket: String,
+}
+
 struct Paths {
     wallpaper_dir: PathBuf,
     metadata_file: PathBuf,
@@ -302,10 +308,29 @@ fn current(paths: &Paths, available: &[PathBuf]) -> Option<PathBuf> {
     }
 }
 
-fn hyprpaper_socket_path() -> Option<PathBuf> {
-    let runtime_dir = env::var("XDG_RUNTIME_DIR").ok()?;
-    let instance = env::var("HYPRLAND_INSTANCE_SIGNATURE").ok()?;
-    Some(PathBuf::from(runtime_dir).join("hypr").join(instance).join(".hyprpaper.sock"))
+fn active_hyprland_instance() -> Result<String, String> {
+    let output = Command::new("hyprctl")
+        .args(["instances", "-j"])
+        .output()
+        .map_err(|e| format!("failed to list Hyprland instances: {e}"))?;
+    if !output.status.success() {
+        return Err("failed to list Hyprland instances".to_string());
+    }
+
+    let instances: Vec<HyprlandInstance> =
+        serde_json::from_slice(&output.stdout).map_err(|e| format!("invalid Hyprland instance list: {e}"))?;
+    let wayland_display = env::var("WAYLAND_DISPLAY").ok();
+    instances
+        .iter()
+        .find(|instance| wayland_display.as_deref() == Some(instance.wl_socket.as_str()))
+        .or_else(|| (instances.len() == 1).then(|| &instances[0]))
+        .map(|instance| instance.instance.clone())
+        .ok_or_else(|| "cannot identify the active Hyprland instance".to_string())
+}
+
+fn hyprpaper_socket_path(instance: &str) -> Result<PathBuf, String> {
+    let runtime_dir = env::var("XDG_RUNTIME_DIR").map_err(|_| "XDG_RUNTIME_DIR is not set")?;
+    Ok(PathBuf::from(runtime_dir).join("hypr").join(instance).join(".hyprpaper.sock"))
 }
 
 /// Existence alone isn't enough: a hyprpaper that died without cleaning up
@@ -315,13 +340,14 @@ fn socket_alive(socket: &Path) -> bool {
     std::os::unix::net::UnixStream::connect(socket).is_ok()
 }
 
-fn ensure_daemon() -> Result<(), String> {
-    let socket = hyprpaper_socket_path().ok_or("cannot locate hyprpaper socket (not running under Hyprland?)")?;
+fn ensure_daemon(instance: &str) -> Result<(), String> {
+    let socket = hyprpaper_socket_path(instance)?;
     if socket_alive(&socket) {
         return Ok(());
     }
 
     Command::new("hyprpaper")
+        .env("HYPRLAND_INSTANCE_SIGNATURE", instance)
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .process_group(0)
@@ -395,11 +421,13 @@ fn commit_wallpaper(paths: &Paths, available: &[PathBuf], raw_path: &str) -> Res
 
 fn set_wallpaper(paths: &Paths, available: &[PathBuf], raw_path: &str, persist: bool) -> Result<PathBuf, String> {
     let requested = resolve_wallpaper(paths, available, raw_path)?;
+    let instance = active_hyprland_instance()?;
 
-    ensure_daemon()?;
+    ensure_daemon(&instance)?;
 
     let arg = format!(",{},cover", requested.display());
     let status = Command::new("hyprctl")
+        .env("HYPRLAND_INSTANCE_SIGNATURE", &instance)
         .args(["hyprpaper", "wallpaper", &arg])
         .status()
         .map_err(|e| format!("failed to run hyprctl: {e}"))?;
