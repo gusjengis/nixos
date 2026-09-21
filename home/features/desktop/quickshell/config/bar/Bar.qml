@@ -51,14 +51,14 @@ Scope {
     }
 
     Variants {
-        model: Quickshell.screens
+        model: monitorModes.initialized ? Quickshell.screens : []
 
         delegate: Component {
             BarWindow {
                 required property var modelData
                 screen: modelData
                 shown: root.shown
-                hugeMargins: monitorModes.enabledFor(modelData)
+                hugeMargins: monitorModes.hugeMargins[modelData.name] === true
                 usage: usageService.usage
                 refreshUsage: () => usageService.refresh()
                 accountAction: (profile, saved) => usageService.account(profile, saved)

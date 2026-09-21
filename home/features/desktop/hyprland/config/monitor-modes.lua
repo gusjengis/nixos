@@ -3,7 +3,9 @@ local M = {}
 local hugeMarginsByMonitor = {}
 local rulesByMonitor = {}
 local barRulesByMonitor = {}
-local barVisible = false
+-- Quickshell starts with the bar shown; use the same state before its IPC sync
+-- so initial huge-margin rules reserve the bar offset immediately.
+local barVisible = true
 local statePath = (os.getenv("XDG_RUNTIME_DIR") or "/tmp") .. "/hyprland-monitor-modes.json"
 
 local function writeState()
