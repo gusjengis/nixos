@@ -27,12 +27,21 @@ PanelWindow {
     property var catalogEntries: []
     property var metadata: ({})
     property string metadataPath: ""
+    // Filenames the user hid with Ctrl+D, mirrored from ~/Wallpapers/curation.json.
+    property var hiddenFiles: ({})
+    property string curationPath: ""
+    property string notice: ""
+    property int poolSize: 0
     property real animatedIndex: 0
     property string originalWallpaper: ""
     property bool ready: false
     property bool armed: false
-    readonly property string query: search.text.trim()
-    readonly property bool filtering: query !== ""
+    readonly property string rawQuery: search.text.trim()
+    // "is:hidden" is a mode switch rather than a search term: it swaps the
+    // carousel over to what has been hidden so it can be restored.
+    readonly property bool showingHidden: /(^|\s)is:hidden(\s|$)/i.test(rawQuery)
+    readonly property string query: rawQuery.replace(/(^|\s)is:hidden(\s|$)/gi, " ").trim()
+    readonly property bool filtering: query !== "" || showingHidden
     readonly property int selectedIndex: {
         if (wallpapers.length === 0)
             return 0;
@@ -103,6 +112,39 @@ PanelWindow {
         animatedIndex = Math.floor(Math.random() * wallpapers.length);
     }
 
+    // Ctrl+D. Hiding removes a wallpaper from the picker and from the cycle
+    // without deleting the file, so it stays reversible: "is:hidden" lists what
+    // is hidden and Ctrl+D there puts it back.
+    function toggleHiddenSelected() {
+        const entry = selected;
+        if (!entry)
+            return;
+        const nowHidden = !hiddenFiles[entry.file];
+
+        // Anchor on the neighbour before refiltering. applyFilter falls back to
+        // index 0 when the kept path disappears, which would throw the carousel
+        // back to the start of the library on every hide.
+        const neighbour = wallpapers.length > 1 ? wallpapers[(selectedIndex + 1) % wallpapers.length] : null;
+
+        // Applied optimistically: waiting for the process and the curation file
+        // watcher to come back would leave the hidden wallpaper on screen.
+        const updated = Object.assign({}, hiddenFiles);
+        if (nowHidden)
+            updated[entry.file] = true;
+        else
+            delete updated[entry.file];
+        hiddenFiles = updated;
+        entry.hidden = nowHidden;
+
+        applyFilter(neighbour ? neighbour.path : "");
+        notice = nowHidden ? "Hidden - Ctrl+D restores it, or search is:hidden" : "Restored";
+        noticeTimer.restart();
+
+        // Writes curation.json and pushes it; detached so the picker never
+        // waits on git.
+        Quickshell.execDetached(["wallpaper-hide", entry.path]);
+    }
+
     function normalizeText(value) {
         return (value || "").toLowerCase().replace(/[^0-9a-z\u00c0-\u024f]+/g, " ").trim();
     }
@@ -118,6 +160,17 @@ PanelWindow {
         rebuild();
     }
 
+    // Also runs when another machine's hide arrives through the hourly sync.
+    function loadCuration() {
+        try {
+            const parsed = JSON.parse(curationView.text());
+            hiddenFiles = parsed.hidden || {};
+        } catch (error) {
+            hiddenFiles = ({});
+        }
+        rebuild();
+    }
+
     // Joins the catalog with the Peapix metadata and precomputes the search haystacks
     // once per open so filtering stays cheap on every keystroke.
     function rebuild() {
@@ -126,9 +179,15 @@ PanelWindow {
             const item = catalogEntries[index];
             const record = metadata[item.file] || null;
             const tags = record && record.tags ? record.tags : [];
-            const title = record && record.title ? record.title : item.name;
-            const headline = record && record.headline ? record.headline : "";
-            const description = record && record.description ? record.description : "";
+            // Bing publishes a different image per market on many days, so a
+            // large part of the library only ever had German, Japanese, French
+            // and so on. English is preferred for display and search where a
+            // translation exists; the original still feeds the haystack so
+            // searching in the source language keeps working.
+            const originalTitle = record && record.title ? record.title : item.name;
+            const title = record && record.englishTitle ? record.englishTitle : originalTitle;
+            const headline = record && (record.englishHeadline || record.headline) ? record.englishHeadline || record.headline : "";
+            const description = record && (record.englishDescription || record.description) ? record.englishDescription || record.description : "";
             const date = record && record.date ? record.date : "";
             entries.push({
                 "path": item.path,
@@ -136,13 +195,14 @@ PanelWindow {
                 "name": item.name,
                 "extension": item.extension,
                 "order": index,
+                "hidden": !!hiddenFiles[item.file],
                 "title": title,
                 "headline": headline,
                 "date": date,
                 "tags": tags,
-                "titleText": normalizeText(title),
+                "titleText": normalizeText(title === originalTitle ? title : title + " " + originalTitle),
                 "tagText": normalizeText(tags.join(" ")),
-                "bodyText": normalizeText([headline, description, item.name, date].join(" "))
+                "bodyText": normalizeText([headline, description, record && record.headline ? record.headline : "", record && record.description ? record.description : "", item.name, date].join(" "))
             });
         }
         allWallpapers = entries;
@@ -173,11 +233,16 @@ PanelWindow {
         const keep = preferredPath !== undefined && preferredPath !== "" ? preferredPath : selectedPath;
         const terms = normalizeText(query).split(" ").filter(term => term !== "");
 
+        // Hidden wallpapers stay in allWallpapers so toggling "is:hidden" is a
+        // refilter rather than a rebuild, but only one side is ever on screen.
+        const pool = allWallpapers.filter(entry => entry.hidden === showingHidden);
+        poolSize = pool.length;
+
         let results;
         if (terms.length === 0) {
-            results = allWallpapers;
+            results = pool;
         } else {
-            results = allWallpapers.map(entry => ({
+            results = pool.map(entry => ({
                         "entry": entry,
                         "score": matchScore(entry, terms)
                     })).filter(result => result.score >= 0).sort((left, right) => right.score - left.score || left.entry.order - right.entry.order).map(result => result.entry);
@@ -233,6 +298,16 @@ PanelWindow {
                 picker.catalogEntries = result.wallpapers || [];
                 picker.originalWallpaper = result.current || "";
                 picker.metadataPath = result.metadataFile || "";
+                picker.curationPath = result.curationFile || "";
+                // Seeded from the catalog so the first frame already excludes
+                // hidden wallpapers, before curation.json has been read.
+                const seeded = {};
+                for (let index = 0; index < picker.catalogEntries.length; index++) {
+                    const item = picker.catalogEntries[index];
+                    if (item.hidden)
+                        seeded[item.file] = true;
+                }
+                picker.hiddenFiles = seeded;
                 picker.rebuild();
                 if (picker.metadataPath !== "" && Object.keys(picker.metadata).length === 0)
                     metadataView.reload();
@@ -254,6 +329,24 @@ PanelWindow {
         printErrors: false
         onFileChanged: reload()
         onLoaded: picker.loadMetadata()
+    }
+
+    // printErrors stays off because curation.json legitimately does not exist
+    // until the first Ctrl+D.
+    FileView {
+        id: curationView
+        path: picker.curationPath
+        preload: true
+        watchChanges: true
+        printErrors: false
+        onFileChanged: reload()
+        onLoaded: picker.loadCuration()
+    }
+
+    Timer {
+        id: noticeTimer
+        interval: 2600
+        onTriggered: picker.notice = ""
     }
 
     Timer {
@@ -311,6 +404,9 @@ PanelWindow {
                     } else if (event.key === Qt.Key_R && (event.modifiers & Qt.ControlModifier)) {
                         picker.selectRandom();
                         event.accepted = true;
+                    } else if (event.key === Qt.Key_D && (event.modifiers & Qt.ControlModifier)) {
+                        picker.toggleHiddenSelected();
+                        event.accepted = true;
                     }
                 }
                 onAccepted: picker.applySelected()
@@ -322,7 +418,7 @@ PanelWindow {
                 anchors.rightMargin: 14
                 anchors.verticalCenter: parent.verticalCenter
                 visible: picker.filtering
-                text: picker.wallpapers.length + "/" + picker.allWallpapers.length
+                text: picker.wallpapers.length + "/" + picker.poolSize + (picker.showingHidden ? " hidden" : "")
                 color: picker.wallpapers.length === 0 ? Theme.danger : Theme.muted
                 font.family: Theme.fontFamily
                 font.pixelSize: 11
@@ -374,8 +470,10 @@ PanelWindow {
                 horizontalAlignment: Text.AlignHCenter
                 elide: Text.ElideRight
                 visible: text !== ""
-                text: picker.selected ? picker.selected.date : ""
-                color: Theme.muted
+                // The transient Ctrl+D confirmation takes over this line, since
+                // a separate popup would break the picker's focus grab.
+                text: picker.notice !== "" ? picker.notice : picker.selected ? picker.selected.date : ""
+                color: picker.notice !== "" ? Theme.accent : Theme.muted
                 font.family: Theme.fontFamily
                 font.pixelSize: 11
             }
@@ -384,7 +482,7 @@ PanelWindow {
         Text {
             anchors.centerIn: parent
             visible: picker.wallpapers.length === 0
-            text: picker.filtering ? "No wallpapers match \"" + picker.query + "\"" : catalog.running ? "Loading wallpapers..." : "No wallpapers found in ~/Wallpapers"
+            text: picker.showingHidden && picker.query === "" ? "Nothing is hidden" : picker.filtering ? "No wallpapers match \"" + picker.query + "\"" : catalog.running ? "Loading wallpapers..." : "No wallpapers found in ~/Wallpapers"
             color: Theme.muted
             font.family: Theme.fontFamily
             font.pixelSize: 14

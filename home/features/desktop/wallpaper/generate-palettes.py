@@ -11,11 +11,10 @@ resulting metadata.json to the wallpaper repo.
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from pathlib import Path
 
 import palette
 
-WALLPAPER_DIR = Path.home() / "Wallpapers"
+WALLPAPER_DIR = palette.WALLPAPER_DIR
 EXTENSIONS = {".avif", ".gif", ".jpeg", ".jpg", ".png", ".webp"}
 
 
@@ -72,6 +71,7 @@ def main():
         subprocess.run(["git", "-C", str(WALLPAPER_DIR), "add", "metadata.json"], check=True)
         status = subprocess.run(
             ["git", "-C", str(WALLPAPER_DIR), "diff", "--cached", "--quiet"],
+            check=False,
         )
         if status.returncode == 0:
             print("no metadata.json changes to commit", file=sys.stderr)

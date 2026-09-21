@@ -12,7 +12,7 @@
 // - wallpapers() is scanned once per invocation and threaded through, unlike
 //   the old Python version which rescanned the ~900-file directory twice.
 
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::env;
 use std::fs;
 use std::io;
@@ -23,6 +23,7 @@ use std::time::Duration;
 
 use rand::seq::SliceRandom;
 use rand::thread_rng;
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 
 const EXTENSIONS: &[&str] = &["avif", "gif", "jpeg", "jpg", "png", "webp"];
@@ -46,6 +47,7 @@ struct Palette {
 struct Paths {
     wallpaper_dir: PathBuf,
     metadata_file: PathBuf,
+    curation_file: PathBuf,
     current_file: PathBuf,
     order_file: PathBuf,
     colors_file: PathBuf,
@@ -61,6 +63,7 @@ impl Paths {
         let state_dir = state_home.join("wallpaper");
         Paths {
             metadata_file: wallpaper_dir.join("metadata.json"),
+            curation_file: wallpaper_dir.join("curation.json"),
             current_file: state_dir.join("current"),
             order_file: state_dir.join("order.json"),
             colors_file: state_dir.join("colors.json"),
@@ -137,24 +140,154 @@ fn save_order(paths: &Paths, available: &[PathBuf]) -> io::Result<()> {
     write_atomic(&paths.order_file, &json)
 }
 
+/// The persisted random order, reconciled against what is actually on disk.
+///
+/// This used to reshuffle the whole library whenever the file count changed.
+/// With wallpapers arriving daily from the fetcher that discarded the cycle
+/// order every single day, and hiding one wallpaper did the same. Instead the
+/// stored order is kept: vanished files are dropped, and new ones are spliced
+/// in at random positions so they surface soon without moving anything else.
 fn randomized_order(paths: &Paths, available: &[PathBuf]) -> Vec<PathBuf> {
     let stored: Option<Vec<PathBuf>> = fs::read_to_string(&paths.order_file)
         .ok()
         .and_then(|text| serde_json::from_str::<Vec<String>>(&text).ok())
         .map(|list| list.into_iter().map(PathBuf::from).collect());
 
-    if let Some(ordered) = &stored {
-        let ordered_set: HashSet<&PathBuf> = ordered.iter().collect();
-        let available_set: HashSet<&PathBuf> = available.iter().collect();
-        if ordered.len() == available.len() && ordered_set == available_set {
-            return ordered.clone();
+    let available_set: HashSet<&PathBuf> = available.iter().collect();
+
+    let Some(stored) = stored else {
+        let mut shuffled = available.to_vec();
+        shuffled.shuffle(&mut thread_rng());
+        let _ = save_order(paths, &shuffled);
+        return shuffled;
+    };
+
+    let stored_len = stored.len();
+    let mut seen: HashSet<PathBuf> = HashSet::new();
+    let mut ordered: Vec<PathBuf> = Vec::with_capacity(available.len());
+    for path in stored {
+        if available_set.contains(&path) && seen.insert(path.clone()) {
+            ordered.push(path);
         }
     }
 
-    let mut shuffled = available.to_vec();
-    shuffled.shuffle(&mut thread_rng());
-    let _ = save_order(paths, &shuffled);
-    shuffled
+    let mut added: Vec<PathBuf> = available
+        .iter()
+        .filter(|path| !seen.contains(*path))
+        .cloned()
+        .collect();
+
+    if added.is_empty() && ordered.len() == stored_len {
+        return ordered;
+    }
+
+    let mut rng = thread_rng();
+    added.shuffle(&mut rng);
+    for path in added {
+        let position = rng.gen_range(0..=ordered.len());
+        ordered.insert(position, path);
+    }
+
+    let _ = save_order(paths, &ordered);
+    ordered
+}
+
+/// Wallpapers the user has hidden with Ctrl+D in the picker.
+///
+/// Deliberately a separate file from metadata.json, which is 8 MB and is
+/// rewritten by the scheduled fetcher. Keeping curation here means the only
+/// writer is this machine and the only writer of metadata.json is the
+/// fetcher, so the two never produce a merge conflict against each other.
+#[derive(Debug, Default, Serialize, Deserialize)]
+struct Curation {
+    #[serde(default = "curation_version")]
+    version: u32,
+    #[serde(default)]
+    hidden: BTreeMap<String, HiddenEntry>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct HiddenEntry {
+    at: String,
+}
+
+fn curation_version() -> u32 {
+    1
+}
+
+fn load_curation(paths: &Paths) -> Curation {
+    fs::read_to_string(&paths.curation_file)
+        .ok()
+        .and_then(|text| serde_json::from_str::<Curation>(&text).ok())
+        .unwrap_or_else(|| Curation {
+            version: curation_version(),
+            hidden: BTreeMap::new(),
+        })
+}
+
+fn save_curation(paths: &Paths, curation: &Curation) -> io::Result<()> {
+    let json = serde_json::to_string_pretty(curation).unwrap();
+    write_atomic(&paths.curation_file, &format!("{json}\n"))
+}
+
+fn file_name_of(path: &Path) -> String {
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or_default()
+        .to_string()
+}
+
+/// ISO-8601 UTC without pulling in a date crate for one timestamp.
+fn timestamp_now() -> String {
+    let seconds = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+    let days = seconds.div_euclid(86_400);
+    let time = seconds.rem_euclid(86_400);
+    // Civil-from-days (Howard Hinnant's algorithm), epoch shifted to 0000-03-01.
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z.rem_euclid(146_097);
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let day = doy - (153 * mp + 2) / 5 + 1;
+    let month = if mp < 10 { mp + 3 } else { mp - 9 };
+    let year = era * 400 + yoe + if month <= 2 { 1 } else { 0 };
+    format!(
+        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z",
+        year,
+        month,
+        day,
+        time / 3600,
+        (time % 3600) / 60,
+        time % 60
+    )
+}
+
+fn toggle_hidden(paths: &Paths, scanned: &[PathBuf], raw_path: &str) -> Result<(bool, String), String> {
+    let requested = fs::canonicalize(raw_path).map_err(|e| format!("{raw_path}: {e}"))?;
+    // Validated against every scanned wallpaper rather than the cycling list,
+    // so an already-hidden wallpaper can still be un-hidden.
+    if !scanned.contains(&requested) {
+        return Err(format!(
+            "wallpaper is not a supported image under {}: {}",
+            paths.wallpaper_dir.display(),
+            requested.display()
+        ));
+    }
+
+    let name = file_name_of(&requested);
+    let mut curation = load_curation(paths);
+    let hidden = if curation.hidden.remove(&name).is_some() {
+        false
+    } else {
+        curation.hidden.insert(name.clone(), HiddenEntry { at: timestamp_now() });
+        true
+    };
+    save_curation(paths, &curation).map_err(|e| e.to_string())?;
+    Ok((hidden, name))
 }
 
 fn current(paths: &Paths, available: &[PathBuf]) -> Option<PathBuf> {
@@ -223,7 +356,7 @@ fn write_state(paths: &Paths, path: &Path, colors: Option<&Palette>) -> io::Resu
     write_atomic(&paths.current_file, &format!("{}\n", path.display()))
 }
 
-fn set_wallpaper(paths: &Paths, available: &[PathBuf], raw_path: &str, persist: bool) -> Result<PathBuf, String> {
+fn resolve_wallpaper(paths: &Paths, available: &[PathBuf], raw_path: &str) -> Result<PathBuf, String> {
     let requested = fs::canonicalize(raw_path).map_err(|e| format!("{raw_path}: {e}"))?;
     if !available.contains(&requested) {
         return Err(format!(
@@ -232,6 +365,33 @@ fn set_wallpaper(paths: &Paths, available: &[PathBuf], raw_path: &str, persist: 
             requested.display()
         ));
     }
+    Ok(requested)
+}
+
+fn palette_for(paths: &Paths, requested: &Path) -> Option<Palette> {
+    let filename = file_name_of(requested);
+    let colors = cached_palette(paths, &filename);
+    if colors.is_none() {
+        eprintln!(
+            "wallpaperctl: no cached palette for {filename}; run wallpaper-generate-palettes to backfill it"
+        );
+    }
+    colors
+}
+
+/// Records a wallpaper as the active one without touching hyprpaper. The picker
+/// previews by setting the real wallpaper, so closing it on an image that is
+/// already displayed only needs the state write; re-issuing the hyprctl call
+/// would make the close visibly flash.
+fn commit_wallpaper(paths: &Paths, available: &[PathBuf], raw_path: &str) -> Result<PathBuf, String> {
+    let requested = resolve_wallpaper(paths, available, raw_path)?;
+    let colors = palette_for(paths, &requested);
+    write_state(paths, &requested, colors.as_ref()).map_err(|e| e.to_string())?;
+    Ok(requested)
+}
+
+fn set_wallpaper(paths: &Paths, available: &[PathBuf], raw_path: &str, persist: bool) -> Result<PathBuf, String> {
+    let requested = resolve_wallpaper(paths, available, raw_path)?;
 
     ensure_daemon()?;
 
@@ -244,16 +404,7 @@ fn set_wallpaper(paths: &Paths, available: &[PathBuf], raw_path: &str, persist: 
         return Err(format!("hyprctl hyprpaper wallpaper failed for {}", requested.display()));
     }
 
-    let filename = requested
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or_default();
-    let colors = cached_palette(paths, filename);
-    if colors.is_none() {
-        eprintln!(
-            "wallpaperctl: no cached palette for {filename}; run wallpaper-generate-palettes to backfill it"
-        );
-    }
+    let colors = palette_for(paths, &requested);
 
     if persist {
         write_state(paths, &requested, colors.as_ref()).map_err(|e| e.to_string())?;
@@ -286,41 +437,51 @@ fn choose_previous(available: &[PathBuf], active: Option<&PathBuf>) -> Option<Pa
     Some(available[index].clone())
 }
 
-fn print_catalog(paths: &Paths, available: &[PathBuf], active: Option<&PathBuf>) {
+fn print_catalog(
+    paths: &Paths,
+    available: &[PathBuf],
+    active: Option<&PathBuf>,
+    curation: &Curation,
+) {
     #[derive(Serialize)]
     struct Entry {
         name: String,
         file: String,
         path: String,
         extension: String,
+        hidden: bool,
     }
     #[derive(Serialize)]
     struct Catalog {
         current: String,
         #[serde(rename = "metadataFile")]
         metadata_file: String,
+        #[serde(rename = "curationFile")]
+        curation_file: String,
         wallpapers: Vec<Entry>,
     }
 
+    // Hidden wallpapers stay in the catalog, flagged, so the picker can offer
+    // an "is:hidden" view to un-hide them. Only the cycling commands drop them.
     let entries: Vec<Entry> = available
         .iter()
-        .map(|p| Entry {
-            name: p
-                .file_stem()
-                .and_then(|n| n.to_str())
-                .unwrap_or_default()
-                .to_string(),
-            file: p
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or_default()
-                .to_string(),
-            path: p.to_string_lossy().to_string(),
-            extension: p
-                .extension()
-                .and_then(|n| n.to_str())
-                .unwrap_or_default()
-                .to_ascii_uppercase(),
+        .map(|p| {
+            let file = file_name_of(p);
+            Entry {
+                name: p
+                    .file_stem()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or_default()
+                    .to_string(),
+                hidden: curation.hidden.contains_key(&file),
+                file,
+                path: p.to_string_lossy().to_string(),
+                extension: p
+                    .extension()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or_default()
+                    .to_ascii_uppercase(),
+            }
         })
         .collect();
 
@@ -331,14 +492,63 @@ fn print_catalog(paths: &Paths, available: &[PathBuf], active: Option<&PathBuf>)
         } else {
             String::new()
         },
+        // Always reported, even before the file exists: the picker watches it
+        // so the first Ctrl+D is picked up without reopening the picker.
+        curation_file: paths.curation_file.to_string_lossy().to_string(),
         wallpapers: entries,
     };
 
     println!("{}", serde_json::to_string(&catalog).unwrap());
 }
 
+/// Pick the next/previous wallpaper, skipping everything the user hid.
+///
+/// When the active wallpaper is itself hidden it is still present in the full
+/// order, so the walk resumes from its slot there. Cycling over the visible
+/// list alone would restart at index 0 the moment you hide what you are
+/// looking at.
+fn resolve_cycle_target(
+    available: &[PathBuf],
+    cycling: &[PathBuf],
+    active: Option<&PathBuf>,
+    forward: bool,
+) -> Option<PathBuf> {
+    if cycling.is_empty() {
+        return None;
+    }
+    let Some(active) = active else {
+        return if forward {
+            choose_next(cycling, None)
+        } else {
+            choose_previous(cycling, None)
+        };
+    };
+    if cycling.contains(active) {
+        return if forward {
+            choose_next(cycling, Some(active))
+        } else {
+            choose_previous(cycling, Some(active))
+        };
+    }
+
+    let start = available.iter().position(|path| path == active)?;
+    let visible: HashSet<&PathBuf> = cycling.iter().collect();
+    let len = available.len();
+    (1..=len).find_map(|offset| {
+        let index = if forward {
+            (start + offset) % len
+        } else {
+            (start + len - offset) % len
+        };
+        let candidate = &available[index];
+        visible.contains(candidate).then(|| candidate.clone())
+    })
+}
+
 fn usage_and_exit() -> ! {
-    eprintln!("usage: wallpaperctl {{catalog|current|set PATH|preview PATH|random|next|previous|restore}}");
+    eprintln!(
+        "usage: wallpaperctl {{catalog|current|set PATH|preview PATH|commit PATH|random|next|previous|restore|toggle-hidden PATH}}"
+    );
     std::process::exit(2);
 }
 
@@ -352,13 +562,26 @@ fn main() {
     let paths = Paths::new();
     let scanned = wallpapers(&paths);
     let available = randomized_order(&paths, &scanned);
+    let curation = load_curation(&paths);
+    // Two lists on purpose: `available` is every wallpaper in cycle order and
+    // backs the catalog plus set/preview, while `cycling` drops what the user
+    // hid so next/previous/random/restore can never land on it again.
+    let cycling: Vec<PathBuf> = available
+        .iter()
+        .filter(|path| !curation.hidden.contains_key(&file_name_of(path)))
+        .cloned()
+        .collect();
     let active = current(&paths, &available);
 
     let command = args.get(1).map(String::as_str).unwrap_or("");
 
     match command {
-        "catalog" => print_catalog(&paths, &available, active.as_ref()),
+        "catalog" => print_catalog(&paths, &available, active.as_ref(), &curation),
         "current" => println!("{}", active.map(|p| p.to_string_lossy().to_string()).unwrap_or_default()),
+        "toggle-hidden" if args.len() == 3 => match toggle_hidden(&paths, &scanned, &args[2]) {
+            Ok((hidden, name)) => println!("{} {}", if hidden { "hidden" } else { "visible" }, name),
+            Err(e) => fail(&e),
+        },
         "set" if args.len() == 3 => match set_wallpaper(&paths, &available, &args[2], true) {
             Ok(path) => println!("{}", path.display()),
             Err(e) => fail(&e),
@@ -367,8 +590,12 @@ fn main() {
             Ok(path) => println!("{}", path.display()),
             Err(e) => fail(&e),
         },
+        "commit" if args.len() == 3 => match commit_wallpaper(&paths, &available, &args[2]) {
+            Ok(path) => println!("{}", path.display()),
+            Err(e) => fail(&e),
+        },
         "random" | "next" => {
-            if let Some(target) = choose_next(&available, active.as_ref()) {
+            if let Some(target) = resolve_cycle_target(&available, &cycling, active.as_ref(), true) {
                 match set_wallpaper(&paths, &available, &target.to_string_lossy(), true) {
                     Ok(path) => println!("{}", path.display()),
                     Err(e) => fail(&e),
@@ -376,7 +603,7 @@ fn main() {
             }
         }
         "previous" => {
-            if let Some(target) = choose_previous(&available, active.as_ref()) {
+            if let Some(target) = resolve_cycle_target(&available, &cycling, active.as_ref(), false) {
                 match set_wallpaper(&paths, &available, &target.to_string_lossy(), true) {
                     Ok(path) => println!("{}", path.display()),
                     Err(e) => fail(&e),
@@ -384,7 +611,13 @@ fn main() {
             }
         }
         "restore" => {
-            let target = active.clone().or_else(|| choose_next(&available, None));
+            // A wallpaper hidden while it was active must not come back on the
+            // next login, so fall through to the one that follows it.
+            let target = match active.as_ref() {
+                Some(path) if cycling.contains(path) => Some(path.clone()),
+                Some(_) => resolve_cycle_target(&available, &cycling, active.as_ref(), true),
+                None => choose_next(&cycling, None),
+            };
             if let Some(target) = target {
                 match set_wallpaper(&paths, &available, &target.to_string_lossy(), true) {
                     Ok(path) => println!("{}", path.display()),
@@ -393,5 +626,89 @@ fn main() {
             }
         }
         _ => usage_and_exit(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn paths(names: &[&str]) -> Vec<PathBuf> {
+        names.iter().map(PathBuf::from).collect()
+    }
+
+    #[test]
+    fn cycles_forward_over_visible_wallpapers_only() {
+        let available = paths(&["a", "b", "c", "d"]);
+        let cycling = paths(&["a", "c", "d"]);
+        let active = PathBuf::from("a");
+        assert_eq!(
+            resolve_cycle_target(&available, &cycling, Some(&active), true),
+            Some(PathBuf::from("c"))
+        );
+    }
+
+    #[test]
+    fn cycles_backward_over_visible_wallpapers_only() {
+        let available = paths(&["a", "b", "c", "d"]);
+        let cycling = paths(&["a", "c", "d"]);
+        let active = PathBuf::from("c");
+        assert_eq!(
+            resolve_cycle_target(&available, &cycling, Some(&active), false),
+            Some(PathBuf::from("a"))
+        );
+    }
+
+    #[test]
+    fn resumes_from_the_slot_of_a_hidden_active_wallpaper() {
+        // "b" was hidden while it was on screen. Cycling over the visible list
+        // alone would restart at "a"; it must continue to "c" instead.
+        let available = paths(&["a", "b", "c", "d"]);
+        let cycling = paths(&["a", "c", "d"]);
+        let active = PathBuf::from("b");
+        assert_eq!(
+            resolve_cycle_target(&available, &cycling, Some(&active), true),
+            Some(PathBuf::from("c"))
+        );
+        assert_eq!(
+            resolve_cycle_target(&available, &cycling, Some(&active), false),
+            Some(PathBuf::from("a"))
+        );
+    }
+
+    #[test]
+    fn wraps_around_from_a_hidden_active_wallpaper_at_the_end() {
+        let available = paths(&["a", "b", "c", "d"]);
+        let cycling = paths(&["a", "b"]);
+        let active = PathBuf::from("d");
+        assert_eq!(
+            resolve_cycle_target(&available, &cycling, Some(&active), true),
+            Some(PathBuf::from("a"))
+        );
+        assert_eq!(
+            resolve_cycle_target(&available, &cycling, Some(&active), false),
+            Some(PathBuf::from("b"))
+        );
+    }
+
+    #[test]
+    fn returns_nothing_when_every_wallpaper_is_hidden() {
+        let available = paths(&["a", "b"]);
+        let active = PathBuf::from("a");
+        assert_eq!(
+            resolve_cycle_target(&available, &[], Some(&active), true),
+            None
+        );
+    }
+
+    #[test]
+    fn timestamp_is_iso8601_utc() {
+        let stamp = timestamp_now();
+        assert_eq!(stamp.len(), 20, "{stamp}");
+        assert!(stamp.ends_with('Z'), "{stamp}");
+        assert_eq!(&stamp[4..5], "-");
+        assert_eq!(&stamp[10..11], "T");
+        let year: i32 = stamp[0..4].parse().unwrap();
+        assert!(year >= 2024 && year < 2100, "{stamp}");
     }
 }

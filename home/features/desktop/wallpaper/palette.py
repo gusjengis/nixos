@@ -7,10 +7,13 @@ manual/periodic script that actually calls matugen and backfills the cache.
 """
 
 import json
+import os
 import subprocess
 from pathlib import Path
 
-WALLPAPER_DIR = Path.home() / "Wallpapers"
+# Overridable so the scheduled CI job, which has no ~/Wallpapers, can point the
+# whole toolchain at its checkout without any code changes.
+WALLPAPER_DIR = Path(os.environ.get("WALLPAPER_DIR") or Path.home() / "Wallpapers")
 METADATA_FILE = WALLPAPER_DIR / "metadata.json"
 
 
@@ -65,9 +68,13 @@ def load_metadata():
 
 
 def save_metadata(metadata):
-    metadata["entries"] = dict(sorted(metadata["entries"].items()))
+    # Serialise a sorted *copy*. Rebinding metadata["entries"] would orphan the
+    # live dict callers hold across checkpoints: entries added after the first
+    # save would be written to a dict nobody serialises again and silently lost.
+    payload = dict(metadata)
+    payload["entries"] = dict(sorted(metadata["entries"].items()))
     temporary = METADATA_FILE.with_suffix(".tmp")
-    temporary.write_text(json.dumps(metadata, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     temporary.replace(METADATA_FILE)
 
 

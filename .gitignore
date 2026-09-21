@@ -8,3 +8,4 @@ result
 home/features/repo-sync/repos/local.list
 .direnv/
 target/
+__pycache__/

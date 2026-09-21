@@ -85,6 +85,64 @@ let
       exec python3 "${wallpaperDir}/generate-palettes.py" "$@"
     '';
   };
+  # Publishes curation.json and collects whatever the scheduled fetcher pushed.
+  # Shared by the picker's Ctrl+D and the hourly timer below, which is why the
+  # script itself takes a lock rather than relying on the callers.
+  wallpaperSync = pkgs.writeShellApplication {
+    name = "wallpaper-sync";
+    runtimeInputs = [
+      pkgs.coreutils
+      pkgs.git
+      pkgs.git-lfs
+      pkgs.util-linux
+    ];
+    text = ''
+      exec bash "${wallpaperDir}/wallpaper-sync.sh" "$@"
+    '';
+  };
+  # Ctrl+D in the picker. Flips the hidden flag locally, then pushes in the
+  # background so the keypress stays instant.
+  wallpaperHide = pkgs.writeShellApplication {
+    name = "wallpaper-hide";
+    runtimeInputs = [
+      pkgs.util-linux
+      wallpaperSync
+      wallpaperctl
+    ];
+    text = ''
+      exec bash "${wallpaperDir}/wallpaper-hide.sh" "$@"
+    '';
+  };
+  # Manual/periodic backfill of ~/Wallpapers from peapix.com. Enumerates both
+  # sections by id, keeps only natively-4K images, and deduplicates on sha256
+  # plus a perceptual hash. ImageMagick is what computes that perceptual hash,
+  # and git-lfs materialises a stored image when a hash collision has to be
+  # settled on pixels in a checkout that has none.
+  wallpaperFetchPeapix = pkgs.writeShellApplication {
+    name = "wallpaper-fetch-peapix";
+    runtimeInputs = [
+      pkgs.git
+      pkgs.git-lfs
+      pkgs.imagemagick
+      pkgs.python3
+    ];
+    text = ''
+      exec python3 "${wallpaperDir}/fetch-peapix.py" "$@"
+    '';
+  };
+  # Bing runs a different image per market on most days, so a large part of the
+  # library only ever had German, Japanese, French or Chinese prose. This adds
+  # English alongside the original so the picker's search works on all of it.
+  wallpaperTranslate = pkgs.writeShellApplication {
+    name = "wallpaper-translate";
+    runtimeInputs = [
+      pkgs.python3
+      pkgs.translate-shell
+    ];
+    text = ''
+      exec python3 "${wallpaperDir}/translate-metadata.py" "$@"
+    '';
+  };
   aiUsage = pkgs.writeShellApplication {
     name = "quickshell-ai-usage";
     runtimeInputs = [ pkgs.python3 ];
@@ -171,6 +229,10 @@ in
       remoteApps
       wallpaperctl
       wallpaperGeneratePalettes
+      wallpaperFetchPeapix
+      wallpaperTranslate
+      wallpaperSync
+      wallpaperHide
       aiUsage
       aiAccount
       universalSearch
@@ -184,5 +246,34 @@ in
     # Link the directory so Quickshell and future tooling can atomically replace
     # files without breaking repository-backed configuration.
     xdg.configFile."quickshell".source = config.lib.file.mkOutOfStoreSymlink configRoot;
+
+    # ~/Wallpapers is updated by a scheduled GitHub Actions job rather than by
+    # hand, so it needs a pull that is not tied to login. repo-sync only runs on
+    # first network after boot, which would leave a machine that stays up for
+    # days on a stale library.
+    systemd.user.services.wallpaper-sync = {
+      Unit = {
+        Description = "Sync ~/Wallpapers with its git remote";
+        After = [ "network-online.target" ];
+        Wants = [ "network-online.target" ];
+      };
+      Service = {
+        Type = "oneshot";
+        ExecStart = lib.getExe wallpaperSync;
+      };
+    };
+
+    systemd.user.timers.wallpaper-sync = {
+      Unit.Description = "Pull new wallpapers and publish local curation hourly";
+      Timer = {
+        OnStartupSec = "2m";
+        OnUnitActiveSec = "1h";
+        # Keeps several machines waking up from suspend together from hitting
+        # the remote at the same instant.
+        RandomizedDelaySec = "5m";
+        Persistent = true;
+      };
+      Install.WantedBy = [ "timers.target" ];
+    };
   };
 }
