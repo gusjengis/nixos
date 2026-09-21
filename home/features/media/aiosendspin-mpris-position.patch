@@ -1,0 +1,77 @@
+diff --git a/aiosendspin_mpris/adapter.py b/aiosendspin_mpris/adapter.py
+index 9b39a3b..d8669b6 100644
+--- a/aiosendspin_mpris/adapter.py
++++ b/aiosendspin_mpris/adapter.py
+@@ -7,6 +7,7 @@ from __future__ import annotations
+ import asyncio
+ import logging
+ import sys
++import time
+ from dataclasses import dataclass, field
+ from typing import TYPE_CHECKING, override
+ 
+@@ -86,6 +87,8 @@ class MprisState:
+     art_url: str | None = None
+     duration_ms: int | None = None
+     progress_ms: int | None = None
++    playback_speed: int = 0
++    progress_updated_at: float = 0.0
+ 
+ 
+ class SendspinMprisAdapterRoot(IMprisAdapterRoot):
+@@ -263,7 +266,13 @@ class SendspinMprisAdapterPlayer(IMprisAdapterPlayer):
+     @override
+     def getPosition(self) -> Microseconds:
+         """Return current track position in microseconds."""
+-        return Microseconds((self._state.progress_ms or 0) * 1000)
++        position_ms = self._state.progress_ms or 0
++        if self._state.progress_updated_at > 0 and self._state.playback_speed > 0:
++            elapsed_s = time.monotonic() - self._state.progress_updated_at
++            position_ms += int(elapsed_s * self._state.playback_speed)
++        if self._state.duration_ms is not None:
++            position_ms = min(position_ms, self._state.duration_ms)
++        return Microseconds(position_ms * 1000)
+ 
+     @override
+     def getLoopStatus(self) -> MprisLoopStatus:
+diff --git a/aiosendspin_mpris/mpris.py b/aiosendspin_mpris/mpris.py
+index ce69175..5907fa1 100644
+--- a/aiosendspin_mpris/mpris.py
++++ b/aiosendspin_mpris/mpris.py
+@@ -4,6 +4,7 @@ from __future__ import annotations
+ 
+ import asyncio
+ import logging
++import time
+ from collections.abc import Callable
+ from pathlib import Path
+ from tempfile import NamedTemporaryFile
+@@ -242,11 +243,14 @@ class SendspinMpris:
+         if not isinstance(metadata.progress, UndefinedField) and metadata.progress is not None:
+             duration_ms = metadata.progress.track_duration
+             progress_ms = metadata.progress.track_progress
++            playback_speed = metadata.progress.playback_speed
++        else:
++            playback_speed = self._state.playback_speed
+ 
+         self.set_metadata(title=title, artist=artist, album=album, duration_ms=duration_ms)
+ 
+         if progress_ms is not None:
+-            self.set_progress(progress_ms)
++            self.set_progress(progress_ms, playback_speed)
+ 
+     def _on_group_update(self, payload: GroupUpdateServerPayload) -> None:
+         """Handle group update (playback state) from the client."""
+@@ -283,9 +287,11 @@ class SendspinMpris:
+         except Exception:
+             _LOGGER.debug("Failed to emit MPRIS metadata change", exc_info=True)
+ 
+-    def set_progress(self, progress_ms: int | None) -> None:
++    def set_progress(self, progress_ms: int | None, playback_speed: int = 0) -> None:
+         """Update track progress."""
+         self._state.progress_ms = progress_ms
++        self._state.playback_speed = playback_speed
++        self._state.progress_updated_at = time.monotonic()
+ 
+     def set_playback_state(self, state: PlaybackStateType) -> None:
+         """Update playback state."""

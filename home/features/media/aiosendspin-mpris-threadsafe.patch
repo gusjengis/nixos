@@ -1,0 +1,87 @@
+diff --git a/aiosendspin_mpris/mpris.py b/aiosendspin_mpris/mpris.py
+index 5907fa1..7ce276d 100644
+--- a/aiosendspin_mpris/mpris.py
++++ b/aiosendspin_mpris/mpris.py
+@@ -203,7 +203,7 @@ class SendspinMpris:
+             self._state.art_url = self._artwork_path.as_uri()
+ 
+         if self._update_notifier is not None:
+-            self._update_notifier.emitterPlayer.emitPropertyChangeAll()
++            self._service.emit_player_properties_changed()
+ 
+     def _on_artwork_update(self, channel: int, payload: bytes) -> None:
+         """Publish album artwork channel updates."""
+@@ -283,7 +283,7 @@ class SendspinMpris:
+             return
+ 
+         try:
+-            self._update_notifier.emitterPlayer.emitPropertyChangeAll()
++            self._service.emit_player_properties_changed()
+         except Exception:
+             _LOGGER.debug("Failed to emit MPRIS metadata change", exc_info=True)
+ 
+@@ -304,7 +304,7 @@ class SendspinMpris:
+             return
+ 
+         try:
+-            self._update_notifier.emitterPlayer.emitPropertyChangeAll()
++            self._service.emit_player_properties_changed()
+         except Exception:
+             _LOGGER.debug("Failed to emit MPRIS playback state change", exc_info=True)
+ 
+@@ -324,7 +324,7 @@ class SendspinMpris:
+             return
+ 
+         try:
+-            self._update_notifier.emitterPlayer.emitPropertyChangeAll()
++            self._service.emit_player_properties_changed()
+         except Exception:
+             _LOGGER.debug("Failed to emit MPRIS volume change", exc_info=True)
+ 
+@@ -340,6 +340,6 @@ class SendspinMpris:
+             return
+ 
+         try:
+-            self._update_notifier.emitterPlayer.emitPropertyChangeAll()
++            self._service.emit_player_properties_changed()
+         except Exception:
+             _LOGGER.debug("Failed to emit MPRIS options change", exc_info=True)
+diff --git a/aiosendspin_mpris/mpris_service.py b/aiosendspin_mpris/mpris_service.py
+index 7834a69..cf62627 100644
+--- a/aiosendspin_mpris/mpris_service.py
++++ b/aiosendspin_mpris/mpris_service.py
+@@ -2,6 +2,7 @@
+ 
+ from __future__ import annotations
+ 
++import asyncio
+ import logging
+ from typing import Any, override
+ 
+@@ -51,10 +52,20 @@ class PatchedMprisService(MprisService):
+         self._interfacePlayLists: MprisInterfacePlayLists | None = PatchedMprisInterfacePlayLists(
+             adapter=adapterPlayLists
+         )
++        self._dbus_loop: asyncio.AbstractEventLoop | None = None
++
++    def emit_player_properties_changed(self) -> None:
++        """Emit from the event loop that owns the D-Bus connection."""
++        loop = self._dbus_loop
++        if loop is not None and loop.is_running():
++            loop.call_soon_threadsafe(
++                self.updateNotifier.emitterPlayer.emitPropertyChangeAll
++            )
+ 
+     @override
+     async def _loop(self) -> None:
+         try:
++            self._dbus_loop = asyncio.get_running_loop()
+             self._messageBus = messageBus = await MessageBus().connect()  # noqa: N806  # pyright: ignore[reportUnannotatedClassAttribute]
+ 
+             messageBus.export(MprisConstant.PATH, self._interfaceRoot)
+@@ -71,4 +82,5 @@ class PatchedMprisService(MprisService):
+         except InvalidAddressError:
+             _LOGGER.warning("MPRIS not available: DBus address error")
+         finally:
++            self._dbus_loop = None
+             self._disconnect()

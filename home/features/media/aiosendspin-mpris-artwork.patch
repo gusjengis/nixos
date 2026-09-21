@@ -1,0 +1,96 @@
+diff --git a/aiosendspin_mpris/adapter.py b/aiosendspin_mpris/adapter.py
+index 96e02c4..1843f98 100644
+--- a/aiosendspin_mpris/adapter.py
++++ b/aiosendspin_mpris/adapter.py
+@@ -83,6 +83,7 @@ class MprisState:
+     title: str | None = None
+     artist: str | None = None
+     album: str | None = None
++    art_url: str | None = None
+     duration_ms: int | None = None
+     progress_ms: int | None = None
+ 
+@@ -247,6 +248,7 @@ class SendspinMprisAdapterPlayer(IMprisAdapterPlayer):
+             title=self._state.title or "",
+             artists=[self._state.artist] if self._state.artist else None,
+             album=self._state.album or "",
++            artUrl=self._state.art_url,
+         )
+ 
+     @override
+diff --git a/aiosendspin_mpris/mpris.py b/aiosendspin_mpris/mpris.py
+index 75ee572..7e98cfd 100644
+--- a/aiosendspin_mpris/mpris.py
++++ b/aiosendspin_mpris/mpris.py
+@@ -5,6 +5,8 @@ from __future__ import annotations
+ import asyncio
+ import logging
+ from collections.abc import Callable
++from pathlib import Path
++from tempfile import NamedTemporaryFile
+ from typing import TYPE_CHECKING
+ 
+ from .adapter import (
+@@ -63,6 +65,7 @@ class SendspinMpris:
+     _update_notifier: MprisUpdateNotifier | None
+     _running: bool
+     _listener_removers: list[Callable[[], None]]
++    _artwork_path: Path | None
+ 
+     def __init__(
+         self, client: SendspinClient, name: str = "Sendspin", desktop_entry: str | None = None
+@@ -90,6 +93,7 @@ class SendspinMpris:
+         self._update_notifier = None
+         self._running = False
+         self._listener_removers = []
++        self._artwork_path = None
+ 
+     def start(self) -> None:
+         """Start the MPRIS D-Bus service and attach listeners to the client.
+@@ -153,6 +157,7 @@ class SendspinMpris:
+             except Exception:
+                 _LOGGER.debug("Error removing listener", exc_info=True)
+         self._listener_removers.clear()
++        self._set_artwork(None)
+ 
+         if self._service is not None:
+             try:
+@@ -177,9 +182,38 @@ class SendspinMpris:
+         self._listener_removers.append(
+             self._client.add_controller_state_listener(self._on_controller_state)
+         )
++        self._listener_removers.append(self._client.add_artwork_listener(self._on_artwork_update))
++        self._listener_removers.append(self._client.add_stream_end_listener(self._on_stream_end))
++        self._listener_removers.append(self._client.add_stream_clear_listener(self._on_stream_end))
+ 
+         _LOGGER.debug("Attached MPRIS listeners to SendspinClient")
+ 
++    def _set_artwork(self, payload: bytes | None) -> None:
++        """Replace cached artwork and publish its local URI over MPRIS."""
++        if self._artwork_path is not None:
++            self._artwork_path.unlink(missing_ok=True)
++            self._artwork_path = None
++
++        self._state.art_url = None
++        if payload:
++            with NamedTemporaryFile(prefix="sendspin-artwork-", suffix=".png", delete=False) as file:
++                file.write(payload)
++                self._artwork_path = Path(file.name)
++            self._state.art_url = self._artwork_path.as_uri()
++
++        if self._update_notifier is not None:
++            self._update_notifier.emitterPlayer.emitPropertyChangeAll()
++
++    def _on_artwork_update(self, channel: int, payload: bytes) -> None:
++        """Publish album artwork channel updates."""
++        if channel == 0:
++            self._set_artwork(payload)
++
++    def _on_stream_end(self, roles: list[str] | None) -> None:
++        """Clear stale artwork when its stream ends or resets."""
++        if roles is None or "artwork" in roles:
++            self._set_artwork(None)
++
+     def _on_metadata_update(self, payload: ServerStatePayload) -> None:
+         """Handle metadata updates from the client."""
+         from aiosendspin.models.types import UndefinedField

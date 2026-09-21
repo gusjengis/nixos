@@ -1,0 +1,51 @@
+diff --git a/sendspin/daemon/daemon.py b/sendspin/daemon/daemon.py
+index 590ef8d..b41ab9c 100644
+--- a/sendspin/daemon/daemon.py
++++ b/sendspin/daemon/daemon.py
+@@ -12,13 +12,16 @@ from typing import TYPE_CHECKING
+ 
+ from aiohttp import ClientError, web
+ from aiosendspin.client import ClientListener, PairingSupport, SendspinClient
++from aiosendspin.models.artwork import ArtworkChannel, ClientHelloArtworkSupport
+ from aiosendspin.models.core import GroupUpdateServerPayload, ServerCommandPayload
+ from aiosendspin.models.player import ClientHelloPlayerSupport, SupportedAudioFormat
+ from aiosendspin_mpris import MPRIS_AVAILABLE, SendspinMpris
+ from aiosendspin.models.types import (
+     Activity,
++    ArtworkSource,
+     GoodbyeReason,
+     PairAbortReason,
++    PictureFormat,
+     PlaybackStateType,
+     PlayerCommand,
+     Roles,
+@@ -90,9 +93,20 @@ class SendspinDaemon:
+     def _create_client(self) -> SendspinClient:
+         """Create a new SendspinClient instance."""
+         assert self._audio_handler is not None
+         client_roles = [Roles.PLAYER]
++        artwork_support = None
+         if MPRIS_AVAILABLE and self._args.use_mpris:
+-            client_roles.extend([Roles.METADATA, Roles.CONTROLLER])
++            client_roles.extend([Roles.METADATA, Roles.CONTROLLER, Roles.ARTWORK])
++            artwork_support = ClientHelloArtworkSupport(
++                channels=[
++                    ArtworkChannel(
++                        source=ArtworkSource.ALBUM,
++                        format=PictureFormat.PNG,
++                        media_width=512,
++                        media_height=512,
++                    )
++                ]
++            )
+ 
+         supported_formats = detect_supported_audio_formats(self._args.audio_device)
+         if self._args.preferred_format is not None:
+@@ -114,6 +128,7 @@ class SendspinDaemon:
+                 buffer_capacity=32_000_000,
+                 supported_commands=[PlayerCommand.VOLUME, PlayerCommand.MUTE],
+             ),
++            artwork_support=artwork_support,
+             static_delay_ms=self._static_delay_ms,
+             state_supported_commands=[PlayerCommand.SET_STATIC_DELAY],
+             initial_volume=self._audio_handler.volume,

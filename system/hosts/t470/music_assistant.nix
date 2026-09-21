@@ -116,5 +116,12 @@ in
       5353 # mDNS / Zeroconf
       1900 # SSDP / UPnP
     ];
+
+    # Sendspin protocol port, for the quickshell Sendspin player running on
+    # desktop hosts (home/features/media/sendspin.nix). Tailnet-only, since
+    # those hosts reach t470 over Tailscale rather than a shared LAN.
+    networking.firewall.interfaces."tailscale0".allowedTCPPorts = [
+      8927 # Sendspin
+    ];
   };
 }
