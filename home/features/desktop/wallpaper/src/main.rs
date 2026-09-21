@@ -3,8 +3,10 @@
 // Design notes (see /etc/nixos conversation history for the full story):
 // - Palette lookup is cache-only. This binary never shells out to matugen;
 //   it reads the "palette" field cached in metadata.json by
-//   generate-palettes.py. A cache miss just leaves colors.json untouched
-//   (prints a hint to stderr) instead of blocking the wallpaper swap.
+//   generate-palettes.py, which lives in the Wallpapers repo itself and is
+//   run by its scheduled GitHub Actions job. A cache miss just leaves
+//   colors.json untouched (prints a hint to stderr) instead of blocking the
+//   wallpaper swap.
 // - Wallpaper is applied via `hyprctl hyprpaper wallpaper mon,path,fit`,
 //   talking to the hyprpaper daemon (started on demand if its IPC socket
 //   isn't present yet). hyprpaper's protocol has no transition/fade concept,
@@ -336,7 +338,8 @@ fn ensure_daemon() -> Result<(), String> {
 }
 
 /// Cache-only palette lookup: reads metadata.json's entries[filename].palette.
-/// Never invokes matugen - that is generate-palettes.py's job, run manually.
+/// Never invokes matugen - that is generate-palettes.py's job, run by the
+/// Wallpapers repo's scheduled job.
 fn cached_palette(paths: &Paths, filename: &str) -> Option<Palette> {
     let text = fs::read_to_string(&paths.metadata_file).ok()?;
     let root: serde_json::Value = serde_json::from_str(&text).ok()?;
@@ -373,7 +376,7 @@ fn palette_for(paths: &Paths, requested: &Path) -> Option<Palette> {
     let colors = cached_palette(paths, &filename);
     if colors.is_none() {
         eprintln!(
-            "wallpaperctl: no cached palette for {filename}; run wallpaper-generate-palettes to backfill it"
+            "wallpaperctl: no cached palette for {filename}; the Wallpapers repo's scheduled job backfills these, or run generate-palettes.py there by hand"
         );
     }
     colors

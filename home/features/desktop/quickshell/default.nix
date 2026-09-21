@@ -47,7 +47,8 @@ let
   # compiled binary: it runs on every scroll step in the wallpaper picker, and
   # a Python interpreter plus a double directory scan was most of its latency.
   # Palette lookup here is cache-only (reads metadata.json); matugen itself is
-  # only ever invoked by wallpaper-generate-palettes, run manually.
+  # only ever invoked by generate-palettes.py, which now lives in the
+  # Wallpapers repo and is run by its scheduled GitHub Actions job.
   wallpaperctl = pkgs.rustPlatform.buildRustPackage {
     pname = "wallpaperctl";
     version = "0.1.0";
@@ -69,20 +70,6 @@ let
             pkgs.hyprpaper
           ]
         }
-    '';
-  };
-  # Manual/periodic: backfills matugen palettes into metadata.json so
-  # wallpaperctl's cache-only lookup has something to find. Not on the hot
-  # path, so it stays Python; wrapped the same way as the other scripts here
-  # purely so it's runnable without hand-prefixing PATH with matugen.
-  wallpaperGeneratePalettes = pkgs.writeShellApplication {
-    name = "wallpaper-generate-palettes";
-    runtimeInputs = [
-      pkgs.matugen
-      pkgs.python3
-    ];
-    text = ''
-      exec python3 "${wallpaperDir}/generate-palettes.py" "$@"
     '';
   };
   # Publishes curation.json and collects whatever the scheduled fetcher pushed.
@@ -111,36 +98,6 @@ let
     ];
     text = ''
       exec bash "${wallpaperDir}/wallpaper-hide.sh" "$@"
-    '';
-  };
-  # Manual/periodic backfill of ~/Wallpapers from peapix.com. Enumerates both
-  # sections by id, keeps only natively-4K images, and deduplicates on sha256
-  # plus a perceptual hash. ImageMagick is what computes that perceptual hash,
-  # and git-lfs materialises a stored image when a hash collision has to be
-  # settled on pixels in a checkout that has none.
-  wallpaperFetchPeapix = pkgs.writeShellApplication {
-    name = "wallpaper-fetch-peapix";
-    runtimeInputs = [
-      pkgs.git
-      pkgs.git-lfs
-      pkgs.imagemagick
-      pkgs.python3
-    ];
-    text = ''
-      exec python3 "${wallpaperDir}/fetch-peapix.py" "$@"
-    '';
-  };
-  # Bing runs a different image per market on most days, so a large part of the
-  # library only ever had German, Japanese, French or Chinese prose. This adds
-  # English alongside the original so the picker's search works on all of it.
-  wallpaperTranslate = pkgs.writeShellApplication {
-    name = "wallpaper-translate";
-    runtimeInputs = [
-      pkgs.python3
-      pkgs.translate-shell
-    ];
-    text = ''
-      exec python3 "${wallpaperDir}/translate-metadata.py" "$@"
     '';
   };
   aiUsage = pkgs.writeShellApplication {
@@ -228,9 +185,6 @@ in
       sfPro
       remoteApps
       wallpaperctl
-      wallpaperGeneratePalettes
-      wallpaperFetchPeapix
-      wallpaperTranslate
       wallpaperSync
       wallpaperHide
       aiUsage
