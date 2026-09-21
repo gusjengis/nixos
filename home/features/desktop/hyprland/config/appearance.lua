@@ -80,6 +80,26 @@ hl.layer_rule({
 	animation = "fade",
 })
 
+hl.layer_rule({
+	name = "wallpaper-overlay-fade",
+	match = { namespace = "^quickshell-wallpaper-overlay$" },
+	animation = "fade",
+})
+
+hl.layer_rule({
+	name = "quickshell-popup-blur",
+	match = { namespace = "^quickshell-bar$" },
+	blur_popups = true,
+	ignore_alpha = 0.2,
+})
+
+hl.layer_rule({
+	name = "quickshell-launcher-blur",
+	match = { namespace = "^quickshell-(tools-)?launcher$" },
+	blur = true,
+	ignore_alpha = 0.2,
+})
+
 colorPickerNoAnimationRule = hl.layer_rule({
 	name = "tools-launcher-no-animation",
 	enabled = false,

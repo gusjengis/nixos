@@ -50,10 +50,10 @@ ShellRoot {
     IpcHandler {
         target: "wallpaper"
         function toggle(): void {
-            wallpaperPicker.toggle();
+            wallpaperOverlay.toggle();
         }
         function open(): void {
-            wallpaperPicker.show();
+            wallpaperOverlay.show();
         }
     }
 
@@ -65,7 +65,7 @@ ShellRoot {
         repeat: true
         running: true
         onTriggered: {
-            if (!wallpaperPicker.visible)
+            if (!wallpaperOverlay.visible)
                 Quickshell.execDetached(["wallpaperctl", "random"]);
         }
     }
@@ -92,7 +92,10 @@ ShellRoot {
         initialMode: "tools"
     }
 
-    WallpaperPicker {
-        id: wallpaperPicker
+    // The wallpaper itself is the preview surface; the overlay only draws the
+    // title and the search field. The earlier carousel UI is kept, unused, in
+    // WallpaperPicker.qml.
+    WallpaperOverlay {
+        id: wallpaperOverlay
     }
 }
