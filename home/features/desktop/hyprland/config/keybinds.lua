@@ -23,16 +23,6 @@ bind("SUPER + F", hl.dsp.exec_cmd(vars.fileManager), "Launch File Manager")
 bind("SUPER + V", hl.dsp.window.float(), "Toggle Floating")
 bind("SUPER + W", hl.dsp.exec_cmd("qs ipc call wallpaper toggle"), "Wallpaper Picker")
 bind("SUPER + R", hl.dsp.exec_cmd("qs ipc call bar toggle"), "Toggle Status Bar")
-bind(
-	"SUPER + SHIFT + N",
-	hl.dsp.exec_cmd("bash " .. repo .. "/home/features/desktop/wallpaper/next-wallpaper.sh"),
-	"Next Wallpaper"
-)
-bind(
-	"SUPER + SHIFT + P",
-	hl.dsp.exec_cmd("bash " .. repo .. "/home/features/desktop/wallpaper/previous-wallpaper.sh"),
-	"Previous Wallpaper"
-)
 bind("SUPER + J", hl.dsp.layout("togglesplit"), "Rotate Split")
 
 bind("code:202", hl.dsp.exec_cmd("handy --toggle-transcription"), "Dictate")
@@ -81,6 +71,7 @@ local function monitor_workspace(workspace)
 
 	if legacy and legacy.monitor == monitor then
 		hl.dispatch(hl.dsp.workspace.rename({ workspace = legacy, name = name }))
+		return legacy
 	end
 
 	return "name:" .. name
