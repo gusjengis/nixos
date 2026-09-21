@@ -14,20 +14,6 @@ if not file_present then
 	})
 end
 
--- TEMPORARY, for diagnosing the monitor-hotplug crash. Revert once caught.
--- disable_logs defaults to true, which silences everything Hyprland itself
--- logs after the config loads; only aquamarine keeps writing, since it logs
--- through a connection that bypasses that switch. enable_stdout_logs is what
--- makes the log survive a crash: the file stream is never flushed, the stdout
--- one is flushed per line, and bash.nix redirects that stdout to a file.
-hl.config({
-	debug = {
-		disable_logs = false,
-		disable_time = false,
-		enable_stdout_logs = true,
-	},
-})
-
 hl.config({
 	misc = {
 		force_default_wallpaper = 0,
