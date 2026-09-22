@@ -8,7 +8,7 @@ Rectangle {
     function displayTime(date) {
         const hours = date.getHours() % 12 || 12;
         const minutes = ("0" + date.getMinutes()).slice(-2);
-        return Qt.formatDate(date, "ddd MMM d") + " " + hours + ":" + minutes;
+        return Qt.formatDate(date, "ddd MMM d") + "   " + hours + ":" + minutes;
     }
 
     width: label.implicitWidth + 18
