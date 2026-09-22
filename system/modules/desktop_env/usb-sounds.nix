@@ -6,9 +6,13 @@
 }:
 
 let
-  # Sounds ripped straight from a real Windows install (sda2, Windows/Media)
-  # so this matches the stock Windows USB connect/disconnect chime exactly.
-  assets = ./assets;
+  # Sounds ripped straight from real Windows installs (Windows/Media) so
+  # this matches the stock Windows USB connect/disconnect chime exactly.
+  # win10 came from the old sda2 install, win11 from the current nvme0n1p3
+  # install (build 26200, 25H2). Both sets are kept in the repo; the
+  # edition option below just picks which one actually plays.
+  edition = config.usbSounds.edition;
+  assets = ./assets + "/${edition}";
   insertWav = "${assets}/Windows Hardware Insert.wav";
   removeWav = "${assets}/Windows Hardware Remove.wav";
 
@@ -51,6 +55,15 @@ let
   };
 in
 {
+  options.usbSounds.edition = lib.mkOption {
+    type = lib.types.enum [
+      "win10"
+      "win11"
+    ];
+    default = "win10";
+    description = "Which ripped Windows sound set to play on USB connect/disconnect.";
+  };
+
   # Only machines with a DE (hyprland.enable) have a user session worth
   # chiming at; headless/server hosts skip this entirely.
   config = lib.mkIf config.hyprland.enable {
