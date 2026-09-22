@@ -4,7 +4,6 @@
 
 {
   imports = [
-    ./gopro-camera.nix
     ./windows-vm.nix
   ];
 
