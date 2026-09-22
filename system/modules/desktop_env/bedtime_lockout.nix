@@ -26,7 +26,7 @@ let
         ${pkgs.util-linux}/bin/runuser -u "$user" -- \
           ${pkgs.coreutils}/bin/env XDG_RUNTIME_DIR="/run/user/$uid" \
             PATH="/home/$user/.nix-profile/bin:/etc/profiles/per-user/$user/bin" \
-            hyprctl dispatch dpms on \
+            hyprctl dispatch 'hl.dsp.dpms({ action = "on" })' \
             >/dev/null 2>&1 || true
       done < ${stateDir}/scopes
     fi
@@ -229,7 +229,7 @@ let
           ${pkgs.util-linux}/bin/runuser -u "$user" -- \
             ${pkgs.coreutils}/bin/env XDG_RUNTIME_DIR="/run/user/$uid" \
               PATH="/home/$user/.nix-profile/bin:/etc/profiles/per-user/$user/bin" \
-              hyprctl dispatch dpms off \
+              hyprctl dispatch 'hl.dsp.dpms({ action = "off" })' \
               >/dev/null 2>&1 || true
 
           printf '%s %s %s\n' "$scope" "$uid" "$user" >> ${stateDir}/scopes

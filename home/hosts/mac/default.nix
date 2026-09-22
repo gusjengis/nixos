@@ -3,6 +3,8 @@
 # aarch64, so the native Discord and Slack packages are unavailable here and
 # the webapp launchers stand in for them. See features/applications/communication.
 {
+  imports = [ ./display-recovery.nix ];
+
   laptop.enable = true;
 
   desktopEnv.enable = true;
