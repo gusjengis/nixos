@@ -5,12 +5,49 @@ hl.monitor({
 	position = "0x0",
 })
 
-hl.monitor({
+local internalMonitor = {
 	output = "eDP-1",
 	mode = "3456x2160@120.00",
 	scale = 2.0,
 	position = "3840x1080",
-})
+}
+
+local function setInternalDisplay(enabled)
+	if enabled then
+		hl.monitor(internalMonitor)
+	else
+		hl.monitor({ output = "eDP-1", disabled = true })
+	end
+end
+
+setInternalDisplay(true)
+
+hl.bind("switch:on:Apple SMC power/lid events", function()
+	setInternalDisplay(false)
+end, { locked = true })
+
+-- Re-enabling a disabled output requires applying the complete monitor config.
+hl.bind("switch:off:Apple SMC power/lid events", hl.dsp.exec_cmd("hyprctl reload"), { locked = true })
+
+local function lidIsClosed()
+	local command =
+		"/run/current-system/sw/bin/busctl get-property org.freedesktop.login1 /org/freedesktop/login1 org.freedesktop.login1.Manager LidClosed"
+	local process = io.popen(command)
+	if not process then
+		return false
+	end
+	local state = process:read("*a")
+	process:close()
+	return state:match("true") ~= nil
+end
+
+-- display-recovery also reloads Hyprland. Reconcile after its scheduled monitor
+-- rules apply so those reloads cannot bring the panel back while the lid is shut.
+hl.timer(function()
+	if lidIsClosed() then
+		setInternalDisplay(false)
+	end
+end, { timeout = 500, type = "oneshot" })
 
 -- Manual fallback for the DCP HDMI link teardown that display-recovery.nix
 -- normally handles on its own. Forces the output down and back up, which is
