@@ -18,6 +18,7 @@
     ./hardware/grub.nix
     ./desktop_env/hyprland.nix
     ./desktop_env/bedtime_lockout.nix
+    ./desktop_env/usb-sounds.nix
     ./software/nvim.nix
     ./software/git.nix
     ./software/ollama.nix

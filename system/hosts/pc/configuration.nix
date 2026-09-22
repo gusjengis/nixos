@@ -3,7 +3,10 @@
 }:
 
 {
-  imports = [ ./windows-vm.nix ];
+  imports = [
+    ./gopro-camera.nix
+    ./windows-vm.nix
+  ];
 
   bedtimeLockout.enable = false;
   nvidia.enable = true;
