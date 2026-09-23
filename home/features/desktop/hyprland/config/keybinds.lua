@@ -18,7 +18,19 @@ bind("SUPER + SHIFT + T", hl.dsp.exec_cmd("qs ipc call launcher tools"), "Tools 
 bind("SUPER + Q", hl.dsp.exec_cmd(vars.terminal), "Launch Terminal")
 bind("SUPER + B", hl.dsp.exec_cmd(vars.browser), "Launch Browser")
 bind("ALT + F4", hl.dsp.window.close(), "Close Program")
-bind("SUPER + F11", hl.dsp.window.fullscreen(), "Fullscreen")
+bind("SUPER + F11", function()
+	local window = hl.get_active_window()
+	if window and window.fullscreen == 1 and window.fullscreen_client == 2 then
+		hl.dispatch(hl.dsp.window.fullscreen_state({
+			internal = 0,
+			client = 0,
+			action = "set",
+			window = "address:" .. window.address,
+		}))
+	else
+		hl.dispatch(hl.dsp.window.fullscreen())
+	end
+end, "Fullscreen")
 bind("SUPER + F", hl.dsp.exec_cmd(vars.fileManager), "Launch File Manager")
 bind("SUPER + V", hl.dsp.window.float(), "Toggle Floating")
 bind("SUPER + W", hl.dsp.exec_cmd("qs ipc call wallpaper toggle"), "Wallpaper Picker")

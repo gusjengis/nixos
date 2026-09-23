@@ -13,6 +13,7 @@ ClippingRectangle {
     property var player: null
     readonly property bool playing: player && player.playbackState === MprisPlaybackState.Playing
     readonly property bool hasProgress: player && player.positionSupported && player.lengthSupported && player.length > 0
+    readonly property bool popupVisible: popup.visible
     readonly property real progress: hasProgress ? Math.max(0, Math.min(1, player.position / player.length)) : 0
 
     readonly property bool hasTrack: player !== null && player.trackTitle !== ""

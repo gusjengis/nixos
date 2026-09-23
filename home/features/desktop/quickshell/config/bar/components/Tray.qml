@@ -7,6 +7,7 @@ import "../../theme"
 RowLayout {
     id: root
 
+    readonly property bool popupVisible: contextMenu.visible
     spacing: 4
 
     TrayMenu { id: contextMenu }

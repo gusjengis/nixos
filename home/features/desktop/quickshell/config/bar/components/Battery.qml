@@ -6,6 +6,7 @@ Rectangle {
     id: root
 
     property var batteryService: null
+    readonly property bool popupVisible: popup.visible
 
     visible: !!batteryService && batteryService.available
     implicitWidth: 34

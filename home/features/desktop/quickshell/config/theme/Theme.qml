@@ -22,7 +22,8 @@ QtObject {
     readonly property color danger: wallpaperColors.danger || "#ef8d8d"
     readonly property color border: wallpaperColors.border || "#344052"
 
-    readonly property int barHeight: 40
+    // Mac notch mode adds 74 physical rows at 2x scale.
+    readonly property int barHeight: 37
     // The bar's tint does not stop at its exclusive zone: BarScrim.qml continues
     // the same ramp below it on the bottom layer, where windows paint over it, so
     // the long fade is only ever visible against the wallpaper. Both surfaces

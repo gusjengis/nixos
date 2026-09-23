@@ -1,60 +1,31 @@
 import QtQuick
-import QtQuick.Layouts
 import Quickshell
 import "../../notifications"
 import "../../theme"
 
-Rectangle {
+Item {
     id: root
 
     required property var notificationService
     required property Item popupAnchor
     readonly property var history: notificationService ? notificationService.history : []
 
-    implicitWidth: content.implicitWidth + 14
-    implicitHeight: 28
-    radius: Theme.radius
-    color: mouse.containsMouse || popup.visible ? Theme.surfaceHover : "transparent"
+    readonly property bool popupVisible: popup.visible
 
-    RowLayout {
-        id: content
-        anchors.centerIn: parent
-        spacing: 4
-
-        Text {
-            text: ""
-            color: root.history.length > 0 ? Theme.accent : Theme.muted
-            font { family: Theme.iconFontFamily; pixelSize: 16 }
+    function toggle(anchorItem) {
+        if (popup.visible) {
+            popup.visible = false;
+            return;
         }
-
-        Text {
-            text: root.history.length.toString()
-            color: root.history.length > 0 ? Theme.accent : Theme.muted
-            font { family: Theme.fontFamily; pixelSize: Theme.fontSize - 1; weight: Font.DemiBold }
-        }
-    }
-
-    MouseArea {
-        id: mouse
-        anchors.fill: parent
-        hoverEnabled: true
-        onClicked: popup.toggle()
+        popup.anchor.item = anchorItem;
+        popup.visible = true;
     }
 
     GuardedPopupWindow {
         id: popup
 
-        function toggle() {
-            if (visible) {
-                visible = false;
-                return;
-            }
-            anchor.item = root;
-            visible = true;
-        }
-
         anchor.rect.x: root.popupAnchor.width
-            - root.mapToItem(root.popupAnchor, 0, 0).x
+            - (anchor.item ? anchor.item.mapToItem(root.popupAnchor, 0, 0).x : 0)
             - width - 10
         anchor.rect.y: Theme.barPopupY(anchor.item)
         implicitWidth: 420

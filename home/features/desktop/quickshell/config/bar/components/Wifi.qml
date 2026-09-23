@@ -11,6 +11,7 @@ Rectangle {
     required property var controls
     readonly property var state: controls.wifi
     readonly property bool busy: controls.actionTarget === "wifi" && controls.action.running
+    readonly property bool popupVisible: popup.visible
 
     implicitWidth: 28
     implicitHeight: 28

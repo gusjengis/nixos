@@ -5,16 +5,21 @@ import "../../theme"
 Rectangle {
     id: root
 
+    required property var notificationService
+    required property Item popupAnchor
+    readonly property bool popupVisible: popup.popupVisible
+
     function displayTime(date) {
         const hours = date.getHours() % 12 || 12;
         const minutes = ("0" + date.getMinutes()).slice(-2);
-        return Qt.formatDate(date, "ddd MMM d") + "   " + hours + ":" + minutes;
+        const period = date.getHours() < 12 ? " AM" : " PM";
+        return Qt.formatDate(date, "ddd MMM d") + "  " + hours + ":" + minutes + period;
     }
 
     width: label.implicitWidth + 18
     height: 28
     radius: Theme.radius
-    color: mouse.containsMouse || popup.visible ? Theme.surfaceHover : "transparent"
+    color: mouse.containsMouse || popup.popupVisible ? Theme.surfaceHover : "transparent"
 
     SystemClock {
         id: clock
@@ -41,8 +46,9 @@ Rectangle {
         onClicked: popup.toggle(root)
     }
 
-    CalendarPopup {
+    NotificationInbox {
         id: popup
-        today: clock.date
+        notificationService: root.notificationService
+        popupAnchor: root.popupAnchor
     }
 }

@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import Quickshell.Hyprland
 import Quickshell.Io
 import "../notifications"
 
@@ -7,6 +8,7 @@ Scope {
     id: root
 
     property bool shown: true
+    property string notchMonitor: ""
 
     function syncHyprlandBarState(): void {
         Quickshell.execDetached([
@@ -18,6 +20,27 @@ Scope {
 
     onShownChanged: syncHyprlandBarState()
     Component.onCompleted: syncHyprlandBarState()
+
+    FileView {
+        id: notchMonitorFile
+        path: (Quickshell.env("XDG_DATA_HOME") || Quickshell.env("HOME") + "/.local/share")
+            + "/quickshell/notch-monitor"
+        preload: true
+        blockLoading: true
+        watchChanges: true
+        printErrors: false
+        onFileChanged: reload()
+        onLoaded: root.notchMonitor = text().trim()
+    }
+
+    Connections {
+        target: Hyprland
+        function onRawEvent(event) {
+            const relevant = ["fullscreen", "workspace", "workspacev2", "movewindow", "movewindowv2"];
+            if (relevant.indexOf(event.name) !== -1)
+                Hyprland.refreshToplevels();
+        }
+    }
 
     UsageService { id: usageService }
     BatteryService { id: batteryService }
@@ -58,6 +81,7 @@ Scope {
                 required property var modelData
                 screen: modelData
                 shown: root.shown
+                notchMonitor: root.notchMonitor
                 hugeMargins: monitorModes.hugeMargins[modelData.name] === true
                 usage: usageService.usage
                 refreshUsage: () => usageService.refresh()

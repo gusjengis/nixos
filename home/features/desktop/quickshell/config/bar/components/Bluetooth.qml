@@ -13,6 +13,7 @@ Rectangle {
     readonly property var deviceList: state.devices || []
     readonly property bool connected: deviceList.some(device => device.connected)
     readonly property bool busy: controls.actionTarget === "bluetooth" && controls.action.running
+    readonly property bool popupVisible: popup.visible
 
     implicitWidth: 28
     implicitHeight: 28

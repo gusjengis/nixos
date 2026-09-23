@@ -9,6 +9,7 @@ Rectangle {
     required property var usage
     required property bool accountBusy
     required property string accountError
+    readonly property bool popupVisible: popup.visible
     signal refreshRequested()
     signal accountRequested(string profile, bool saved)
 

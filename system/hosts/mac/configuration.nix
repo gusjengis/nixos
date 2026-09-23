@@ -31,7 +31,23 @@ in
     "nix-command"
     "flakes"
   ];
-  boot.loader.efi.canTouchEfiVariables = false;
+  grub.enable = true;
+  boot.loader = {
+    efi.canTouchEfiVariables = false;
+    systemd-boot.enable = false;
+    grub = {
+      configurationLimit = 3;
+      efiInstallAsRemovable = true;
+      extraPrepareConfig = lib.mkAfter ''
+        grubCore="@bootPath@/grub/arm64-efi/core.efi"
+        efiFallback="@bootPath@/EFI/BOOT/BOOTAA64.EFI"
+        if [ ! -e "$grubCore" ] || ! ${pkgs.diffutils}/bin/cmp -s "$grubCore" "$efiFallback"; then
+          ${pkgs.coreutils}/bin/rm -f "@bootPath@/grub/state"
+        fi
+      '';
+    };
+  };
+  boot.kernelParams = [ "appledrm.show_notch=1" ];
   networking.networkmanager.wifi.backend = "iwd";
 
   hardware.graphics = {

@@ -8,6 +8,9 @@
   laptop.enable = true;
 
   desktopEnv.enable = true;
+  # Hardware capability marker consumed by Quickshell. Other hosts have no
+  # marker, so their fullscreen and bar behavior stays unchanged.
+  xdg.dataFile."quickshell/notch-monitor".text = "eDP-1\n";
   dev.enable = true;
   gaming.enable = false;
   gameDev.enable = false;

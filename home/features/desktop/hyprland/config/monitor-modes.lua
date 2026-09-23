@@ -1,6 +1,7 @@
 local M = {}
 
 local hugeMarginsByMonitor = {}
+local fullscreenByMonitor = {}
 local rulesByMonitor = {}
 local barRulesByMonitor = {}
 -- Quickshell starts with the bar shown; use the same state before its IPC sync
@@ -43,9 +44,18 @@ function M.set_bar_visible(visible)
 	barVisible = visible
 	for name, rules in pairs(barRulesByMonitor) do
 		for _, rule in ipairs(rules) do
-			rule:set_enabled(hugeMarginsByMonitor[name] and barVisible)
+			rule:set_enabled(hugeMarginsByMonitor[name] and not fullscreenByMonitor[name] and barVisible)
 		end
 	end
+end
+
+function M.set_fullscreen(name, fullscreen)
+	if hugeMarginsByMonitor[name] == nil then
+		return
+	end
+
+	fullscreenByMonitor[name] = fullscreen
+	setRulesEnabled(name, hugeMarginsByMonitor[name] and not fullscreen)
 end
 
 function M.toggle()
@@ -55,13 +65,14 @@ function M.toggle()
 	end
 
 	hugeMarginsByMonitor[monitor.name] = not hugeMarginsByMonitor[monitor.name]
-	setRulesEnabled(monitor.name, hugeMarginsByMonitor[monitor.name])
+	setRulesEnabled(monitor.name, hugeMarginsByMonitor[monitor.name] and not fullscreenByMonitor[monitor.name])
 	writeState()
 end
 
 function M.configure(monitors)
 	for name, mode in pairs(monitors) do
 		hugeMarginsByMonitor[name] = mode.enabled
+		fullscreenByMonitor[name] = false
 		rulesByMonitor[name] = {}
 		table.insert(
 			rulesByMonitor[name],

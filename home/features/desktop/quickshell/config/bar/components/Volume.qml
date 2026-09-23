@@ -15,6 +15,7 @@ Rectangle {
     readonly property bool muted: sink && sink.audio ? sink.audio.muted : false
     readonly property bool inputMuted: sourceNode && sourceNode.audio ? sourceNode.audio.muted : false
     readonly property real inputVolume: sourceNode && sourceNode.audio ? sourceNode.audio.volume : 0
+    readonly property bool popupVisible: popup.visible
 
     implicitWidth: 28
     implicitHeight: 28
