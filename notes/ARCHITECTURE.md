@@ -10,9 +10,10 @@ private secrets repository; manually installed software is considered a bug.
 ```text
 flake.nix                 inputs, pins, and all flake outputs
 system/
-  hosts/default.nix       machine roster and machine-id mapping
-  hosts/<host>/           NixOS and hardware configuration per machine
+  hosts/default.nix       roster discovery; machines are the directories beside it
+  hosts/<host>/           meta, hardware report, disk layout, NixOS configuration
   modules/                shared NixOS modules
+  install/                the installer, and the data it derives its questions from
 home/
   default.nix             shared Home Manager configuration
   hosts/<host>/           per-machine Home Manager settings
@@ -27,24 +28,31 @@ work from implicitly upgrading the operating system.
 
 ## Machine Identity
 
-Every machine reports hostname `nixos`, so `/etc/machine-id` selects its flake
-output. `system/hosts/default.nix` maps each ID to a host name, architecture,
-and description. `rehome` and `rebuild` perform this lookup and also accept an
-explicit host name for fresh installations:
+A machine's roster key is its NixOS hostname and its Tailscale node name at
+once, so `hostname` selects its flake output. `rehome` and `rebuild` perform
+that lookup and also accept an explicit host name, which matters during
+recovery when the runtime hostname is not yet correct:
 
 ```bash
 rehome t480s
 rebuild t480s
 ```
 
-A reinstall changes machine-id. Use an explicit host until the roster is
-updated.
+The roster is discovered rather than listed. Every directory under
+`system/hosts/` containing a `meta.nix` is a machine, and that file holds the
+architecture, the description, and the services worth naming. Adding a machine
+is creating a directory, which is what the installer does; no shared file is
+edited, so two machines enrolled independently never conflict.
 
 ## Outputs
 
 ```text
-homeConfigurations.<host>    Home Manager for gusjengis on all eight machines
+homeConfigurations.<host>    Home Manager for gusjengis on every machine
 nixosConfigurations.<host>   NixOS for each system-managed machine
+roleCatalogs.<host>          Installable modules and their values for that host
+packages.<system>.install    The installer
+apps.<system>.install        `nix run .#install`
+checks.<system>              Installer build, installer lint, catalog consistency
 ```
 
 Home Manager imports `home/features`, then `home/hosts/<host>`. Host files set
@@ -87,6 +95,55 @@ the diff it prints, then `rebuild`.
 
 The updater never pulls a dirty `/etc/nixos` checkout. Application-written
 configuration therefore remains visible for review instead of being overwritten.
+
+Home Manager is standalone and never evaluates a NixOS configuration, so it
+cannot read `repo.hardware.detected`. It reads the same committed report
+directly through `system/install/lib/facter.nix`, which is also what the
+installer uses. That shared helper is why `laptop.enable` has one definition
+rather than three.
+
+Portable hardware is detected from the SMBIOS chassis type, not from
+`hardware.system.form_factor`. Facter reports `form_factor` as `laptop` on
+every machine in this fleet, the desktops included, so it cannot distinguish
+anything.
+
+## Installation
+
+`nix run .#install` installs a new machine end to end. See `INSTALL.md` for
+using it; this is how it fits together.
+
+The installer does not know what modules exist. `system/install/catalog.nix`
+walks the evaluated NixOS and Home Manager option trees and keeps boolean
+`*.enable` options that are declared inside this repository and outside
+`system/hosts/` and `home/hosts/`. The first filter removes the roughly sixteen
+thousand upstream options; the second removes machine-specific modules, which
+is why `immich.enable` is alpha's business and never a question asked of some
+other machine.
+
+The value reported for each module is the *effective* value for the host being
+installed, not the option's declared default. For a new machine that is what
+the shared modules default to. For a machine already on the roster it is that
+machine's current configuration, which is how reinstalling one offers its own
+settings back without a special case.
+
+`system/install/roles.nix` holds only what the module system has nowhere to
+put: categories, short flag names, and summaries written for someone choosing
+at install time. All of it is checked against the discovered modules, so an
+entry naming an option that no longer exists fails evaluation rather than
+quietly describing something gone. `nix flake check` evaluates every host's
+catalog, so that check runs without installing anything.
+
+New machines are partitioned by Disko from a named layout in
+`system/install/lib/layouts.nix`, and have no generated
+`hardware-configuration.nix`: Disko supplies `fileSystems` and Facter supplies
+the kernel and initrd modules. The machines that predate the installer keep
+theirs, and their `disk.nix` files stay `disko.enableConfig = false`,
+describing a layout that already exists rather than one to create.
+
+Home Manager activation happens on first boot through
+`system/modules/software/first-boot.nix`, with its closure already built into
+the store during installation. The unit is conditioned on a marker file the
+installer writes, so it is inert on every machine that was not just installed.
 
 ## Editable Configuration
 

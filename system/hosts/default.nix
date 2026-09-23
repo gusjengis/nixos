@@ -5,118 +5,28 @@
 # an untracked file any more.
 #
 # The roster key is both the NixOS hostname and the Tailscale node name.
-{
-  pc = {
-    system = "x86_64-linux";
-    description = "Main desktop. Gaming, game development, 3D printing, Windows VM host.";
-    services = [
-      {
-        unit = "libvirtd.service";
-        label = "Windows VM host";
-      }
-      {
-        unit = "docker.service";
-        label = "Container runtime";
-      }
-    ];
-  };
+#
+# The roster is discovered rather than hand-written: every directory beside
+# this file that contains a `meta.nix` is a machine. Adding a host is therefore
+# creating a directory, which is what the installer does. Nothing has to edit a
+# shared file, so two machines enrolled independently never conflict here.
+#
+# Each `meta.nix` evaluates to:
+#
+#   { system; description; services = [ { unit; label; } ]; systemManaged ? true; }
+#
+# `systemManaged = false` keeps a machine in the Home Manager roster without
+# building a NixOS configuration for it.
+let
+  entries = builtins.readDir ./.;
 
-  alpha = {
-    system = "x86_64-linux";
-    description = "Headless desktop server.";
-    services = [
-      {
-        unit = "nfs-server.service";
-        label = "Fleet data drive";
-      }
-      {
-        unit = "immich-server.service";
-        label = "Immich photo library";
-      }
-      {
-        unit = "phpfpm-nextcloud.service";
-        label = "Nextcloud";
-      }
-      {
-        unit = "parakeet-asr.service";
-        label = "GPU speech recognition";
-      }
-      {
-        unit = "ultrabridge.service";
-        label = "UltraBridge device sync";
-      }
-    ];
-  };
+  isHost = name: entries.${name} == "directory" && builtins.pathExists (./. + "/${name}/meta.nix");
 
-  omega = {
-    system = "x86_64-linux";
-    description = "Headless desktop server.";
-    services = [
-      {
-        unit = "docker.service";
-        label = "Container runtime";
-      }
-    ];
-  };
-
-  legion = {
-    system = "x86_64-linux";
-    description = "Laptop with the full desktop.";
-    services = [
-      {
-        unit = "docker.service";
-        label = "Container runtime";
-      }
-    ];
-  };
-
-  mac = {
-    system = "aarch64-linux";
-    description = "Apple Silicon laptop running Asahi, with the full desktop.";
-    services = [
-      {
-        unit = "tailscale-advertise-routes.service";
-        label = "Office network gateway";
-      }
-    ];
-  };
-
-  t480s = {
-    system = "x86_64-linux";
-    description = "ThinkPad T480s with the full desktop.";
-    services = [ ];
-  };
-
-  t470 = {
-    system = "x86_64-linux";
-    description = "ThinkPad T470, headless.";
-    services = [
-      {
-        unit = "podman-homeassistant.service";
-        label = "Home Assistant";
-      }
-      {
-        unit = "musicassistant.service";
-        label = "Music Assistant";
-      }
-      {
-        unit = "podman-ble-scale-sync.service";
-        label = "BLE scale sync";
-      }
-      {
-        unit = "podman-zone-configurator.service";
-        label = "Zone configurator";
-      }
-      {
-        unit = "joshs-mass.service";
-        label = "Josh's Music Assistant";
-      }
-    ];
-  };
-
-  zombie = {
-    system = "x86_64-linux";
-    description = "Headless laptop.";
-    services = [ ];
-  };
-}
+  hostNames = builtins.filter isHost (builtins.attrNames entries);
+in
+builtins.listToAttrs (
+  map (name: {
+    inherit name;
+    value = import (./. + "/${name}/meta.nix");
+  }) hostNames
+)

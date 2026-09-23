@@ -12,6 +12,7 @@
 {
   imports = [
     ./features
+    ./policy/hardware.nix
     ./policy/insecure-packages.nix
     ./hosts/${hostName}
   ];

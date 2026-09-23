@@ -151,49 +151,74 @@ adding Disko changes no existing host's boot or filesystem configuration.
 
 ### 4. Phase 4: Installer flake app
 
-- [ ] Add an explicit role catalog in Nix: option name, description, group,
-  default, and whether it belongs to NixOS or Home Manager.
-- [ ] Assert catalog options exist. Do not revive the old script's fragile awk
-  parsing of `mkEnableOption` source text.
-- [ ] Export catalog JSON for the installer TUI.
-- [ ] Add `apps.<system>.install` using `writeShellApplication` with pinned
-  runtime dependencies: Git, Disko, NixOS Facter, jq, util-linux, and required
-  terminal tools.
-- [ ] Preserve interactive multi-select and useful previews from the old
-  installer's native TUI, but keep installation policy in Nix data.
-- [ ] Support new-host enrollment and reinstalling an existing roster host.
-- [ ] Ask for explicit destructive disk confirmation including device model,
-  size, and current partitions.
-- [ ] Generate and stage the roster entry, system host module, home host module,
-  Disko config, and facter report. Flakes ignore untracked Git files.
-- [ ] Run Disko, then `nixos-install --flake path:/mnt/etc/nixos#<host>`.
-- [ ] Install the repository at `/mnt/etc/nixos`, owned by `gusjengis` but not
-  writable by unrelated users because root later evaluates it.
-- [ ] Add `apps.<system>.enroll` for an already-running NixOS machine without
-  repartitioning.
-- [ ] Handle user password setup explicitly; do not ship a reusable initial
-  password or password hash.
-- [ ] Detect whether Secure Boot, disk encryption, swap, hibernation, or dual
-  boot need installer questions before choosing defaults.
+- [x] Derive the role catalog from the evaluated NixOS and Home Manager option
+      trees rather than declaring it. `system/install/catalog.nix` walks both
+      trees and keeps boolean `*.enable` options declared inside this
+      repository and outside `system/hosts/` and `home/hosts/`, which is what
+      excludes machine-specific modules such as `immich.enable` without
+      listing them anywhere.
+- [x] Assert consistency instead of parsing source text. Metadata naming an
+      option that no longer exists, two roles claiming one flag name, or a role
+      in an unknown category all fail evaluation. `nix flake check` evaluates
+      every host's catalog, so the check runs without an installation.
+- [x] Export the catalog as JSON through `roleCatalogs.<host>`.
+- [x] Add `apps.<system>.install`. It is a Python program, not a shell script:
+      `system/install/installer`, packaged by `system/install/package.nix` with
+      Disko, nixos-install-tools, nixos-facter, util-linux, git, openssh, nix
+      and shadow pinned onto its PATH.
+- [x] Replace the old native multi-select with a Textual interface whose tabs
+      are the decisions: host, disk, modules, accounts, secrets, review.
+      Categories are toggleable headers with their modules nested underneath.
+- [x] Make every decision available as a flag, so a batch of machines needs no
+      interface at all. Modules are `--<module>=true|false`, categories are
+      `--group-<id>=true|false`, and `--list-modules` prints both.
+- [x] Reinstall an existing roster host by evaluating that host's catalog,
+      which reports its current selections as the defaults. No special case:
+      it is the same code path a new machine takes.
+- [x] Confirm destruction with device, model, size, and current partitions.
+- [x] Generate the roster entry, host module, home module, Disko
+      configuration, and Facter report. Evaluated over `path:` rather than
+      `git+file:`, which is what makes the untracked scaffold visible.
+- [x] Run Disko, then `nixos-install --flake path:<workspace>#<host>`.
+- [x] Install the repository at `/etc/nixos`, owned by `gusjengis` and not
+      group- or world-writable.
+- [x] Take passwords for both accounts, with a checkbox for using one for
+      both. Set through `chpasswd` on stdin inside `nixos-enter`; no hash is
+      ever written to a tracked file.
+- [x] Decide the remaining hardware questions: no encryption, no Secure Boot,
+      no hibernation. See "Deliberately out of scope" below.
+- [x] Fix `laptop.enable` to follow detected hardware rather than an answer.
+      It reads the SMBIOS chassis type through `system/install/lib/facter.nix`.
+- [ ] Install a real machine from a real ISO.
+
+Dropped: `apps.<system>.enroll`. Adopting an already-installed machine is not
+a case that has come up, and the installer is smaller without it.
 
 Stop condition: a stock NixOS ISO can install a new x86 machine using only the
 single `nix run github:gusjengis/nixos#install` entry point after networking.
 
 ### 5. Phase 5: First boot
 
-- [ ] Keep Home Manager standalone so its nixpkgs pin and fast user-only
-  iteration remain independent from NixOS.
-- [ ] Add a root or user oneshot guarded by a persistent completion marker such
-  as `/var/lib/nixos-config/first-boot-complete`.
-- [ ] Transfer GitHub/secrets bootstrap credentials without placing them in the
-  Nix store or repository. Use mode `0600`; delete bootstrap credentials after
-  successful use.
-- [ ] Clone `~/.config/secrets`, then run Home Manager for the selected host.
-- [ ] Run repository synchronization only after secrets and GitHub
-  authentication are ready.
-- [ ] Write the completion marker only after all required steps succeed, so a
-  failed first boot retries safely.
-- [ ] Ensure normal rebuilds and logins never display installer questions.
+Mostly absorbed into Phase 4. Secrets arrive during installation rather than
+through a credential handoff, so there is nothing to transfer and no bootstrap
+credential to delete afterwards.
+
+- [x] Keep Home Manager standalone.
+- [x] Clone `~/.config/secrets` during installation, using the GitHub token the
+      installer was given. One token is enough for a finished machine: the
+      checkout carries the personal access token the shell exports, the SSH
+      keys, the SMB credentials, and the Tailscale auth key that
+      `tailscale-autoconnect.service` reads, so the machine joins the tailnet
+      by itself.
+- [x] Build the Home Manager closure into the new system's store during
+      installation, so first boot activates rather than compiles.
+- [x] Activate on first boot through `system/modules/software/first-boot.nix`,
+      conditioned on `/var/lib/nixos-install/pending-home-manager`. The unit is
+      inert on every machine that was not just installed, and a failure leaves
+      the marker in place so the next boot retries.
+- [x] Normal rebuilds and logins never show installer questions: there is no
+      enable option and nothing runs without the marker.
+- [ ] Confirm on real hardware that first boot reaches the desktop.
 
 Stop condition: first boot reaches the configured desktop or headless state
 without manual Home Manager commands, and later boots do not repeat setup.
@@ -201,14 +226,80 @@ without manual Home Manager commands, and later boots do not repeat setup.
 ### 6. Phase 6: Cleanup and documentation
 
 - [ ] Archive `gusjengis/nix-install-script`; replace its README with a pointer
-  to this repository.
-- [ ] Remove `nix-install-script` from
-  `home/features/repo-sync/repos/dev.list`.
-- [ ] Add `INSTALL.md` containing only the supported ISO flow, recovery flow,
-  Mac/Asahi exception, and rollback instructions.
-- [ ] Update `ARCHITECTURE.md` after installer and first-boot behavior exist.
+      to this repository. Needs doing on GitHub, not here.
+- [x] Remove `nix-install-script` from
+      `home/features/repo-sync/repos/dev.list`.
+- [x] Add `notes/INSTALL.md` containing the supported ISO flow, the
+      non-interactive flow, reinstalling an existing host, the Mac/Asahi
+      exception, and what to do when a step fails.
+- [x] Update `ARCHITECTURE.md`. Its machine-identity section still described
+      the machine-id lookup that Phase 1 removed; that is corrected, and the
+      installer and first-boot behaviour are documented.
 - [ ] Test the documented process in a disposable VM before using physical
-  hardware.
+      hardware.
+
+## Deliberately Out Of Scope
+
+Decided while building Phase 4. Recorded because each one is cheap to add
+later only if the reason it was skipped is written down.
+
+### Disk encryption (LUKS)
+
+Not wanted. It protects data at rest on stolen hardware, and costs a
+passphrase prompt at every boot. That prompt is fatal for the headless
+machines, which would hang at boot waiting for a keyboard that is not there.
+TPM auto-unlock and initrd network unlock both exist and are both real
+complexity for a threat this fleet does not have.
+
+Worth knowing: this cannot be added to a machine afterwards without
+reinstalling it. Adding it later means a new entry in
+`system/install/lib/layouts.nix` and reinstalling the machines that want it.
+
+### Hibernation
+
+Wanted eventually, not now.
+
+Hibernation writes RAM to swap and powers off completely, so a laptop can stay
+closed for a week without draining. It is different from the suspend the lids
+currently do, which keeps RAM powered.
+
+It is impossible on this fleet as it stands: every machine uses
+`zramSwap.enable`, which is compressed swap inside RAM, and there is no disk
+swap anywhere. Hibernation needs a swap area at least the size of RAM plus
+`boot.resumeDevice`.
+
+To add it:
+
+1. Add a `swap` layout to `system/install/lib/layouts.nix` with a swap
+   partition sized to RAM, and set `boot.resumeDevice` from it.
+2. Existing machines need repartitioning or a swap *file*, which also works
+   but needs `boot.resumeOffset`.
+3. Expect trouble on the NVIDIA machines (`pc`, `alpha`, `zombie`); resume
+   with the proprietary driver has historically been unreliable.
+
+The layout is behind a name specifically so this is an additive change.
+
+### Secure Boot
+
+Not wanted. It needs `lanzaboote` and enrolling custom keys into each
+machine's firmware, and buys boot-chain integrity enforcement that nothing
+here asks for.
+
+## Known Problems
+
+### The Git history is about 1.45 GiB
+
+`git count-objects -vH` reports 1.45 GiB packed, against a working tree of
+roughly 6 MB of real content. Something large is in the history, most likely
+wallpapers from before they moved to the Wallpapers repository.
+
+This is a tax on every installation and every `update`. The installer works
+around it by cloning with `--depth 1` and only deepening when it has something
+to push, but the underlying problem is still there.
+
+Fixing it means `git filter-repo` over the history and a force-push, which
+rewrites every commit hash and requires every machine in the fleet to re-clone.
+It is worth doing as its own piece of work, not folded into something else.
 
 ## Design Decisions
 
@@ -224,9 +315,40 @@ without manual Home Manager commands, and later boots do not repeat setup.
 
 ## Resume Checklist
 
-1. Read this file and `ARCHITECTURE.md`.
-2. Inspect `git status` and recent commits; Phase 1 may still be uncommitted.
+1. Read this file, `INSTALL.md`, and `ARCHITECTURE.md`.
+2. Inspect `git status` and recent commits.
 3. Verify all eight nodes are reachable with `tailscale status` before fleet
    changes.
-4. Continue with Phase 2, preserving each stop condition.
+4. What is left is testing: install a real machine from a real ISO, confirm
+   first boot reaches the desktop, then archive the old install script
+   repository on GitHub.
 5. Update this file as tasks complete or new blockers appear.
+
+## Verifying a change to the installer
+
+```bash
+# Everything that does not need hardware.
+nix flake check
+
+# Modules, their flags and their defaults, without root.
+nix run .#install -- --list-modules --source /etc/nixos
+
+# Resolve every decision and show the files that would be written.
+nix run .#install -- --dry-run --yes --source /etc/nixos \
+  --host test --disk /dev/sda --password x --github-token y
+
+# Prove the generated machine is real.
+nix build path:/tmp/nixos-install#nixosConfigurations.test.config.system.build.toplevel
+```
+
+When changing anything that touches the shared modules, take derivation paths
+for all eight machines before and after and diff them. An unexplained change
+there means a machine is about to be rebuilt for a reason nobody intended:
+
+```bash
+for h in pc alpha omega legion mac t480s t470 zombie; do
+  printf '%s ' "$h"
+  nix eval --raw ".#nixosConfigurations.$h.config.system.build.toplevel.drvPath"
+  echo
+done
+```

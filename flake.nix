@@ -119,6 +119,16 @@
 
       nixosConfigurationFor =
         hostName: host:
+        let
+          hostDir = ./system/hosts + "/${hostName}";
+
+          # Machines installed by `nix run .#install` have no generated
+          # hardware-configuration.nix: Disko owns their `fileSystems` and
+          # Facter supplies their kernel and initrd modules. The machines that
+          # predate the installer keep theirs, so this import stays optional
+          # rather than becoming required of new hosts.
+          generatedHardware = hostDir + "/hardware-configuration.nix";
+        in
         nixpkgs-system.lib.nixosSystem {
           system = host.system;
           specialArgs = {
@@ -128,20 +138,101 @@
           modules = [
             inputs.disko.nixosModules.disko
             {
-              hardware.facter.reportPath = ./system/hosts/${hostName}/facter.json;
+              hardware.facter.reportPath = hostDir + "/facter.json";
             }
-            (./system/hosts + "/${hostName}/disk.nix")
-            (./system/hosts + "/${hostName}/hardware-configuration.nix")
-            (./system/hosts + "/${hostName}/configuration.nix")
+            (hostDir + "/disk.nix")
+          ]
+          ++ lib.optional (builtins.pathExists generatedHardware) generatedHardware
+          ++ [
+            (hostDir + "/configuration.nix")
             ./system/modules
           ];
         };
+
+      # The installer's question list. See system/install/catalog.nix: this is
+      # derived from the evaluated option trees, so it cannot describe a module
+      # that no longer exists.
+      catalog = import ./system/install/catalog.nix {
+        inherit lib;
+        sourceRoot = ./.;
+        roles = import ./system/install/roles.nix;
+      };
+
+      roleCatalogFor =
+        hostName: host:
+        catalog.forHost {
+          inherit hostName;
+          meta = host;
+          nixosOptions =
+            if systemHosts ? ${hostName} then self.nixosConfigurations.${hostName}.options else { };
+          homeOptions = self.homeConfigurations.${hostName}.options;
+        };
+
+      installerFor =
+        system:
+        (pkgsFor system).callPackage ./system/install/package.nix {
+          repoUrl = "https://github.com/gusjengis/nixos.git";
+        };
+
+      self = {
+        homeConfigurations = lib.mapAttrs homeConfigurationFor hosts;
+        nixosConfigurations = lib.mapAttrs nixosConfigurationFor systemHosts;
+
+        roleCatalogs = lib.mapAttrs roleCatalogFor hosts;
+
+        # Facts the installer needs before any host configuration exists.
+        installer = {
+          # What a machine installed today should pin `system.stateVersion` to.
+          # Read from the system nixpkgs rather than hardcoded, so it cannot go
+          # stale the way a literal in a template would.
+          stateVersion = nixpkgs-system.lib.trivial.release;
+        };
+
+        packages = lib.genAttrs systems (system: {
+          install = installerFor system;
+        });
+
+        apps = lib.genAttrs systems (system: {
+          install = {
+            type = "app";
+            program = lib.getExe (installerFor system);
+            meta.description = "Install this configuration onto this machine";
+          };
+          default = self.apps.${system}.install;
+        });
+
+        devShells = lib.genAttrs systems (system: {
+          default = devShellFor system;
+        });
+
+        checks = lib.genAttrs systems (
+          system:
+          let
+            pkgs = pkgsFor system;
+
+            hostsFor = lib.filterAttrs (_: host: host.system == system) hosts;
+          in
+          {
+            # Builds the installer, which also runs its tests.
+            installer = installerFor system;
+
+            installer-lint = pkgs.runCommand "installer-lint" { nativeBuildInputs = [ pkgs.ruff ]; } ''
+              cd ${./system/install/installer}
+              ruff check --no-cache .
+              ruff format --no-cache --check .
+              touch $out
+            '';
+
+            # Evaluating every host's catalog is what enforces the consistency
+            # assertions in system/install/catalog.nix, so `nix flake check`
+            # catches metadata that names a module which has been renamed away.
+            role-catalogs = pkgs.writeTextFile {
+              name = "role-catalogs";
+              text = builtins.toJSON (lib.mapAttrs (name: _: self.roleCatalogs.${name}) hostsFor);
+            };
+          }
+        );
+      };
     in
-    {
-      homeConfigurations = lib.mapAttrs homeConfigurationFor hosts;
-      nixosConfigurations = lib.mapAttrs nixosConfigurationFor systemHosts;
-      devShells = lib.genAttrs systems (system: {
-        default = devShellFor system;
-      });
-    };
+    self;
 }
