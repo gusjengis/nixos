@@ -29,6 +29,10 @@ use rand::Rng;
 use serde::{Deserialize, Serialize};
 
 const EXTENSIONS: &[&str] = &["avif", "gif", "jpeg", "jpg", "png", "webp"];
+// Assumed when the wallpaper can't be sampled (unreadable file, no `magick` on
+// PATH). Dark, matching the palette's own dark-mode-only default, so the bar
+// fails toward its historical always-white-content behaviour.
+const DEFAULT_BAR_LUMINANCE: f64 = 0.08;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct Palette {
@@ -44,6 +48,50 @@ struct Palette {
     warning: String,
     danger: String,
     border: String,
+}
+
+/// What actually gets written to colors.json: the cached matugen palette (used
+/// by popups and other surfaces that sit on their own opaque-ish backing) plus
+/// `barLuminance`, which the bar's floating content - text and icons with no
+/// backing of their own - uses to decide between light and dark content and
+/// how strong a scrim it needs, the same problem macOS's auto menu bar solves.
+/// Kept as its own struct rather than folded into Palette: Palette also
+/// doubles as metadata.json's cache schema, and barLuminance is never cached
+/// there since it comes from a live pixel sample, not matugen.
+#[derive(Debug, Clone, Serialize)]
+struct ColorsFile {
+    background: String,
+    surface: String,
+    #[serde(rename = "surfaceHover")]
+    surface_hover: String,
+    text: String,
+    muted: String,
+    accent: String,
+    #[serde(rename = "accentStrong")]
+    accent_strong: String,
+    warning: String,
+    danger: String,
+    border: String,
+    #[serde(rename = "barLuminance")]
+    bar_luminance: f64,
+}
+
+impl ColorsFile {
+    fn new(palette: &Palette, bar_luminance: f64) -> Self {
+        ColorsFile {
+            background: palette.background.clone(),
+            surface: palette.surface.clone(),
+            surface_hover: palette.surface_hover.clone(),
+            text: palette.text.clone(),
+            muted: palette.muted.clone(),
+            accent: palette.accent.clone(),
+            accent_strong: palette.accent_strong.clone(),
+            warning: palette.warning.clone(),
+            danger: palette.danger.clone(),
+            border: palette.border.clone(),
+            bar_luminance,
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -373,14 +421,85 @@ fn cached_palette(paths: &Paths, filename: &str) -> Option<Palette> {
     serde_json::from_value(palette_value).ok()
 }
 
-fn write_colors(paths: &Paths, colors: &Palette) -> io::Result<()> {
-    let json = serde_json::to_string(colors).unwrap();
+/// Relative luminance (WCAG, sRGB gamma-corrected) of a single RGB triple in
+/// the 0..1 range, where 0 is black and 1 is white.
+fn relative_luminance(r: f64, g: f64, b: f64) -> f64 {
+    fn linearize(channel: f64) -> f64 {
+        if channel <= 0.04045 {
+            channel / 12.92
+        } else {
+            ((channel + 0.055) / 1.055).powf(2.4)
+        }
+    }
+    0.2126 * linearize(r) + 0.7152 * linearize(g) + 0.0722 * linearize(b)
+}
+
+/// Parses ImageMagick's `%[pixel:...]` output, e.g. "srgb(7.1%,8%,13.6%)" or
+/// "srgb(114,133,158)" (percent vs. 0-255 depending on image depth/format).
+fn parse_pixel_luminance(text: &str) -> Option<f64> {
+    let start = text.find('(')?;
+    let end = text.find(')')?;
+    let mut channels = text[start + 1..end].split(',').map(str::trim);
+    let mut channel = || -> Option<f64> {
+        let raw = channels.next()?;
+        if let Some(percent) = raw.strip_suffix('%') {
+            percent.trim().parse::<f64>().ok().map(|v| v / 100.0)
+        } else {
+            raw.parse::<f64>().ok().map(|v| v / 255.0)
+        }
+    };
+    let r = channel()?;
+    let g = channel()?;
+    let b = channel()?;
+    Some(relative_luminance(r, g, b))
+}
+
+/// Samples the strip of the wallpaper that actually sits behind the bar - the
+/// top of the image, "cover"-fit wallpapers keep that anchored to the top of
+/// the screen - and averages it down to one pixel with ImageMagick. A
+/// generous 10% strip (the bar itself is a couple of percent of a typical
+/// screen's height) keeps this forgiving of monitors with a taller bar or a
+/// slightly different aspect ratio than the wallpaper.
+///
+/// This is a live pixel sample, not a cache: unlike the matugen palette it
+/// costs no backfill step and never misses, only fails if the file cannot be
+/// decoded at all - the None case just leaves the previous barLuminance in
+/// place, matching how a matugen cache miss leaves colors.json untouched.
+fn sample_bar_luminance(path: &Path) -> Option<f64> {
+    let output = Command::new("magick")
+        .args([
+            path.to_string_lossy().as_ref(),
+            "-auto-orient",
+            "-gravity",
+            "North",
+            "-crop",
+            "100%x10%+0+0",
+            "+repage",
+            "-colorspace",
+            "sRGB",
+            "-resize",
+            "1x1!",
+            "-format",
+            "%[pixel:p{0,0}]",
+            "info:",
+        ])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    parse_pixel_luminance(&String::from_utf8_lossy(&output.stdout))
+}
+
+fn write_colors(paths: &Paths, colors: &Palette, bar_luminance: f64) -> io::Result<()> {
+    let file = ColorsFile::new(colors, bar_luminance);
+    let json = serde_json::to_string(&file).unwrap();
     write_atomic(&paths.colors_file, &json)
 }
 
-fn write_state(paths: &Paths, path: &Path, colors: Option<&Palette>) -> io::Result<()> {
+fn write_state(paths: &Paths, path: &Path, colors: Option<&Palette>, bar_luminance: f64) -> io::Result<()> {
     if let Some(colors) = colors {
-        write_colors(paths, colors)?;
+        write_colors(paths, colors, bar_luminance)?;
     }
     write_atomic(&paths.current_file, &format!("{}\n", path.display()))
 }
@@ -415,7 +534,8 @@ fn palette_for(paths: &Paths, requested: &Path) -> Option<Palette> {
 fn commit_wallpaper(paths: &Paths, available: &[PathBuf], raw_path: &str) -> Result<PathBuf, String> {
     let requested = resolve_wallpaper(paths, available, raw_path)?;
     let colors = palette_for(paths, &requested);
-    write_state(paths, &requested, colors.as_ref()).map_err(|e| e.to_string())?;
+    let bar_luminance = sample_bar_luminance(&requested).unwrap_or(DEFAULT_BAR_LUMINANCE);
+    write_state(paths, &requested, colors.as_ref(), bar_luminance).map_err(|e| e.to_string())?;
     Ok(requested)
 }
 
@@ -436,11 +556,12 @@ fn set_wallpaper(paths: &Paths, available: &[PathBuf], raw_path: &str, persist: 
     }
 
     let colors = palette_for(paths, &requested);
+    let bar_luminance = sample_bar_luminance(&requested).unwrap_or(DEFAULT_BAR_LUMINANCE);
 
     if persist {
-        write_state(paths, &requested, colors.as_ref()).map_err(|e| e.to_string())?;
+        write_state(paths, &requested, colors.as_ref(), bar_luminance).map_err(|e| e.to_string())?;
     } else if let Some(colors) = &colors {
-        write_colors(paths, colors).map_err(|e| e.to_string())?;
+        write_colors(paths, colors, bar_luminance).map_err(|e| e.to_string())?;
     }
 
     Ok(requested)
@@ -730,6 +851,24 @@ mod tests {
             resolve_cycle_target(&available, &[], Some(&active), true),
             None
         );
+    }
+
+    #[test]
+    fn parses_percent_pixel_output() {
+        let luminance = parse_pixel_luminance("srgb(7.06668%,7.95562%,13.633%)").unwrap();
+        assert!(luminance > 0.0 && luminance < 0.1, "{luminance}");
+    }
+
+    #[test]
+    fn parses_integer_pixel_output() {
+        let luminance = parse_pixel_luminance("srgb(255,255,255)").unwrap();
+        assert!((luminance - 1.0).abs() < 1e-9, "{luminance}");
+    }
+
+    #[test]
+    fn black_and_white_are_the_luminance_extremes() {
+        assert!((relative_luminance(0.0, 0.0, 0.0)).abs() < 1e-9);
+        assert!((relative_luminance(1.0, 1.0, 1.0) - 1.0).abs() < 1e-9);
     }
 
     #[test]

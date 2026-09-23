@@ -148,7 +148,11 @@ RowLayout {
                 anchors.centerIn: parent
                 // text: ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十"][parent.index]
                 text: parent.number
-                color: parent.active ? Theme.background : parent.occupied ? Theme.text : Theme.muted
+                // Occupied/hovered numbers sit on their own Theme.surface(Hover)
+                // chip, unaffected by the wallpaper. An idle, unoccupied number
+                // has no chip at all though - it floats directly on the
+                // wallpaper - so it needs the reactive bar color instead.
+                color: parent.active ? Theme.background : parent.occupied ? Theme.text : (mouse.containsMouse ? Theme.muted : Theme.barMuted)
                 font {
                     family: Theme.fontFamily
                     pixelSize: Theme.fontSize

@@ -20,7 +20,7 @@ Rectangle {
     implicitWidth: 28
     implicitHeight: 28
     radius: Theme.radius
-    color: mouse.containsMouse || popup.visible ? Theme.surfaceHover : "transparent"
+    color: mouse.containsMouse || popup.visible ? Theme.barHoverFill : "transparent"
 
     function iconText() {
         if (muted || volume <= 0)
@@ -35,7 +35,7 @@ Rectangle {
     Text {
         anchors.centerIn: parent
         text: root.iconText()
-        color: root.muted ? Theme.muted : Theme.text
+        color: root.muted ? Theme.barMuted : Theme.barText
         font { family: Theme.iconFontFamily; pixelSize: 17 }
     }
 

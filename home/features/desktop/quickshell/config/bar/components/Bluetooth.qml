@@ -18,7 +18,7 @@ Rectangle {
     implicitWidth: 28
     implicitHeight: 28
     radius: Theme.radius
-    color: mouse.containsMouse || popup.visible ? Theme.surfaceHover : "transparent"
+    color: mouse.containsMouse || popup.visible ? Theme.barHoverFill : "transparent"
 
     function alpha(source, amount) {
         return Qt.rgba(source.r, source.g, source.b, amount);
@@ -49,7 +49,7 @@ Rectangle {
     Text {
         anchors.centerIn: parent
         text: root.state.powered ? (root.connected ? "󰂱" : "󰂯") : "󰂲"
-        color: root.connected ? Theme.accent : root.state.powered ? Theme.text : Theme.muted
+        color: root.connected ? Theme.barAccent : root.state.powered ? Theme.barText : Theme.barMuted
         opacity: root.state.powered ? 1 : 0.45
         font { family: Theme.iconFontFamily; pixelSize: 17 }
     }

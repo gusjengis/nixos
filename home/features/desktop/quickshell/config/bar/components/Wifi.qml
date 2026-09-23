@@ -16,7 +16,7 @@ Rectangle {
     implicitWidth: 28
     implicitHeight: 28
     radius: Theme.radius
-    color: mouse.containsMouse || popup.visible ? Theme.surfaceHover : "transparent"
+    color: mouse.containsMouse || popup.visible ? Theme.barHoverFill : "transparent"
 
     function alpha(source, amount) {
         return Qt.rgba(source.r, source.g, source.b, amount);
@@ -27,7 +27,7 @@ Rectangle {
         signal: root.state.connected ? root.state.connected.signal : 0
         enabled: root.state.enabled
         connected: !!root.state.connected
-        iconColor: root.state.enabled ? Theme.text : Theme.muted
+        iconColor: root.state.enabled ? Theme.barText : Theme.barMuted
     }
 
     MouseArea {

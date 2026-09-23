@@ -12,7 +12,7 @@ Rectangle {
     implicitWidth: 34
     implicitHeight: 28
     radius: Theme.radius
-    color: mouse.containsMouse || popup.visible ? Theme.surfaceHover : "transparent"
+    color: mouse.containsMouse || popup.visible ? Theme.barHoverFill : "transparent"
 
     Item {
         anchors.centerIn: parent
@@ -26,7 +26,7 @@ Rectangle {
             height: 11
             radius: 2
             color: "transparent"
-            border { width: 1; color: Theme.text }
+            border { width: 1; color: Theme.barText }
 
             Rectangle {
                 anchors { left: parent.left; top: parent.top; bottom: parent.bottom; margins: 2 }
@@ -35,14 +35,14 @@ Rectangle {
                 radius: 1
                 color: root.batteryService && root.batteryService.percentage <= 15
                     ? Theme.danger
-                    : root.batteryService && root.batteryService.charging ? Theme.accent : Theme.text
+                    : root.batteryService && root.batteryService.charging ? Theme.barAccent : Theme.barText
             }
 
             Text {
                 anchors.centerIn: parent
                 visible: !!root.batteryService && root.batteryService.charging
-                text: ""
-                color: Theme.backgroundBase
+                text: ""
+                color: Theme.barAccentContrast
                 font { family: Theme.iconFontFamily; pixelSize: 9 }
             }
         }
@@ -53,7 +53,7 @@ Rectangle {
             width: 2
             height: 5
             radius: 1
-            color: Theme.text
+            color: Theme.barText
         }
     }
 

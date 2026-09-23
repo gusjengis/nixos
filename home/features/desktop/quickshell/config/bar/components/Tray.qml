@@ -20,7 +20,7 @@ RowLayout {
             implicitWidth: 28
             implicitHeight: 28
             radius: Theme.radius
-            color: mouse.containsMouse ? Theme.surfaceHover : "transparent"
+            color: mouse.containsMouse ? Theme.barHoverFill : "transparent"
 
             IconImage {
                 anchors.centerIn: parent

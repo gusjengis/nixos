@@ -16,12 +16,12 @@ Rectangle {
     implicitWidth: 28
     implicitHeight: 28
     radius: Theme.radius
-    color: mouse.containsMouse || popup.visible ? Theme.surfaceHover : "transparent"
+    color: mouse.containsMouse || popup.visible ? Theme.barHoverFill : "transparent"
 
     Text {
         anchors.centerIn: parent
         text: "AI"
-        color: Theme.accent
+        color: Theme.barAccent
         font { family: Theme.fontFamily; pixelSize: Theme.fontSize; weight: Font.DemiBold }
     }
 

@@ -68,6 +68,9 @@ let
           lib.makeBinPath [
             hyprlandPackages.hyprland
             pkgs.hyprpaper
+            # Samples the pixels behind the bar so it can react to wallpaper
+            # brightness; see sample_bar_luminance in src/main.rs.
+            pkgs.imagemagick
           ]
         }
     '';

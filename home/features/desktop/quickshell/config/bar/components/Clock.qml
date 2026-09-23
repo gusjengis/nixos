@@ -19,7 +19,7 @@ Rectangle {
     width: label.implicitWidth + 18
     height: 28
     radius: Theme.radius
-    color: mouse.containsMouse || popup.popupVisible ? Theme.surfaceHover : "transparent"
+    color: mouse.containsMouse || popup.popupVisible ? Theme.barHoverFill : "transparent"
 
     SystemClock {
         id: clock
@@ -30,7 +30,7 @@ Rectangle {
         id: label
         anchors.centerIn: parent
         text: root.displayTime(clock.date)
-        color: Theme.text
+        color: Theme.barText
         font {
             family: Theme.fontFamily
             pixelSize: Theme.fontSize
