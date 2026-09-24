@@ -20,12 +20,17 @@ RowLayout {
             implicitWidth: 28
             implicitHeight: 28
             radius: Theme.radius
-            color: mouse.containsMouse ? Theme.barHoverFill : "transparent"
+            color: hover.hovered ? Theme.barHoverFill : "transparent"
 
             IconImage {
                 anchors.centerIn: parent
                 implicitSize: 20
                 source: parent.modelData.icon
+            }
+
+            HoverHandler {
+                id: hover
+                blocking: false
             }
 
             MouseArea {

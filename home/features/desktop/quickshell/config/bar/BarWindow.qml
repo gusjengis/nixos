@@ -127,6 +127,11 @@ PanelWindow {
             }
         }
 
+        HoverHandler {
+            id: notchReveal
+            blocking: false
+        }
+
         Workspaces {
             anchors {
                 left: parent.left
@@ -186,17 +191,4 @@ PanelWindow {
         }
     }
 
-    Item {
-        anchors {
-            top: parent.top
-            left: parent.left
-            right: parent.right
-        }
-        height: Theme.barHeight
-        z: 1
-
-        HoverHandler {
-            id: notchReveal
-        }
-    }
 }

@@ -19,7 +19,7 @@ Rectangle {
     width: label.implicitWidth + 18
     height: 28
     radius: Theme.radius
-    color: mouse.containsMouse || popup.popupVisible ? Theme.barHoverFill : "transparent"
+    color: hover.hovered ? Theme.barHoverFill : "transparent"
 
     SystemClock {
         id: clock
@@ -36,6 +36,11 @@ Rectangle {
             pixelSize: Theme.fontSize
             weight: Font.DemiBold
         }
+    }
+
+    HoverHandler {
+        id: hover
+        blocking: false
     }
 
     MouseArea {

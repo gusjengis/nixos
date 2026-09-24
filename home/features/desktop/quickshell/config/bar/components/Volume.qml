@@ -20,7 +20,7 @@ Rectangle {
     implicitWidth: 28
     implicitHeight: 28
     radius: Theme.radius
-    color: mouse.containsMouse || popup.visible ? Theme.barHoverFill : "transparent"
+    color: hover.hovered ? Theme.barHoverFill : "transparent"
 
     function iconText() {
         if (muted || volume <= 0)
@@ -37,6 +37,11 @@ Rectangle {
         text: root.iconText()
         color: root.muted ? Theme.barMuted : Theme.barText
         font { family: Theme.iconFontFamily; pixelSize: 17 }
+    }
+
+    HoverHandler {
+        id: hover
+        blocking: false
     }
 
     MouseArea {

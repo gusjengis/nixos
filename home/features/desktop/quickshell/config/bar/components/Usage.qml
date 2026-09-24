@@ -16,13 +16,18 @@ Rectangle {
     implicitWidth: 28
     implicitHeight: 28
     radius: Theme.radius
-    color: mouse.containsMouse || popup.visible ? Theme.barHoverFill : "transparent"
+    color: hover.hovered ? Theme.barHoverFill : "transparent"
 
     Text {
         anchors.centerIn: parent
         text: "AI"
         color: Theme.barAccent
         font { family: Theme.fontFamily; pixelSize: Theme.fontSize; weight: Font.DemiBold }
+    }
+
+    HoverHandler {
+        id: hover
+        blocking: false
     }
 
     MouseArea {
