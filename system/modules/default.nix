@@ -97,6 +97,7 @@
     systemd.services."NetworkManager-wait-online".enable = false;
     programs.nix-ld.enable = true;
     programs.dconf.enable = true;
+    programs.xfconf.enable = true;
     virtualisation.docker.enable = true;
     systemd.services.docker.after = [
       "network-online.target"
