@@ -74,7 +74,7 @@ for _, direction in ipairs({ "left", "right", "up", "down" }) do
 	)
 end
 
--- hl.bind("SUPER + SHIFT + P", hl.dsp.window.pin({ action = "enable" }))
+hl.bind("SUPER + SHIFT + P", hl.dsp.window.pin({ action = "enable" }))
 
 local function monitor_workspace(workspace)
 	local monitor = hl.get_active_monitor()
