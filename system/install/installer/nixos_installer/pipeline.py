@@ -18,9 +18,8 @@ from pathlib import Path
 from .model import Answers, Catalog
 from .probe import is_portable
 from .proc import CommandError, Reporter, run
-from .workspace import Workspace, git_credentials
+from .workspace import SECRETS_REPO, Workspace, check_github_token, git_credentials
 
-SECRETS_REPO = "https://github.com/gusjengis/secrets.git"
 TARGET_USER = "gusjengis"
 MOUNTPOINT = Path("/mnt")
 MARKER_DIR = "var/lib/nixos-install"
@@ -77,6 +76,19 @@ class Installer:
             )
 
         self.reporter.info("UEFI firmware, running as root, target disk is real")
+
+        if self.answers.github_token:
+            self.reporter.step("Checking the GitHub token")
+            ok, message = check_github_token(
+                self.answers.github_token, reporter=self.reporter
+            )
+            if not ok:
+                raise PreflightError(
+                    f"{message} Fix it on the Secrets tab, or clear the token "
+                    "and continue without one; the machine will still "
+                    "install, just without secrets."
+                )
+            self.reporter.info(message)
 
     def _is_live_medium(self, device: Path) -> bool:
         """Whether the chosen disk is the one currently supplying the ISO.
@@ -394,7 +406,7 @@ class Installer:
         self.publish()
 
         self.reporter.step(f"{self.answers.host} is installed")
-        self.reporter.info("Reboot. Home Manager finishes on the first boot.")
+        self.reporter.info("Home Manager finishes on the first boot.")
 
 
 def _chown_tree(path: Path, uid: int, gid: int) -> None:

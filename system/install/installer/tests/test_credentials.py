@@ -47,6 +47,20 @@ class TestCredentialHelper:
         with git_credentials(TOKEN) as env:
             assert env["GIT_TERMINAL_PROMPT"] == "0"
 
+    def test_other_credential_helpers_are_disabled(self):
+        """A cached `gh` login or keychain helper must not get to answer first.
+
+        Without this, whatever is already configured wherever this runs would
+        authenticate silently, and the token just given to the installer
+        would never actually be the one git used. Checking a token would then
+        say "accepted" regardless of whether that specific token works.
+        """
+
+        with git_credentials(TOKEN) as env:
+            assert env["GIT_CONFIG_COUNT"] == "1"
+            assert env["GIT_CONFIG_KEY_0"] == "credential.helper"
+            assert env["GIT_CONFIG_VALUE_0"] == ""
+
     def test_helper_is_not_placed_next_to_the_checkout(self, tmp_path):
         """The bug this guards against put the token on the installed disk.
 

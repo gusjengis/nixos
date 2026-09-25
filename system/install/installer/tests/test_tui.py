@@ -237,3 +237,148 @@ class TestDiskSelection:
             return app._collect().disk
 
         assert drive(app, body) == "/dev/sda"
+
+
+class TestTokenCheck:
+    """The token field is hidden by design, so whether what was typed is
+    actually correct is otherwise unknowable until the machine fails to join
+    the tailnet on first boot. These drive the same path a real check would,
+    with `_check_token_worker` replaced by a synchronous stand-in so no test
+    touches a thread or the network.
+    """
+
+    def test_show_token_reveals_the_field(self, catalog, disks):
+        app = make_app(catalog, disks)
+
+        async def body(pilot):
+            from textual.widgets import Checkbox, Input
+
+            assert app.query_one("#input-token", Input).password is True
+            app.query_one("#show-token", Checkbox).toggle()
+            await pilot.pause()
+            return app.query_one("#input-token", Input).password
+
+        assert drive(app, body) is False
+
+    def test_editing_the_token_clears_a_stale_result(self, catalog, disks):
+        app = make_app(catalog, disks)
+
+        async def body(pilot):
+            from textual.widgets import Input, Static
+
+            app.token_verified = True
+            app.query_one("#token-status", Static).update("Token accepted.")
+            app.query_one("#input-token", Input).value = "ghp_somethingelse"
+            await pilot.pause()
+            return app.token_verified, str(
+                app.query_one("#token-status", Static).content
+            )
+
+        verified, status = drive(app, body)
+        assert verified is None
+        assert status == ""
+
+    def test_check_button_reports_success(self, catalog, disks, monkeypatch):
+        app = make_app(catalog, disks)
+
+        def fake_worker(self, token):
+            self._apply_token_result(token, True, "Token accepted.")
+
+        monkeypatch.setattr(InstallerApp, "_check_token_worker", fake_worker)
+
+        async def body(pilot):
+            from textual.widgets import Input, Static
+
+            app.query_one("#input-token", Input).value = "ghp_realone"
+            await pilot.pause()
+            app._check_token_pressed()
+            await pilot.pause()
+            return app.token_verified, str(
+                app.query_one("#token-status", Static).content
+            )
+
+        verified, status = drive(app, body)
+        assert verified is True
+        assert "accepted" in status.lower()
+
+    def test_check_button_reports_rejection(self, catalog, disks, monkeypatch):
+        app = make_app(catalog, disks)
+
+        def fake_worker(self, token):
+            self._apply_token_result(token, False, "Token rejected.")
+
+        monkeypatch.setattr(InstallerApp, "_check_token_worker", fake_worker)
+
+        async def body(pilot):
+            from textual.widgets import Input, Static
+
+            app.query_one("#input-token", Input).value = "ghp_wrongone"
+            await pilot.pause()
+            app._check_token_pressed()
+            await pilot.pause()
+            return app.token_verified, str(
+                app.query_one("#token-status", Static).content
+            )
+
+        verified, status = drive(app, body)
+        assert verified is False
+        assert "rejected" in status.lower()
+
+    def test_a_result_for_an_already_edited_token_is_discarded(self, catalog, disks):
+        app = make_app(catalog, disks)
+
+        async def body(pilot):
+            from textual.widgets import Input
+
+            app.query_one("#input-token", Input).value = "ghp_first"
+            await pilot.pause()
+            # A result arrives for a token that is no longer in the field.
+            app._apply_token_result("ghp_first_but_stale", True, "Token accepted.")
+            await pilot.pause()
+            return app.token_verified
+
+        assert drive(app, body) is None
+
+    def test_checking_with_no_token_does_not_start_a_worker(
+        self, catalog, disks, monkeypatch
+    ):
+        app = make_app(catalog, disks)
+
+        def fail_if_called(self, token):
+            raise AssertionError("should not check an empty token")
+
+        monkeypatch.setattr(InstallerApp, "_check_token_worker", fail_if_called)
+
+        async def body(pilot):
+            from textual.widgets import Static
+
+            app._check_token_pressed()
+            await pilot.pause()
+            return str(app.query_one("#token-status", Static).content)
+
+        assert "no token" in drive(app, body).lower()
+
+    def test_review_reflects_an_unchecked_token(self, catalog, disks):
+        app = make_app(catalog, disks, Answers(github_token="ghp_x"))
+
+        async def body(pilot):
+            from textual.widgets import Static, TabbedContent
+
+            app.query_one("#stages", TabbedContent).active = "tab-review"
+            await pilot.pause()
+            return str(app.query_one("#review-summary", Static).content)
+
+        assert "not checked" in drive(app, body).lower()
+
+    def test_review_reflects_a_rejected_token(self, catalog, disks):
+        app = make_app(catalog, disks, Answers(github_token="ghp_x"))
+
+        async def body(pilot):
+            from textual.widgets import Static, TabbedContent
+
+            app.token_verified = False
+            app.query_one("#stages", TabbedContent).active = "tab-review"
+            await pilot.pause()
+            return str(app.query_one("#review-summary", Static).content)
+
+        assert "rejected" in drive(app, body).lower()

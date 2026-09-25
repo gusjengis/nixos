@@ -1,8 +1,8 @@
 # Installing a machine
 
-One command, from a stock NixOS ISO, start to finish. When it is done, reboot
-and the machine is on the tailnet with the desktop up and the repositories
-cloned. There is no second step to remember.
+One command, from a stock NixOS ISO, start to finish. It reboots itself when
+done, and the machine comes up on the tailnet with the desktop up and the
+repositories cloned. There is no second step to remember.
 
 ## What you need
 
@@ -41,6 +41,13 @@ Every module starts at whatever the configuration already defaults to, so an
 untouched Modules tab installs a sensible machine. A category header turns
 everything under it on or off at once; the modules stay individually
 toggleable underneath.
+
+The token field is hidden by default; a "Show token" checkbox next to it
+reveals what was actually typed. A "Check" button (or pressing Enter in the
+field) verifies it against GitHub immediately, without waiting for the
+install to reach that point. The same check runs again automatically right
+before the disk is touched, so a token that was never checked, or that
+changed after it was, still gets caught before anything destructive happens.
 
 Nothing about hardware is asked. Graphics, CPU microcode, Bluetooth, the
 fingerprint reader, and whether the machine is a laptop are all read from the
@@ -91,12 +98,15 @@ rather than erasing a disk and then discovering it has no password to set.
 3. Writes the new machine's files and evaluates them, which is where the module
    list and its defaults come from.
 4. Asks, or takes the answers from flags.
-5. Partitions the disk with Disko and installs NixOS.
-6. Places the repository at `/etc/nixos`, owned by `gusjengis`.
-7. Clones the secrets checkout into the new home directory.
-8. Builds the Home Manager closure into the new system's store.
-9. Sets both passwords.
-10. Commits the new machine's files and pushes them.
+5. Confirms the GitHub token can read the secrets repository, if one was
+   given. This is the last check before anything is destroyed.
+6. Partitions the disk with Disko and installs NixOS.
+7. Places the repository at `/etc/nixos`, owned by `gusjengis`.
+8. Clones the secrets checkout into the new home directory.
+9. Builds the Home Manager closure into the new system's store.
+10. Sets both passwords.
+11. Commits the new machine's files and pushes them.
+12. Reboots into the installed system.
 
 Home Manager is *activated* on the first boot rather than during installation,
 by `nixos-first-boot.service`. Its closure is already built by then, so this is
@@ -104,6 +114,11 @@ a matter of linking a profile, not compiling a desktop. The unit is conditioned
 on `/var/lib/nixos-install/pending-home-manager` and does nothing on any machine
 that was not just installed. If it fails, the marker stays and the next boot
 tries again.
+
+The reboot warns for ten seconds first, so there is time to pull the
+installation USB stick if the firmware would otherwise boot it again. Add
+`--reboot=false` to stop after the install instead and reboot by hand
+whenever ready.
 
 ## Reinstalling a machine that already exists
 

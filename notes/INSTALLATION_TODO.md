@@ -189,6 +189,20 @@ adding Disko changes no existing host's boot or filesystem configuration.
       no hibernation. See "Deliberately out of scope" below.
 - [x] Fix `laptop.enable` to follow detected hardware rather than an answer.
       It reads the SMBIOS chassis type through `system/install/lib/facter.nix`.
+- [x] Verify the GitHub token against the secrets repository (`git
+      ls-remote`) rather than only checking it is non-empty. Checked live in
+      the TUI (a "Check" button, and on Enter), with a "Show token" checkbox
+      since the field is hidden by default; checked again in `preflight()`
+      right before the disk is touched, so a token nobody checked, or that
+      changed after it was, still gets caught. Also closed a real bug found
+      while building this: any credential helper already configured wherever
+      the installer runs (a cached `gh` login, a keychain helper) was
+      answering git's auth prompt before the supplied token ever got a
+      chance, which made a wrong token look accepted. `git_credentials()` now
+      disables other credential helpers for everything it authenticates.
+- [x] Reboot automatically once installation finishes, with a ten-second
+      warning to pull removable installation media first. `--reboot=false`
+      keeps the old manual-reboot behaviour for scripted runs.
 - [ ] Install a real machine from a real ISO.
 
 Dropped: `apps.<system>.enroll`. Adopting an already-installed machine is not

@@ -80,6 +80,15 @@ class CommandError(RuntimeError):
         )
 
 
+class CommandTimeout(CommandError):
+    """A command did not finish within the time it was given.
+
+    Distinguished from a plain `CommandError` because a caller checking a
+    network-dependent command, like whether a token is valid, wants to tell
+    someone "GitHub did not answer" apart from "GitHub said no".
+    """
+
+
 @dataclass
 class Reporter:
     """Where progress goes.
@@ -144,26 +153,50 @@ def run(
     capture: bool = True,
     stream: bool = False,
     secrets: Iterable[str] = (),
+    timeout: float | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Run a command, reporting it and its output.
 
     `stream=True` forwards output line by line as it arrives, which is what the
     long-running steps want: `nixos-install` can spend twenty minutes building,
     and silence for twenty minutes is indistinguishable from a hang.
+
+    `timeout` is for the opposite kind of step: a network call that should
+    fail fast rather than hang, such as checking a token against GitHub before
+    anything destructive has happened. It only applies with `stream=False`;
+    nothing here needs both.
     """
 
     reporter.command(_redact(command, secrets))
 
     if not stream:
-        completed = subprocess.run(  # noqa: S603 - commands are constructed, never shell-parsed
-            list(command),
-            cwd=cwd,
-            env=dict(env) if env is not None else None,
-            input=stdin_text,
-            capture_output=capture,
-            text=True,
-            check=False,
-        )
+        try:
+            completed = subprocess.run(  # noqa: S603 - commands are constructed, never shell-parsed
+                list(command),
+                cwd=cwd,
+                env=dict(env) if env is not None else None,
+                input=stdin_text,
+                capture_output=capture,
+                text=True,
+                check=False,
+                timeout=timeout,
+            )
+        except subprocess.TimeoutExpired as error:
+            output = "".join(
+                part
+                for part in (
+                    error.stdout.decode()
+                    if isinstance(error.stdout, bytes)
+                    else error.stdout,
+                    error.stderr.decode()
+                    if isinstance(error.stderr, bytes)
+                    else error.stderr,
+                )
+                if part
+            )
+            raise CommandTimeout(
+                command, -1, output or f"timed out after {timeout:g}s"
+            ) from error
         if check and completed.returncode != 0:
             output = "".join(
                 part for part in (completed.stdout, completed.stderr) if part

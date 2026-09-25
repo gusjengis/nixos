@@ -19,9 +19,23 @@ from pathlib import Path
 
 from . import nixsrc
 from .model import Catalog
-from .proc import CommandError, Reporter, run
+from .proc import CommandError, CommandTimeout, Reporter, run
 
 DEFAULT_REPO = "https://github.com/gusjengis/nixos.git"
+SECRETS_REPO = "https://github.com/gusjengis/secrets.git"
+
+# Long enough for a slow connection to finish a real `ls-remote`, short enough
+# that someone typing a token does not wonder whether the installer has hung.
+TOKEN_CHECK_TIMEOUT = 15.0
+
+_NETWORK_FAILURE_PHRASES = (
+    "could not resolve host",
+    "could not resolve",
+    "network is unreachable",
+    "connection timed out",
+    "temporary failure in name resolution",
+    "no route to host",
+)
 
 
 # Nix's flake reference for "this directory, exactly as it is". Anything else
@@ -39,6 +53,12 @@ def git_credentials(token: str) -> Iterator[dict[str, str]]:
     onto a disk and committed to a public repository. The helper is written to
     a private temporary directory and removed when this context exits, so it
     never lands on the installed system either.
+
+    Any credential helper already configured wherever this runs is disabled
+    for the duration, because it would otherwise get to answer first: a
+    machine with a cached `gh` login or a keychain helper would silently
+    authenticate with that instead of the token just given it, which would
+    make checking whether *this* token works meaningless.
     """
 
     directory = tempfile.mkdtemp(prefix="nixos-install-credentials.")
@@ -54,9 +74,58 @@ def git_credentials(token: str) -> Iterator[dict[str, str]]:
         env = dict(os.environ)
         env["GIT_ASKPASS"] = str(helper)
         env["GIT_TERMINAL_PROMPT"] = "0"
+        # git's environment-based config override (2.31+): equivalent to
+        # `-c credential.helper=` on every invocation, without editing every
+        # command that uses this environment.
+        env["GIT_CONFIG_COUNT"] = "1"
+        env["GIT_CONFIG_KEY_0"] = "credential.helper"
+        env["GIT_CONFIG_VALUE_0"] = ""
         yield env
     finally:
         shutil.rmtree(directory, ignore_errors=True)
+
+
+def check_github_token(
+    token: str,
+    *,
+    repo: str = SECRETS_REPO,
+    reporter: Reporter | None = None,
+    timeout: float = TOKEN_CHECK_TIMEOUT,
+) -> tuple[bool, str]:
+    """Whether `token` can read `repo`, checked the way the real clone will.
+
+    Runs an authenticated `git ls-remote` rather than calling GitHub's API,
+    so a token that passes this is proven to work for exactly the operation
+    the installer is about to perform with it, not merely valid in general.
+    GitHub answers a private repository the token cannot see with the same
+    "not found" a typo'd URL would get, so an invalid token and a token
+    missing `repo` scope are indistinguishable here and reported the same way.
+
+    Returns `(ok, message)`. The message is written for the screen and never
+    contains the token.
+    """
+
+    if not token:
+        return False, "No token given."
+
+    with git_credentials(token) as env:
+        try:
+            run(
+                ["git", "ls-remote", repo, "HEAD"],
+                reporter=reporter or Reporter(),
+                env=env,
+                secrets=[token],
+                timeout=timeout,
+            )
+        except CommandTimeout:
+            return False, "Timed out reaching GitHub. Check the network connection."
+        except CommandError as error:
+            output = error.output.lower()
+            if any(phrase in output for phrase in _NETWORK_FAILURE_PHRASES):
+                return False, "Could not reach GitHub. Check the network connection."
+            return False, "Token rejected, or it cannot read the secrets repository."
+
+    return True, "Token accepted; the secrets repository is reachable."
 
 
 @dataclass

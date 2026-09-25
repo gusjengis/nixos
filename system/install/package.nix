@@ -20,6 +20,7 @@
   openssh,
   nix,
   shadow,
+  systemd,
   repoUrl ? "https://github.com/gusjengis/nixos.git",
 }:
 
@@ -34,6 +35,7 @@ let
     openssh
     nix
     shadow # chpasswd, used inside nixos-enter
+    systemd # systemctl reboot, once the machine is actually installed
   ];
 in
 python3Packages.buildPythonApplication {

@@ -208,6 +208,15 @@ def base_parser(*, add_help: bool = True) -> argparse.ArgumentParser:
         ),
     )
     behaviour.add_argument(
+        "--reboot",
+        type=parse_bool,
+        nargs="?",
+        const=True,
+        default=True,
+        metavar="BOOL",
+        help=("Reboot into the new system once installation finishes. (default: true)"),
+    )
+    behaviour.add_argument(
         "--list-modules",
         action="store_true",
         help="Print every module, its flag, category and default, then exit.",

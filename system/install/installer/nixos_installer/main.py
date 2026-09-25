@@ -21,13 +21,19 @@ import json
 import os
 import shutil
 import sys
+import time
 from pathlib import Path
 
 from . import cli, probe
 from .model import AnswerError, Answers, Catalog, missing_answers, validate_hostname
 from .pipeline import Installer, PreflightError
-from .proc import CommandError, Reporter, ensure_experimental_features
+from .proc import CommandError, Reporter, ensure_experimental_features, run
 from .workspace import Workspace
+
+# Time between the "remove the installation media" warning and the reboot
+# itself. Long enough to pull a USB stick out, short enough that nobody is
+# left wondering whether the installer is still doing something.
+REBOOT_WARNING_SECONDS = 10
 
 # Used while the real host name is still unknown: the catalog has to be
 # evaluated against *some* host, and for a machine that is not on the roster
@@ -173,7 +179,32 @@ def _run(argv: list[str], preliminary, reporter: Reporter) -> int:
         return 130
 
     installer.run_all()
+
+    if namespace.reboot:
+        _reboot(reporter)
+    else:
+        reporter.info("Reboot when ready. Home Manager finishes on the first boot.")
+
     return 0
+
+
+def _reboot(reporter: Reporter) -> None:
+    """Reboot into the machine that was just installed.
+
+    Run from the live environment, not the installed system, so this is the
+    same as someone typing `reboot` themselves once the prompt returns control
+    to them: the only thing this saves is the second command, not a judgment
+    call about whether the install actually succeeded, which run_all() above
+    already made by raising instead of returning if it did not.
+    """
+
+    reporter.step(f"Rebooting in {REBOOT_WARNING_SECONDS}s")
+    reporter.warn(
+        "Remove the installation media now if it is removable, so the "
+        "machine boots the disk it was just installed to."
+    )
+    time.sleep(REBOOT_WARNING_SECONDS)
+    run(["systemctl", "reboot"], reporter=reporter, check=False)
 
 
 def _hardware_report(
