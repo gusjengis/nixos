@@ -26,7 +26,7 @@ from pathlib import Path
 from . import cli, probe
 from .model import AnswerError, Answers, Catalog, missing_answers, validate_hostname
 from .pipeline import Installer, PreflightError
-from .proc import CommandError, Reporter
+from .proc import CommandError, Reporter, ensure_experimental_features
 from .workspace import Workspace
 
 # Used while the real host name is still unknown: the catalog has to be
@@ -41,6 +41,12 @@ PROVISIONAL_DEVICE = "/dev/null"
 
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
+
+    # Every `nix`, `nixos-install`, and `disko` call this program makes is a
+    # fresh process; none of them inherit flags typed on the `nix run` that
+    # started the installer. Setting this before anything is cloned or
+    # evaluated is what makes every one of those calls work unattended.
+    ensure_experimental_features(os.environ)
 
     # Answered before anything is cloned or probed, so that asking what the
     # installer does never partitions, downloads, or requires root.

@@ -13,10 +13,55 @@ import shlex
 import subprocess
 import sys
 import threading
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, MutableMapping, Sequence
 from dataclasses import dataclass, field
 
 Sink = Callable[[str], None]
+
+REQUIRED_EXPERIMENTAL_FEATURES = ("flakes", "nix-command")
+
+
+def merged_nix_config(
+    existing: str, *, required: Iterable[str] = REQUIRED_EXPERIMENTAL_FEATURES
+) -> str:
+    """Add `required` to the `experimental-features` line of a NIX_CONFIG value.
+
+    Every other setting in `existing` is left alone and in place; only the
+    `experimental-features` line is rewritten, gaining whatever from `required`
+    it did not already have.
+    """
+
+    features = set(required)
+    found = False
+    lines: list[str] = []
+    for line in existing.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("experimental-features"):
+            found = True
+            _, _, value = stripped.partition("=")
+            features.update(value.split())
+            lines.append(f"experimental-features = {' '.join(sorted(features))}")
+        else:
+            lines.append(line)
+    if not found:
+        lines.append(f"experimental-features = {' '.join(sorted(features))}")
+    return "\n".join(line for line in lines if line.strip())
+
+
+def ensure_experimental_features(env: MutableMapping[str, str]) -> None:
+    """Guarantee `nix-command` and `flakes` for every subprocess this program starts.
+
+    A stock installer ISO's default `nix.conf` does not enable either. Typing
+    `--extra-experimental-features` on the `nix run` that starts the installer
+    only covers that one process; every `nix eval`, `nix build`, `nixos-install`,
+    and `disko` invocation this program makes afterwards is a fresh process that
+    never sees it. `NIX_CONFIG` is read by all of those, so setting it once here,
+    before anything is cloned or evaluated, means the flag on the command line
+    that starts the installer is generous documentation rather than something
+    every internal step has to repeat, and a shorter command line still works.
+    """
+
+    env["NIX_CONFIG"] = merged_nix_config(env.get("NIX_CONFIG", ""))
 
 
 class CommandError(RuntimeError):
