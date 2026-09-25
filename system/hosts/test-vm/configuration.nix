@@ -9,7 +9,7 @@
   system.stateVersion = "26.11";
 
   # Core
-  bedtimeLockout.enable = false;
+  bedtimeLockout.enable = true;
   dataDrive.client.enable = true;
   git.enable = true;
   grub.enable = true;
