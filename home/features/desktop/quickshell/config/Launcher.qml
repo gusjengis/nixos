@@ -40,7 +40,7 @@ PanelWindow {
             "name": "Mirror",
             "description": "Show a mirrored, low-latency webcam view",
             "icon": "camera-web-symbolic",
-            "command": ["mpv", "--title=Mirror", "--profile=low-latency", "--untimed", "--vf=hflip", "av://v4l2:/dev/video0"]
+            "command": ["mpv", "--title=Mirror", "--profile=low-latency", "--untimed", "--target-colorspace-hint=no", "--vf=hflip", "av://v4l2:/dev/video0"]
         }
     ]
 
