@@ -103,17 +103,24 @@ rather than erasing a disk and then discovering it has no password to set.
 6. Partitions the disk with Disko and installs NixOS.
 7. Places the repository at `/etc/nixos`, owned by `gusjengis`.
 8. Clones the secrets checkout into the new home directory.
-9. Builds the Home Manager closure into the new system's store.
-10. Sets both passwords.
-11. Commits the new machine's files and pushes them.
-12. Reboots into the installed system.
+9. Sets both passwords, commits the new machine's files, and pushes them.
+10. Builds and activates Home Manager as `gusjengis` inside the installed
+    system.
+11. Synchronizes the repositories selected by that Home Manager configuration.
+12. Records the deployed revision, then reboots into the finished system.
 
-Home Manager is *activated* on the first boot rather than during installation,
-by `nixos-first-boot.service`. Its closure is already built by then, so this is
-a matter of linking a profile, not compiling a desktop. The unit is conditioned
-on `/var/lib/nixos-install/pending-home-manager` and does nothing on any machine
-that was not just installed. If it fails, the marker stays and the next boot
-tries again.
+Home Manager activation happens before reboot. The installer enters the target
+system with `nixos-enter`, starts its Nix daemon temporarily, and activates the
+prebuilt generation as the installed user. This means tty1's first login already
+has the Bash configuration that starts Hyprland. The
+`nixos-first-boot.service` unit remains only as recovery for an interrupted
+installation; successful activation removes its marker.
+
+Repository synchronization is retried three times. A repository that still
+cannot be cloned produces a warning rather than preventing boot; the normal
+user update service retries it later. Git never asks hidden credential or host
+key questions during this phase: it uses the token already entered in the TUI
+and accepts a new SSH host key noninteractively.
 
 The reboot warns for ten seconds first, so there is time to pull the
 installation USB stick if the firmware would otherwise boot it again. Add
@@ -163,11 +170,12 @@ being installed and the failure is recoverable by running the installer again:
 every step either completes or leaves the disk in a state the next run will
 repartition anyway.
 
-Two failures are deliberately not fatal, because the machine is already
-installed and working by the time they can happen:
+Home Manager build or activation failure is fatal and suppresses automatic
+reboot: without it, a desktop machine is not finished. Two later failures are
+warnings because the installed environment itself is already usable:
 
-- The Home Manager pre-build. First boot builds it instead, which needs a
-  network connection then.
+- A repository that still fails after three synchronization attempts. The
+  user update service retries it after boot.
 - The push. The commit is in `/etc/nixos`; push it later.
 
 A warning about a missing `TAILSCALE_AUTH_KEY` matters on a headless machine:

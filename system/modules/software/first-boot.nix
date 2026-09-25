@@ -1,12 +1,8 @@
 # Finishes an installation on the machine's first boot.
 #
-# The installer builds the Home Manager closure into the new system's store
-# while it still has a working nix-daemon on the ISO, so nothing here has to
-# compile anything; activation is a matter of linking a profile that is already
-# present. It is deferred to first boot rather than done in a chroot because
-# activation wants a normal session: a running daemon, a real user, and an
-# initialised per-user profile. Doing that inside `nixos-enter` works until it
-# does not, and a half-activated profile is a bad thing to hand someone.
+# Normal installations activate Home Manager before reboot. This service is a
+# recovery path for interruption after NixOS was installed but before that
+# activation completed. Its marker is removed by the installer on success.
 #
 # There is no enable option on purpose. The unit is inert on every machine that
 # was not just installed, because it is conditioned on a file that only the
@@ -20,13 +16,7 @@ in
   systemd.services.nixos-first-boot = {
     description = "Finish the installer's Home Manager setup";
 
-    # Home Manager reads flake inputs, and the secrets checkout the installer
-    # placed in the home directory is only useful once the network is up.
-    after = [
-      "network-online.target"
-      "nix-daemon.service"
-    ];
-    wants = [ "network-online.target" ];
+    after = [ "nix-daemon.service" ];
     wantedBy = [ "multi-user.target" ];
 
     # The marker holds the roster key to build. Its absence is what makes this
@@ -64,5 +54,12 @@ in
       rm -f ${marker}
       echo "first-boot: done"
     '';
+  };
+
+  # Autologin must not open a bare shell while recovery activation is still
+  # linking the Bash configuration that starts Hyprland on tty1.
+  systemd.services."getty@tty1" = {
+    overrideStrategy = "asDropin";
+    after = [ "nixos-first-boot.service" ];
   };
 }

@@ -113,6 +113,12 @@ done
 
 if [[ "$failed" -ne 0 ]]; then
     echo "one or more repositories could not be synchronized; see messages above" >&2
+    # Normal updates remain best-effort so one persistent conflict does not
+    # retry forever. The installer opts into a failure status so it can retry
+    # transient first-clone failures and show one final warning.
+    if [[ "${SYNC_REPOS_FAIL_ON_ERROR:-0}" == "1" ]]; then
+        exit 1
+    fi
 fi
 
 # A single persistent repository conflict must not block unrelated updates or

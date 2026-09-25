@@ -196,18 +196,6 @@ def base_parser(*, add_help: bool = True) -> argparse.ArgumentParser:
         ),
     )
     behaviour.add_argument(
-        "--prebuild-home",
-        type=parse_bool,
-        nargs="?",
-        const=True,
-        default=True,
-        metavar="BOOL",
-        help=(
-            "Build the Home Manager closure during installation so the first "
-            "boot only has to activate it. (default: true)"
-        ),
-    )
-    behaviour.add_argument(
         "--reboot",
         type=parse_bool,
         nargs="?",

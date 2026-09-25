@@ -14,8 +14,8 @@ nix --extra-experimental-features 'nix-command flakes' \
 
 The installer should interactively select a host and feature roles, partition
 the selected disk, capture hardware facts, install NixOS, clone this repository
-to `/etc/nixos`, and arrange one-time Home Manager and secrets setup after the
-first boot. Normal rebuilds must never prompt.
+to `/etc/nixos`, and finish Home Manager, secrets, and repository setup before
+the first boot. Normal rebuilds must never prompt.
 
 Nix evaluation cannot prompt. Interactive selection therefore belongs in a
 flake-provided script; selected values become normal tracked Nix host files.
@@ -224,12 +224,19 @@ credential to delete afterwards.
       keys, the SMB credentials, and the Tailscale auth key that
       `tailscale-autoconnect.service` reads, so the machine joins the tailnet
       by itself.
-- [x] Build the Home Manager closure into the new system's store during
-      installation, so first boot activates rather than compiles.
-- [x] Activate on first boot through `system/modules/software/first-boot.nix`,
-      conditioned on `/var/lib/nixos-install/pending-home-manager`. The unit is
-      inert on every machine that was not just installed, and a failure leaves
-      the marker in place so the next boot retries.
+- [x] Build and activate Home Manager before reboot. The installer enters the
+      target with `nixos-enter`, starts a target-store Nix daemon temporarily,
+      and runs the staged activation package as `gusjengis`. A failure is fatal
+      and suppresses automatic reboot.
+- [x] Synchronize the Home Manager-selected repositories before reboot. The
+      initial sync uses the token already entered in the TUI, disables hidden
+      Git prompts, retries three times, and warns rather than blocking boot if
+      an individual repository remains unavailable.
+- [x] Keep `system/modules/software/first-boot.nix` only as recovery for an
+      interrupted installation. Successful pre-reboot activation removes its
+      marker, and tty1 is ordered after it so recovery cannot race autologin.
+- [x] Record the deployed Git revision after setup so the first user-session
+      update does not immediately rebuild and re-activate the same generation.
 - [x] Normal rebuilds and logins never show installer questions: there is no
       enable option and nothing runs without the marker.
 - [ ] Confirm on real hardware that first boot reaches the desktop.
@@ -317,7 +324,8 @@ It is worth doing as its own piece of work, not folded into something else.
 
 ## Design Decisions
 
-- Home Manager remains standalone and runs automatically on first boot.
+- Home Manager remains standalone and is activated by the installer before
+  first boot.
 - New generic x86 installations use Disko; existing hosts migrate only with
   proof that layouts match.
 - Hardware detection uses upstream nixpkgs Facter modules plus local policy.

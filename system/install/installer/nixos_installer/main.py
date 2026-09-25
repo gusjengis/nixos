@@ -162,7 +162,6 @@ def _run(argv: list[str], preliminary, reporter: Reporter) -> int:
         catalog=catalog,
         reporter=reporter,
         facter_report=report,
-        prebuild_home=namespace.prebuild_home,
     )
 
     reporter.step("Ready to install")
@@ -183,7 +182,7 @@ def _run(argv: list[str], preliminary, reporter: Reporter) -> int:
     if namespace.reboot:
         _reboot(reporter)
     else:
-        reporter.info("Reboot when ready. Home Manager finishes on the first boot.")
+        reporter.info("Reboot when ready; the installed environment is complete.")
 
     return 0
 

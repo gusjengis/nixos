@@ -140,10 +140,14 @@ the kernel and initrd modules. The machines that predate the installer keep
 theirs, and their `disk.nix` files stay `disko.enableConfig = false`,
 describing a layout that already exists rather than one to create.
 
-Home Manager activation happens on first boot through
-`system/modules/software/first-boot.nix`, with its closure already built into
-the store during installation. The unit is conditioned on a marker file the
-installer writes, so it is inert on every machine that was not just installed.
+Home Manager is built and activated before the installer reboots. The installer
+uses `nixos-enter`, a temporary daemon for the target store, and the prebuilt
+activation package so the first tty1 login already sees the complete shell and
+starts Hyprland. It then synchronizes the repositories selected by the Home
+Manager configuration and records the deployed revision, preventing the first
+user-session update from rebuilding an environment that is already active.
+`system/modules/software/first-boot.nix` is only an interrupted-install recovery
+path; successful activation removes the marker that enables it.
 
 ## Editable Configuration
 

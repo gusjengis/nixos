@@ -11,6 +11,7 @@ from __future__ import annotations
 import contextlib
 import json
 import os
+import shlex
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
@@ -23,6 +24,9 @@ from .workspace import SECRETS_REPO, Workspace, check_github_token, git_credenti
 TARGET_USER = "gusjengis"
 MOUNTPOINT = Path("/mnt")
 MARKER_DIR = "var/lib/nixos-install"
+HOME_GENERATION = f"/{MARKER_DIR}/home-manager-generation"
+PENDING_HOME = f"/{MARKER_DIR}/pending-home-manager"
+REPO_SYNC_ATTEMPTS = 3
 
 
 class PreflightError(RuntimeError):
@@ -37,7 +41,6 @@ class Installer:
     reporter: Reporter
     facter_report: dict[str, object]
     mountpoint: Path = MOUNTPOINT
-    prebuild_home: bool = True
 
     # -- checks -----------------------------------------------------------
 
@@ -256,13 +259,7 @@ class Installer:
             )
 
     def stage_home_manager(self) -> None:
-        """Build the Home Manager closure into the new system's store.
-
-        Activation itself waits for first boot, where there is a nix-daemon, a
-        real session, and an initialised per-user profile. Building it now
-        means that first boot links an existing closure instead of compiling a
-        desktop, so the machine comes up finished rather than busy.
-        """
+        """Build the Home Manager generation into the installed system's store."""
 
         host = self.answers.host
         assert host
@@ -271,35 +268,196 @@ class Installer:
         marker_dir.mkdir(parents=True, exist_ok=True)
         (marker_dir / "pending-home-manager").write_text(f"{host}\n")
 
-        if not self.prebuild_home:
-            self.reporter.info(
-                "Skipping the Home Manager pre-build; first boot will build it."
+        self.reporter.step("Building the Home Manager closure into the new system")
+        installed = Workspace(
+            root=self.mountpoint / "etc" / "nixos", reporter=self.reporter
+        )
+        run(
+            [
+                "nix",
+                "build",
+                "--store",
+                str(self.mountpoint),
+                "--no-write-lock-file",
+                "--out-link",
+                str(self.mountpoint) + HOME_GENERATION,
+                f"{installed.flake}#homeConfigurations.{host}.activationPackage",
+            ],
+            reporter=self.reporter,
+            stream=True,
+        )
+
+    def activate_home_manager(self) -> None:
+        """Activate the staged generation as the installed user before reboot."""
+
+        generation = self.mountpoint / HOME_GENERATION.lstrip("/")
+        if not generation.exists() and not generation.is_symlink():
+            raise RuntimeError("The staged Home Manager generation is missing.")
+
+        self.reporter.step("Activating Home Manager in the installed system")
+        self._run_as_target_user(f"exec {HOME_GENERATION}/activate")
+
+        # From here onward first boot does not need the recovery service. A
+        # failed activation leaves this marker intact so manually rebooting an
+        # interrupted installation still gets one more chance to recover.
+        (self.mountpoint / PENDING_HOME.lstrip("/")).unlink(missing_ok=True)
+
+    def sync_repositories(self) -> None:
+        """Populate user repositories before reboot, retrying transient failures."""
+
+        if not self.answers.github_token:
+            self.reporter.warn(
+                "No GitHub token was given, so repositories were not synchronized."
             )
             return
 
-        self.reporter.step("Building the Home Manager closure into the new system")
+        self.reporter.step("Synchronizing user repositories")
+        sync = f"{HOME_GENERATION}/home-path/bin/sync-repos"
+        session_vars = "/home/gusjengis/.nix-profile/etc/profile.d/hm-session-vars.sh"
+        command = f"""
+if [ -r {session_vars} ]; then
+  . {session_vars}
+fi
+if [ -n "${{NIXOS_INSTALL_TOKEN_FILE:-}}" ] && [ -r "$NIXOS_INSTALL_TOKEN_FILE" ]; then
+  GH_TOKEN="$(<"$NIXOS_INSTALL_TOKEN_FILE")"
+  export GH_TOKEN
+fi
+export GIT_TERMINAL_PROMPT=0
+export GIT_SSH_COMMAND='ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15'
+export SYNC_REPOS_FAIL_ON_ERROR=1
+attempt=1
+while [ "$attempt" -le {REPO_SYNC_ATTEMPTS} ]; do
+  if {sync}; then
+    exit 0
+  fi
+  echo "repository sync attempt $attempt of {REPO_SYNC_ATTEMPTS} failed" >&2
+  attempt=$((attempt + 1))
+  [ "$attempt" -gt {REPO_SYNC_ATTEMPTS} ] || sleep 5
+done
+exit 1
+""".strip()
+
         try:
-            run(
-                [
-                    "nix",
-                    "build",
-                    "--store",
-                    str(self.mountpoint),
-                    "--no-write-lock-file",
-                    "--no-link",
-                    "--print-out-paths",
-                    f"{self.workspace.flake}#homeConfigurations.{host}.activationPackage",
-                ],
-                reporter=self.reporter,
-                stream=True,
-            )
+            self._run_as_target_user(command, github_token=self.answers.github_token)
         except CommandError as error:
-            # Not fatal: the first-boot unit can still build it, given network.
             self.reporter.warn(
-                "Could not pre-build the Home Manager closure. The machine will "
-                "build it on first boot instead, which needs a network "
-                f"connection then.\n{error.output}"
+                "One or more repositories could not be synchronized after "
+                f"{REPO_SYNC_ATTEMPTS} attempts. The installed desktop is ready, "
+                "and the normal update service will retry after boot.\n" + error.output
             )
+
+    def record_deployed_revision(self) -> None:
+        """Tell the first user-session update that this revision is deployed."""
+
+        installed = self.mountpoint / "etc" / "nixos"
+        revision = run(
+            ["git", "-c", f"safe.directory={installed}", "rev-parse", "HEAD"],
+            reporter=self.reporter,
+            cwd=str(installed),
+        ).stdout.strip()
+        state = self.mountpoint / "home" / TARGET_USER / ".local/state/home-manager"
+        state.mkdir(parents=True, exist_ok=True)
+        (state / "deployed-revision").write_text(f"{revision}\n")
+        uid, gid = self._target_user_ids()
+        _chown_tree(state, uid, gid)
+
+        generation = self.mountpoint / HOME_GENERATION.lstrip("/")
+        generation.unlink(missing_ok=True)
+
+    def _run_as_target_user(
+        self, command: str, *, github_token: str | None = None
+    ) -> None:
+        """Run one user command against the target store through a temporary daemon."""
+
+        user_command = shlex.quote(command)
+        script = f"""
+set -eu
+system=/nix/var/nix/profiles/system
+user={TARGET_USER}
+uid="$($system/sw/bin/id -u "$user")"
+runtime=/run/user/$uid
+socket=/nix/var/nix/daemon-socket/socket
+token_file=
+daemon=
+
+cleanup() {{
+  if [ -n "$daemon" ]; then
+    kill "$daemon" 2>/dev/null || true
+    wait "$daemon" 2>/dev/null || true
+  fi
+  $system/sw/bin/rm -f "$socket"
+  $system/sw/bin/rm -rf "$runtime"
+}}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+$system/sw/bin/install -d -m 700 -o "$user" -g users "$runtime"
+$system/sw/bin/install -d -m 755 /nix/var/nix/daemon-socket
+$system/sw/bin/install -d -m 700 -o "$user" -g users \
+  /home/$user/.local/state/nix/profiles \
+  /home/$user/.local/state/home-manager
+if [ -n "${{NIXOS_INSTALL_GITHUB_TOKEN:-}}" ]; then
+  token_file="$runtime/github-token"
+  (umask 077; printf '%s' "$NIXOS_INSTALL_GITHUB_TOKEN" >"$token_file")
+  $system/sw/bin/chown "$user":users "$token_file"
+fi
+$system/sw/bin/rm -f "$socket"
+
+$system/sw/bin/env -i \
+  HOME=/root USER=root LOGNAME=root \
+  PATH=$system/sw/bin:/nix/var/nix/profiles/default/bin \
+  NIX_SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt \
+  SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt \
+  LOCALE_ARCHIVE=$system/sw/lib/locale/locale-archive \
+  TZDIR=/etc/zoneinfo \
+  $system/sw/bin/nix-daemon --daemon \
+  >/tmp/nixos-install-nix-daemon.log 2>&1 &
+daemon=$!
+
+ready=0
+for _ in $($system/sw/bin/seq 1 100); do
+  if [ -S "$socket" ]; then
+    ready=1
+    break
+  fi
+  $system/sw/bin/sleep 0.1
+done
+if [ "$ready" -ne 1 ]; then
+  echo "target nix-daemon did not become ready" >&2
+  $system/sw/bin/cat /tmp/nixos-install-nix-daemon.log >&2 || true
+  exit 1
+fi
+
+$system/sw/bin/runuser -u "$user" -- \
+  $system/sw/bin/env -i \
+    HOME=/home/$user USER=$user LOGNAME=$user SHELL=$system/sw/bin/bash \
+    PATH=/home/$user/.nix-profile/bin:/etc/profiles/per-user/$user/bin:$system/sw/bin \
+    NIX_REMOTE=daemon \
+    NIX_SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt \
+    SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt \
+    LOCALE_ARCHIVE=$system/sw/lib/locale/locale-archive \
+    TZDIR=/etc/zoneinfo LANG=en_US.UTF-8 \
+    XDG_RUNTIME_DIR="$runtime" NIXOS_INSTALL_TOKEN_FILE="$token_file" \
+    $system/sw/bin/bash -c {user_command}
+""".strip()
+
+        env = dict(os.environ)
+        if github_token:
+            env["NIXOS_INSTALL_GITHUB_TOKEN"] = github_token
+        run(
+            [
+                "nixos-enter",
+                "--root",
+                str(self.mountpoint),
+                "--command",
+                script,
+            ],
+            reporter=self.reporter,
+            env=env,
+            secrets=[github_token] if github_token else (),
+            stream=True,
+        )
 
     def set_passwords(self) -> None:
         """Set the user and root passwords inside the installed system.
@@ -401,12 +559,15 @@ class Installer:
         self.install_system()
         self.place_repository()
         self.install_secrets()
-        self.stage_home_manager()
         self.set_passwords()
         self.publish()
+        self.stage_home_manager()
+        self.activate_home_manager()
+        self.sync_repositories()
+        self.record_deployed_revision()
 
         self.reporter.step(f"{self.answers.host} is installed")
-        self.reporter.info("Home Manager finishes on the first boot.")
+        self.reporter.info("NixOS, Home Manager, and user repositories are ready.")
 
 
 def _chown_tree(path: Path, uid: int, gid: int) -> None:
