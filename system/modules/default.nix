@@ -23,6 +23,7 @@
     ./software/nvim.nix
     ./software/git.nix
     ./software/ollama.nix
+    ./software/nix_build_farm.nix
     ./software/vial.nix
     ./software/tailscale.nix
     ./software/fleet-monitor.nix

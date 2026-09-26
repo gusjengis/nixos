@@ -175,6 +175,59 @@ code reads them directly; Nix must not read secret values because evaluated
 inputs become world-readable store objects. The fleet public SSH key is the
 only deliberate evaluation-time exception.
 
+## Build Farm
+
+Omega builds for the fleet and serves its own store back as a signed binary
+cache. `system/modules/software/nix_build_farm.nix` declares both halves, so a
+client and the server cannot disagree about the port, the URL, or the key.
+Omega sets `nixBuildFarm.server.enable`; every other machine defaults to
+`nixBuildFarm.client.enable`.
+
+Clients reach it over MagicDNS at `omega.tail29bd65.ts.net`. Builds go over SSH
+as a dedicated `nixremote` account, authenticated with the existing fleet key
+and listed in Omega's `trusted-users`. Substitution goes over plain HTTP to
+Harmonia on port 5000, opened on `tailscale0` only; the transport is WireGuard
+rather than TLS, and every path is still verified against the committed
+`omega-1` public key, so an unauthenticated cache on the tailnet is safe to
+trust. Omega emulates `aarch64-linux` through binfmt and QEMU, which is what
+lets it build for the Asahi laptop.
+
+`cache.nixos.org` stays authoritative for upstream packages. Harmonia reports
+priority 50 against upstream's 40, and Nix sorts substituters by that number, so
+the private cache is only asked for paths upstream does not have.
+`builders-use-substitutes` is on, so Omega fetches a build's dependencies itself
+instead of receiving them over a domestic uplink.
+
+Build parallelism is four jobs of six cores, which saturates Omega's 24 threads
+and leaves each job around 8 GB of its 32 GB. Retention is continuous rather
+than scheduled: the daemon collects when free space falls under 50 GiB, up to
+200 GiB free, so artifacts survive until the disk is actually wanted. A monthly
+sweep drops profile generations older than 30 days, which is what stops old
+generations from pinning closures the pressure collection may not touch. That
+sweep also collects, so cache artifacts live until the next sweep or the next
+squeeze, whichever comes first.
+
+When Omega is unreachable, an uncached derivation builds locally and an upstream
+path still comes from `cache.nixos.org`. Two settings make that true rather than
+aspirational. `fallback = true` is load-bearing: Nix's default is to treat an
+unreachable substituter as a fatal error, and the private cache is consulted
+exactly for the paths that need building, so without it every uncached build on
+every client fails the moment Omega is off. `ConnectTimeout 5` for Omega in
+`ssh_config` bounds the wait for a builder whose packets are black-holed rather
+than refused, which was otherwise the kernel's full TCP timeout. Measured cost
+of a build while Omega is down, with both in place, is about twenty seconds of
+retries once per command; without them it was a hard failure and two minutes
+forty of stalling respectively. Nothing about the local store or configuration
+is damaged either way, and no generation is affected.
+
+Omega's private signing key lives at `/var/lib/nix-cache/cache-priv-key.pem`,
+outside the store and outside this repository. `nix-cache-key.service` generates
+one if the file is missing and then refuses to let Harmonia start unless it
+matches `nixBuildFarm.publicKey`, printing the mismatch. A reinstalled Omega
+therefore fails loudly instead of serving paths no client will accept; restore
+the key from `~/.config/secrets/nix-cache/` or adopt the printed public key and
+rebuild the clients.
+
 ## Updates And Rollback
 
 Automatic updates rebuild NixOS first and activate Home Manager only after the

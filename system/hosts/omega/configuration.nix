@@ -20,6 +20,12 @@
   ollama.models = [ "qwen3:4b-instruct-2507-q8_0" ];
   ollama.preload = "qwen3:4b-instruct-2507-q8_0";
 
+  # Fleet build server and binary cache. See
+  # system/modules/software/nix_build_farm.nix: every other machine offloads
+  # uncached derivations here over the tailnet and substitutes the results back,
+  # including aarch64 builds for the Asahi laptop through binfmt/QEMU.
+  nixBuildFarm.server.enable = true;
+
   repo.networkmanager.enable = true;
   tailscale.enable = true;
   vial.enable = false;

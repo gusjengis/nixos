@@ -64,6 +64,7 @@
     "dataDrive.client.enable" = "core";
     "git.enable" = "core";
     "grub.enable" = "core";
+    "nixBuildFarm.client.enable" = "core";
     "nvim.enable" = "core";
     "repo.networkmanager.enable" = "core";
     "tailscale.enable" = "core";
@@ -86,6 +87,7 @@
 
     "fleetMonitor.enable" = "services";
     "fleetMonitor.server.enable" = "services";
+    "nixBuildFarm.server.enable" = "services";
     "ollama.enable" = "services";
   };
 
@@ -99,6 +101,8 @@
     "fleetMonitor.enable" = "fleet-monitor";
     "fleetMonitor.server.enable" = "fleet-monitor-server";
     "gameDev.enable" = "game-dev";
+    "nixBuildFarm.client.enable" = "build-farm";
+    "nixBuildFarm.server.enable" = "build-farm-server";
     "officeNetworkDrives.enable" = "office-drives";
     "repo.networkmanager.enable" = "networkmanager";
     "virtual-machines.enable" = "vms";
@@ -123,6 +127,10 @@
     "git.enable" = "System-wide Git configuration.";
     "grub.enable" = "GRUB as the bootloader, in EFI mode.";
     "hyprland.enable" = "The Hyprland compositor and its graphical session.";
+    "nixBuildFarm.client.enable" =
+      "Offload uncached builds to the fleet build server, and use its binary cache.";
+    "nixBuildFarm.server.enable" =
+      "Build and cache for the rest of the fleet, including aarch64 through emulation. One machine only.";
     "nvim.enable" = "Neovim as the system editor.";
     "officeNetworkDrives.enable" =
       "Mount the office SMB shares. Needs credentials from the secrets repository.";
