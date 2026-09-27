@@ -93,8 +93,7 @@ ShellRoot {
     }
 
     // The wallpaper itself is the preview surface; the overlay only draws the
-    // title and the search field. The earlier carousel UI is kept, unused, in
-    // WallpaperPicker.qml.
+    // title and the search field.
     WallpaperOverlay {
         id: wallpaperOverlay
     }

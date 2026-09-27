@@ -82,12 +82,6 @@ hl.animation({ leaf = "specialWorkspaceOut", enabled = true, speed = 1.94, bezie
 hl.animation({ leaf = "zoomFactor", enabled = true, speed = 7, bezier = "quick" })
 
 hl.layer_rule({
-	name = "wallpaper-picker-fade",
-	match = { namespace = "^quickshell-wallpaper-picker$" },
-	animation = "fade",
-})
-
-hl.layer_rule({
 	name = "wallpaper-overlay-fade",
 	match = { namespace = "^quickshell-wallpaper-overlay$" },
 	animation = "fade",

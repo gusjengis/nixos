@@ -12,8 +12,6 @@ import "theme"
 // through the library sets the real wallpaper through `wallpaperctl preview`,
 // and the overlay only draws the title (tvOS aerial style, bottom left) plus a
 // search field that fades in once something is typed.
-//
-// The previous carousel UI is preserved, unused, in WallpaperPicker.qml.
 PanelWindow {
     id: overlay
 
@@ -331,6 +329,20 @@ PanelWindow {
         windows: [overlay]
         onCleared: {
             if (overlay.visible && !FocusGuard.suspended)
+                overlay.dismiss();
+        }
+    }
+
+    // The focus grab only clears when Hyprland takes keyboard focus away from
+    // this layer surface, which does not happen on a plain workspace switch or
+    // when another window becomes active while this monitor's workspace stays
+    // put. Watch those transitions directly so the overlay never lingers over
+    // whatever the user switched to.
+    Connections {
+        target: Hyprland
+        function onRawEvent(event) {
+            const relevant = ["workspace", "workspacev2", "activewindow", "activewindowv2"];
+            if (overlay.visible && !FocusGuard.suspended && relevant.indexOf(event.name) !== -1)
                 overlay.dismiss();
         }
     }

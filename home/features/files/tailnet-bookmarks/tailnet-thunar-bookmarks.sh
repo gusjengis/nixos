@@ -20,7 +20,7 @@ refresh_lock_file="$state_dir/refresh.lock"
 bookmark_label() {
   local host="$1"
   host="${host%%.*}"
-  printf '%s (Tailnet)' "$host"
+  printf '%s' "$host"
 }
 
 peer_lines() {

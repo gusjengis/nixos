@@ -17,4 +17,5 @@
   <property name="hidden-bookmarks" type="array">
     <value type="string" value="network:///"/>
   </property>
+  <property name="last-show-hidden" type="bool" value="false"/>
 </channel>
