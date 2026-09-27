@@ -40,6 +40,13 @@ def assert_shell_syntax(script: str) -> None:
     assert result.returncode == 0, result.stderr
 
 
+def test_command_error_does_not_dump_embedded_script():
+    error = CommandError(["nixos-enter", "--command", "secret\nscript"], 1, "failed")
+    assert "secret" not in str(error)
+    assert "nixos-enter --command '<script>'" in str(error)
+    assert error.output == "failed"
+
+
 def test_stage_home_manager_builds_target_generation(tmp_path, monkeypatch):
     subject = installer(tmp_path)
     installed = subject.mountpoint / "etc/nixos"

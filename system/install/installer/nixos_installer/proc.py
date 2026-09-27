@@ -75,8 +75,9 @@ class CommandError(RuntimeError):
         self.command = list(command)
         self.returncode = returncode
         self.output = output
+        display = ["<script>" if "\n" in part else part for part in self.command]
         super().__init__(
-            f"command failed with exit status {returncode}: {shlex.join(self.command)}"
+            f"command failed with exit status {returncode}: {shlex.join(display)}"
         )
 
 

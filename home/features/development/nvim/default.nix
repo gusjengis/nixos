@@ -37,7 +37,9 @@ let
     name = "nvim-plugin-sync";
     runtimeInputs = with pkgs; [
       coreutils
+      gcc
       git
+      gnumake
       jq
     ];
     text = ''
@@ -47,7 +49,8 @@ let
       lock="$HOME/.config/nvim/lazy-lock.json"
       lazy_dir="$HOME/.local/share/nvim/lazy"
       expected_lock="$(mktemp)"
-      trap 'rm -f "$expected_lock"' EXIT
+      restore_log="$(mktemp)"
+      trap 'rm -f "$expected_lock" "$restore_log"' EXIT
 
       # Never trust the writable runtime copy as the source of truth. Lazy can
       # rewrite it during restore to match a dirty clone; that is what let one
@@ -56,7 +59,7 @@ let
 
       restore() {
         cp "$expected_lock" "$lock"
-        "$nvim_bin" --headless "+Lazy! restore" "+Lazy! clean" +qa >/dev/null 2>&1
+        "$nvim_bin" --headless "+Lazy! restore" "+Lazy! clean" +qa >"$restore_log" 2>&1
         cp "$expected_lock" "$lock"
       }
 
@@ -86,6 +89,10 @@ let
       if [[ -n "$remaining" ]]; then
         echo "nvim-plugin-sync: plugins still differ from lazy-lock.json:" >&2
         echo "$remaining" >&2
+        if [[ -s "$restore_log" ]]; then
+          echo "nvim-plugin-sync: last Lazy restore output:" >&2
+          tail -n 40 "$restore_log" >&2
+        fi
         exit 1
       fi
 
