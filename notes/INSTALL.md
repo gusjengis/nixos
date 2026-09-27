@@ -24,7 +24,7 @@ repositories cloned. There is no second step to remember.
 Boot the ISO, connect to the network with `nmtui`, then:
 
 ```bash
-sudo nixos-config-install
+sudo install
 ```
 
 Six tabs, in the order the decisions are made:
@@ -60,7 +60,7 @@ Supply every answer and add `--yes`. The interface never opens. This is the
 shape to use for several machines in a row.
 
 ```bash
-sudo nixos-config-install \
+sudo install \
   --host t490 \
   --disk /dev/nvme0n1 \
   --password 'the-password' \

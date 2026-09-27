@@ -111,7 +111,7 @@ anything.
 ## Installation
 
 `nix build .#install-iso` builds the live installer image. Boot it and run
-`sudo nixos-config-install` to install a new machine end to end. See
+`sudo install` to install a new machine end to end. See
 `INSTALL.md` for using it; this is how it fits together.
 
 The ISO module at `system/install/iso.nix` adds the installer and a Tailscale

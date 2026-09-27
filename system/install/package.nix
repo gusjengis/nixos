@@ -64,6 +64,7 @@ python3Packages.buildPythonApplication {
     wrapProgram $out/bin/nixos-config-install \
       --prefix PATH : ${lib.makeBinPath runtimeInputs} \
       --set-default NIXOS_INSTALL_REPO ${lib.escapeShellArg repoUrl}
+    ln -s nixos-config-install $out/bin/install
   '';
 
   meta = {

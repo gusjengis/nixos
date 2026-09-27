@@ -8,7 +8,7 @@
   services.getty.helpLine = ''
     Connect to the network with nmtui, then run:
 
-      sudo nixos-config-install
+      sudo install
 
     The installer joins the tailnet temporarily before building the new system.
   '';
