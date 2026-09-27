@@ -1,13 +1,15 @@
 # Installing a machine
 
-One command, from a stock NixOS ISO, start to finish. It reboots itself when
+One command, from this repository's installer ISO, start to finish. It reboots itself when
 done, and the machine comes up on the tailnet with the desktop up and the
 repositories cloned. There is no second step to remember.
 
 ## What you need
 
-- A NixOS installer ISO, any recent one. The graphical and minimal images both
-  work; nothing from the ISO's own installer is used.
+- Build the x86_64 installer image with `nix build .#install-iso`. Write the
+  resulting `result/iso/*.iso` to installation media. The image includes the
+  installer and an unauthenticated, in-memory Tailscale daemon; no secrets are
+  embedded in it.
 - A network connection.
 - A GitHub personal access token with `repo` scope. This is the only credential
   the installer needs, and it is what makes the machine finish itself: it
@@ -22,8 +24,7 @@ repositories cloned. There is no second step to remember.
 Boot the ISO, connect to the network with `nmtui`, then:
 
 ```bash
-sudo nix --extra-experimental-features 'nix-command flakes' \
-  run github:gusjengis/nixos#install
+sudo nixos-config-install
 ```
 
 Six tabs, in the order the decisions are made:
@@ -59,8 +60,7 @@ Supply every answer and add `--yes`. The interface never opens. This is the
 shape to use for several machines in a row.
 
 ```bash
-sudo nix --extra-experimental-features 'nix-command flakes' \
-  run github:gusjengis/nixos#install -- \
+sudo nixos-config-install \
   --host t490 \
   --disk /dev/nvme0n1 \
   --password 'the-password' \
@@ -98,16 +98,20 @@ rather than erasing a disk and then discovering it has no password to set.
 3. Writes the new machine's files and evaluates them, which is where the module
    list and its defaults come from.
 4. Asks, or takes the answers from flags.
-5. Confirms the GitHub token can read the secrets repository, if one was
-   given. This is the last check before anything is destroyed.
-6. Partitions the disk with Disko and installs NixOS.
+5. Confirms the GitHub token can read the secrets repository. For a build-farm
+   client, temporarily clones credentials, joins the tailnet, and verifies
+   Omega's pinned SSH host key, build access, and binary cache. Failure stops
+   before the disk is touched.
+6. Partitions the disk with Disko and installs NixOS. Both the system and Home
+   Manager build use Omega, with local build jobs disabled on the live ISO.
 7. Places the repository at `/etc/nixos`, owned by `gusjengis`.
-8. Clones the secrets checkout into the new home directory.
+8. Copies the temporary secrets checkout into the new home directory.
 9. Sets both passwords, commits the new machine's files, and pushes them.
 10. Builds and activates Home Manager as `gusjengis` inside the installed
     system.
 11. Synchronizes the repositories selected by that Home Manager configuration.
-12. Records the deployed revision, then reboots into the finished system.
+12. Records the deployed revision, logs out the temporary Tailscale identity,
+    then reboots into the finished system.
 
 Home Manager activation happens before reboot. The installer enters the target
 system with `nixos-enter`, starts its Nix daemon temporarily, and activates the

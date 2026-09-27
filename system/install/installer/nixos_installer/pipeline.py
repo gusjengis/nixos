@@ -13,9 +13,10 @@ import json
 import os
 import shlex
 import shutil
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
+from .build_farm import BuildFarm, bootstrap
 from .model import Answers, Catalog
 from .probe import is_portable
 from .proc import CommandError, Reporter, run
@@ -41,6 +42,7 @@ class Installer:
     reporter: Reporter
     facter_report: dict[str, object]
     mountpoint: Path = MOUNTPOINT
+    build_farm: BuildFarm | None = field(default=None, init=False)
 
     # -- checks -----------------------------------------------------------
 
@@ -147,19 +149,23 @@ class Installer:
         self.reporter.step(f"Installing NixOS for {host}")
         self.reporter.info("This is the long part. Output follows.")
 
+        command = [
+            "nixos-install",
+            "--flake",
+            f"{self.workspace.flake}#{host}",
+            "--root",
+            str(self.mountpoint),
+            # Passwords are set explicitly afterwards, for both accounts,
+            # so nixos-install must not stop to prompt for one.
+            "--no-root-password",
+            "--no-channel-copy",
+        ]
+        if self.build_farm:
+            command.extend(self.build_farm.options)
         run(
-            [
-                "nixos-install",
-                "--flake",
-                f"{self.workspace.flake}#{host}",
-                "--root",
-                str(self.mountpoint),
-                # Passwords are set explicitly afterwards, for both accounts,
-                # so nixos-install must not stop to prompt for one.
-                "--no-root-password",
-                "--no-channel-copy",
-            ],
+            command,
             reporter=self.reporter,
+            env=self.build_farm.env if self.build_farm else None,
             stream=True,
         )
 
@@ -213,19 +219,28 @@ class Installer:
         if target.exists():
             shutil.rmtree(target)
 
-        try:
-            with git_credentials(token) as env:
-                run(
-                    ["git", "clone", "--recurse-submodules", SECRETS_REPO, str(target)],
-                    reporter=self.reporter,
-                    env=env,
-                    stream=True,
-                )
-        except CommandError as error:
-            raise RuntimeError(
-                "Could not clone the secrets repository. The token needs `repo` "
-                "scope to read a private repository.\n" + error.output
-            ) from error
+        if self.build_farm:
+            shutil.copytree(self.build_farm.secrets, target)
+        else:
+            try:
+                with git_credentials(token) as env:
+                    run(
+                        [
+                            "git",
+                            "clone",
+                            "--recurse-submodules",
+                            SECRETS_REPO,
+                            str(target),
+                        ],
+                        reporter=self.reporter,
+                        env=env,
+                        stream=True,
+                    )
+            except CommandError as error:
+                raise RuntimeError(
+                    "Could not clone the secrets repository. The token needs `repo` "
+                    "scope to read a private repository.\n" + error.output
+                ) from error
 
         uid, gid = self._target_user_ids()
         _chown_tree(target, uid, gid)
@@ -272,18 +287,22 @@ class Installer:
         installed = Workspace(
             root=self.mountpoint / "etc" / "nixos", reporter=self.reporter
         )
+        command = [
+            "nix",
+            "build",
+            "--store",
+            str(self.mountpoint),
+            "--no-write-lock-file",
+            "--out-link",
+            str(self.mountpoint) + HOME_GENERATION,
+            f"{installed.flake}#homeConfigurations.{host}.activationPackage",
+        ]
+        if self.build_farm:
+            command.extend(self.build_farm.options)
         run(
-            [
-                "nix",
-                "build",
-                "--store",
-                str(self.mountpoint),
-                "--no-write-lock-file",
-                "--out-link",
-                str(self.mountpoint) + HOME_GENERATION,
-                f"{installed.flake}#homeConfigurations.{host}.activationPackage",
-            ],
+            command,
             reporter=self.reporter,
+            env=self.build_farm.env if self.build_farm else None,
             stream=True,
         )
 
@@ -555,16 +574,20 @@ $system/sw/bin/runuser -u "$user" -- \
 
     def run_all(self) -> None:
         self.preflight()
-        self.partition()
-        self.install_system()
-        self.place_repository()
-        self.install_secrets()
-        self.set_passwords()
-        self.publish()
-        self.stage_home_manager()
-        self.activate_home_manager()
-        self.sync_repositories()
-        self.record_deployed_revision()
+        assert self.answers.host
+        with bootstrap(
+            self.workspace, self.answers.host, self.answers.github_token, self.reporter
+        ) as self.build_farm:
+            self.partition()
+            self.install_system()
+            self.place_repository()
+            self.install_secrets()
+            self.set_passwords()
+            self.publish()
+            self.stage_home_manager()
+            self.activate_home_manager()
+            self.sync_repositories()
+            self.record_deployed_revision()
 
         self.reporter.step(f"{self.answers.host} is installed")
         self.reporter.info("NixOS, Home Manager, and user repositories are ready.")

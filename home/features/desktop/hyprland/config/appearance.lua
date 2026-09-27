@@ -47,8 +47,8 @@ hl.config({
 
 hl.workspace_rule({ workspace = "", blur = true })
 hl.window_rule({
-	name = "mirror-no-workspace-blur",
-	match = { title = "^Mirror$" },
+	name = "pin-no-workspace-blur",
+	match = { pin = true },
 	workspace_blur = false,
 })
 

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import contextlib
 import subprocess
 from pathlib import Path
 
 import pytest
 
 from nixos_installer import pipeline
+from nixos_installer.build_farm import BuildFarm
 from nixos_installer.model import Answers, Catalog
 from nixos_installer.proc import CommandError, Reporter
 from nixos_installer.workspace import Workspace
@@ -220,5 +222,67 @@ def test_run_all_completes_home_before_reporting_success(tmp_path, monkeypatch):
     for name in steps:
         monkeypatch.setattr(subject, name, lambda name=name: order.append(name))
 
+    @contextlib.contextmanager
+    def fake_bootstrap(*_args):
+        order.append("bootstrap")
+        yield None
+
+    monkeypatch.setattr(pipeline, "bootstrap", fake_bootstrap)
+
     subject.run_all()
-    assert order == list(steps)
+    assert order == ["preflight", "bootstrap", *steps[1:]]
+
+
+def test_bootstrap_failure_prevents_partition(tmp_path, monkeypatch):
+    subject = installer(tmp_path)
+    monkeypatch.setattr(subject, "preflight", lambda: None)
+    monkeypatch.setattr(subject, "partition", lambda: pytest.fail("disk was erased"))
+
+    @contextlib.contextmanager
+    def fail_bootstrap(*_args):
+        raise RuntimeError("Omega unavailable")
+        yield None
+
+    monkeypatch.setattr(pipeline, "bootstrap", fail_bootstrap)
+    with pytest.raises(RuntimeError, match="Omega unavailable"):
+        subject.run_all()
+
+
+def test_both_builds_use_live_remote_settings(tmp_path, monkeypatch):
+    subject = installer(tmp_path)
+    installed = subject.mountpoint / "etc/nixos"
+    installed.mkdir(parents=True)
+    (installed / "flake.nix").write_text("{}\n")
+    subject.build_farm = BuildFarm(
+        ["--option", "builders", "ssh-ng://omega", "--option", "max-jobs", "0"],
+        {"NIX_SSHOPTS": "-o StrictHostKeyChecking=yes"},
+        tmp_path / "secrets",
+    )
+    calls = []
+
+    def fake_run(command, **kwargs):
+        calls.append((list(command), kwargs))
+        return completed(list(command))
+
+    monkeypatch.setattr(pipeline, "run", fake_run)
+    subject.install_system()
+    subject.stage_home_manager()
+    assert [call[-6:] for call, _ in calls] == [subject.build_farm.options] * 2
+    assert all(kwargs["env"] == subject.build_farm.env for _, kwargs in calls)
+
+
+def test_install_secrets_reuses_temporary_checkout(tmp_path, monkeypatch):
+    subject = installer(tmp_path)
+    secrets = tmp_path / "secrets"
+    (secrets / "ssh").mkdir(parents=True)
+    (secrets / "ssh/shared_ed25519").write_text("private-key")
+    subject.build_farm = BuildFarm([], {}, secrets)
+    monkeypatch.setattr(pipeline, "_chown_tree", lambda *_a: None)
+    monkeypatch.setattr(
+        pipeline, "run", lambda *_a, **_kw: pytest.fail("secrets cloned twice")
+    )
+
+    subject.install_secrets()
+    target = subject.mountpoint / "home/gusjengis/.config/secrets/ssh/shared_ed25519"
+    assert target.read_text() == "private-key"
+    assert target.stat().st_mode & 0o777 == 0o600

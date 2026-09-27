@@ -51,6 +51,7 @@ homeConfigurations.<host>    Home Manager for gusjengis on every machine
 nixosConfigurations.<host>   NixOS for each system-managed machine
 roleCatalogs.<host>          Installable modules and their values for that host
 packages.<system>.install    The installer
+packages.x86_64-linux.install-iso  Bootable minimal installer image
 apps.<system>.install        `nix run .#install`
 checks.<system>              Installer build, installer lint, catalog consistency
 ```
@@ -109,8 +110,16 @@ anything.
 
 ## Installation
 
-`nix run .#install` installs a new machine end to end. See `INSTALL.md` for
-using it; this is how it fits together.
+`nix build .#install-iso` builds the live installer image. Boot it and run
+`sudo nixos-config-install` to install a new machine end to end. See
+`INSTALL.md` for using it; this is how it fits together.
+
+The ISO module at `system/install/iso.nix` adds the installer and a Tailscale
+daemon with in-memory state. No credentials are embedded. Before partitioning,
+the installer clones secrets into a temporary private directory, joins the
+tailnet, verifies Omega's pinned SSH key and cache, and applies remote-only Nix
+settings to both the system and Home Manager builds. Failed access aborts before
+erasing the disk; cleanup logs out the temporary identity and deletes the keys.
 
 The installer does not know what modules exist. `system/install/catalog.nix`
 walks the evaluated NixOS and Home Manager option trees and keeps boolean
@@ -178,10 +187,9 @@ only deliberate evaluation-time exception.
 ## Build Farm
 
 Omega builds for the fleet and serves its own store back as a signed binary
-cache. `system/modules/software/nix_build_farm.nix` declares both halves, so a
-client and the server cannot disagree about the port, the URL, or the key.
-Omega sets `nixBuildFarm.server.enable`; every other machine defaults to
-`nixBuildFarm.client.enable`.
+cache. `system/hosts/omega/nix_build_farm_server.nix` owns server settings;
+`system/modules/software/nix_build_farm_client.nix` owns shared client settings.
+Every machine except Omega defaults to `nixBuildFarm.client.enable`.
 
 Clients reach it over MagicDNS at `omega.tail29bd65.ts.net`. Builds go over SSH
 as a dedicated `nixremote` account, authenticated with the existing fleet key

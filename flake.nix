@@ -174,6 +174,16 @@
           repoUrl = "https://github.com/gusjengis/nixos.git";
         };
 
+      installerIso =
+        (nixpkgs-system.lib.nixosSystem {
+          system = "x86_64-linux";
+          modules = [
+            "${nixpkgs-system}/nixos/modules/installer/cd-dvd/installation-cd-minimal.nix"
+            ./system/install/iso.nix
+            { environment.systemPackages = [ (installerFor "x86_64-linux") ]; }
+          ];
+        }).config.system.build.isoImage;
+
       self = {
         homeConfigurations = lib.mapAttrs homeConfigurationFor hosts;
         nixosConfigurations = lib.mapAttrs nixosConfigurationFor systemHosts;
@@ -188,9 +198,15 @@
           stateVersion = nixpkgs-system.lib.trivial.release;
         };
 
-        packages = lib.genAttrs systems (system: {
-          install = installerFor system;
-        });
+        packages = lib.genAttrs systems (
+          system:
+          {
+            install = installerFor system;
+          }
+          // lib.optionalAttrs (system == "x86_64-linux") {
+            install-iso = installerIso;
+          }
+        );
 
         apps = lib.genAttrs systems (system: {
           install = {
