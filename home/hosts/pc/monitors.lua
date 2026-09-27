@@ -22,6 +22,17 @@ hl.config({
 		cm_client_protocol = false,
 	},
 })
+
+hl.window_rule({
+	name = "place-mirror",
+	match = { class = "mpv", title = "^Mirror$" },
+	monitor = "HDMI-A-1",
+	float = true,
+	size = "688 518",
+	move = "3119 55",
+	pin = true,
+})
+
 --                                                               🤷        🤷
 -- probably a better way to organize this... if it ain't broke    ¯\_(ツ)_/¯
 hl.exec_cmd("easyeffects --gapplication-service")

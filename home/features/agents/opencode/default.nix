@@ -24,6 +24,13 @@ let
       exec bash "${configRoot}/session-notify/session-notify-handler.sh" "$@"
     '';
   };
+  supernoteMcp = pkgs.writeShellApplication {
+    name = "supernote-mirror-mcp";
+    runtimeInputs = [ pkgs.python3 ];
+    text = ''
+      exec python3 "${repoRoot}/home/features/hardware/supernote/mirror-mcp.py"
+    '';
+  };
 in
 {
   # Pinned to the upstream flake rather than pkgs.opencode, which trails behind.
@@ -31,6 +38,7 @@ in
   home.packages = [
     inputs.opencode.packages.${pkgs.stdenv.hostPlatform.system}.default
     sessionNotify
+    supernoteMcp
   ];
 
   programs.bash.shellAliases.oc = "opencode";

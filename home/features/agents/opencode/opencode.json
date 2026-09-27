@@ -4,6 +4,13 @@
     "opencode-claude-auth@1.5.4"
   ],
   "model": "auto/auto",
+  "mcp": {
+    "supernote": {
+      "type": "local",
+      "command": ["supernote-mirror-mcp"],
+      "enabled": true
+    }
+  },
   "agent": {
     "build": {
       "color": "secondary"
