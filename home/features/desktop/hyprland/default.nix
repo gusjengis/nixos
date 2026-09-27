@@ -33,11 +33,21 @@ let
   # into the config directory under the name hyprland.lua expects. Hosts
   # without one fall back to the auto layout in hyprland.lua.
   hasMonitors = builtins.pathExists ./../../../hosts/${config.host.name}/monitors.lua;
+
+  # See the header comment in session-env-sync.sh: the systemd user manager
+  # outlives the compositor, so its display variables go stale on every Hyprland
+  # restart and graphical user services start against a dead socket.
+  sessionEnvSync = pkgs.writeShellApplication {
+    name = "session-env-sync";
+    runtimeInputs = [ pkgs.dbus ];
+    text = builtins.readFile ./session-env-sync.sh;
+  };
 in
 {
   config = lib.mkIf config.desktopEnv.enable {
     home.packages = [
       hyprlandPackages.hyprland
+      sessionEnvSync
     ]
     ++ (with pkgs; [
       hypridle

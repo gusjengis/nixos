@@ -1,7 +1,10 @@
 hl.on("hyprland.start", function()
 	hl.exec_cmd("xset r rate 190 50")
 	hl.exec_cmd("hyprctl setcursor $cursor_theme $cursor_size")
-	hl.exec_cmd("systemctl --user start --no-block thunar.service")
+	-- Refreshes the systemd/D-Bus copies of WAYLAND_DISPLAY and friends before
+	-- starting the services that need them. Without this, thunar.service
+	-- inherits the previous compositor's dead socket and crash-loops.
+	hl.exec_cmd("session-env-sync thunar.service")
 	hl.exec_cmd("hyprsunset")
 	hl.exec_cmd("hypridle")
 	hl.exec_cmd("hyprpaper")

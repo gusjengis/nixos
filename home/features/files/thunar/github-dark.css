@@ -1,0 +1,133 @@
+/* GitHub Dark palette for Thunar. Kept private to its XDG_CONFIG_HOME. */
+@define-color window_bg_color #0d1117;
+@define-color window_fg_color #c9d1d9;
+@define-color view_bg_color #0d1117;
+@define-color view_fg_color #c9d1d9;
+@define-color headerbar_bg_color #161b22;
+@define-color headerbar_fg_color #c9d1d9;
+@define-color headerbar_border_color #30363d;
+@define-color headerbar_backdrop_color #0d1117;
+@define-color headerbar_shade_color #30363d;
+@define-color sidebar_bg_color #161b22;
+@define-color sidebar_fg_color #c9d1d9;
+@define-color sidebar_backdrop_color #0d1117;
+@define-color sidebar_border_color #30363d;
+@define-color sidebar_shade_color #30363d;
+@define-color popover_bg_color #161b22;
+@define-color popover_fg_color #c9d1d9;
+@define-color dialog_bg_color #161b22;
+@define-color dialog_fg_color #c9d1d9;
+@define-color card_bg_color #21262d;
+@define-color card_fg_color #c9d1d9;
+@define-color accent_color #79c0ff;
+@define-color accent_bg_color #58a6ff;
+@define-color accent_fg_color #ffffff;
+@define-color destructive_color #ff7b72;
+@define-color destructive_bg_color #ff7b72;
+@define-color error_color #ff7b72;
+@define-color error_bg_color #ff7b72;
+@define-color warning_color #d29922;
+@define-color warning_bg_color #d29922;
+@define-color success_color #79c0ff;
+@define-color borders #30363d;
+@define-color theme_bg_color #0d1117;
+@define-color theme_fg_color #c9d1d9;
+@define-color theme_base_color #0d1117;
+@define-color theme_text_color #c9d1d9;
+@define-color theme_selected_bg_color #58a6ff;
+@define-color theme_selected_fg_color #ffffff;
+@define-color insensitive_fg_color #8b949e;
+@define-color theme_unfocused_fg_color #8b949e;
+
+/* Thunar sidebar */
+.shortcuts-pane,
+.shortcuts-pane treeview.view,
+.sidebar treeview.view {
+  background-color: @sidebar_bg_color;
+}
+
+.shortcuts-pane treeview.view,
+.sidebar treeview.view {
+  -GtkTreeView-vertical-separator: 7;
+  -GtkTreeView-horizontal-separator: 6;
+}
+
+.shortcuts-pane treeview.view:selected,
+.sidebar treeview.view:selected {
+  background-color: @accent_bg_color;
+  color: @accent_fg_color;
+  border-radius: 7px;
+}
+
+.shortcuts-pane treeview.view:hover:not(:selected),
+.sidebar treeview.view:hover:not(:selected) {
+  background-color: alpha(@window_fg_color, 0.07);
+  border-radius: 7px;
+}
+
+.shortcuts-pane treeview.view:disabled,
+.sidebar treeview.view:disabled {
+  color: alpha(@window_fg_color, 0.55);
+  background-color: transparent;
+}
+
+/* File pane */
+.standard-view,
+.standard-view .view {
+  background-color: @view_bg_color;
+}
+
+.standard-view .view:selected,
+.standard-view iconview:selected,
+.standard-view treeview.view:selected {
+  background-color: @accent_bg_color;
+  color: @accent_fg_color;
+  border-radius: 8px;
+}
+
+/* Headerbar and pathbar */
+headerbar {
+  background-color: @headerbar_bg_color;
+  border-bottom: 1px solid @headerbar_border_color;
+  box-shadow: none;
+  min-height: 42px;
+}
+
+headerbar:backdrop {
+  background-color: @headerbar_backdrop_color;
+}
+
+headerbar button,
+.path-bar-button,
+.location-button {
+  background-image: none;
+  background-color: transparent;
+  border: none;
+  box-shadow: none;
+  border-radius: 7px;
+}
+
+headerbar button:hover,
+.path-bar-button:hover,
+.location-button:hover {
+  background-color: alpha(@window_fg_color, 0.1);
+}
+
+headerbar button:active,
+headerbar button:checked,
+.path-bar-button:checked,
+.location-button:checked {
+  background-color: alpha(@accent_bg_color, 0.3);
+}
+
+paned > separator {
+  background-color: @sidebar_border_color;
+  min-width: 1px;
+}
+
+.thunar-statusbar,
+statusbar {
+  background-color: @headerbar_bg_color;
+  border-top: 1px solid @headerbar_border_color;
+  color: alpha(@window_fg_color, 0.7);
+}
