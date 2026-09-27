@@ -93,6 +93,10 @@ def test_activation_uses_target_daemon_and_removes_recovery_marker(
     assert command[:3] == ["nixos-enter", "--root", str(subject.mountpoint)]
     assert "$system/sw/bin/nix-daemon --daemon" in script
     assert '$system/sw/bin/runuser -u "$user"' in script
+    assert script.index("/home/$user ") < script.index("/home/$user/.local ")
+    assert script.index("/home/$user/.local ") < script.index(
+        "/home/$user/.local/state "
+    )
     assert f"exec {pipeline.HOME_GENERATION}/activate" in script
     assert kwargs["stream"] is True
     assert_shell_syntax(script)

@@ -180,7 +180,7 @@
           modules = [
             "${nixpkgs-system}/nixos/modules/installer/cd-dvd/installation-cd-minimal.nix"
             ./system/install/iso.nix
-            { environment.systemPackages = [ (lib.hiPrio (installerFor "x86_64-linux")) ]; }
+            { environment.systemPackages = [ (installerFor "x86_64-linux") ]; }
           ];
         }).config.system.build.isoImage;
 

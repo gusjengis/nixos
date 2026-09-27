@@ -414,6 +414,9 @@ trap 'exit 143' TERM
 $system/sw/bin/install -d -m 700 -o "$user" -g users "$runtime"
 $system/sw/bin/install -d -m 755 /nix/var/nix/daemon-socket
 $system/sw/bin/install -d -m 700 -o "$user" -g users \
+  /home/$user \
+  /home/$user/.local \
+  /home/$user/.local/state \
   /home/$user/.local/state/nix/profiles \
   /home/$user/.local/state/home-manager
 if [ -n "${{NIXOS_INSTALL_GITHUB_TOKEN:-}}" ]; then
