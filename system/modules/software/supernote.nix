@@ -1,11 +1,15 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 {
   options.supernote.enable = lib.mkEnableOption "Supernote ADB access";
 
   config = lib.mkIf config.supernote.enable {
-    programs.adb.enable = true;
-    users.users.gusjengis.extraGroups = [ "adbusers" ];
+    environment.systemPackages = [ pkgs.android-tools ];
 
     services.udev.extraRules = ''
       ACTION=="add", SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTR{idVendor}=="2207", ATTR{idProduct}=="0017", TAG+="systemd", ENV{SYSTEMD_WANTS}+="supernote-connect.service"

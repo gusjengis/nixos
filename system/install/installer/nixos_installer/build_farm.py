@@ -127,8 +127,8 @@ def bootstrap(
                 reporter=reporter,
                 env=build_env,
                 timeout=15,
-            ).stdout
-            if "Trusted: 1" not in store:
+            )
+            if "Trusted: 1" not in (store.stdout + store.stderr).splitlines():
                 raise RuntimeError(
                     "Omega's remote Nix store did not grant builder access."
                 )

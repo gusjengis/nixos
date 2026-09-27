@@ -84,9 +84,10 @@ def test_bootstrap_uses_ephemeral_credentials_and_cleans_up(monkeypatch):
             )
             assert auth_file.read_text() == "secret"
             assert auth_file.stat().st_mode & 0o777 == 0o600
+        error = ""
         if command[:2] == ["nix", "store"]:
-            output = "Store URL: ssh-ng://omega\nTrusted: 1\n"
-        return subprocess.CompletedProcess(command, 0, output, "")
+            error = "Store URL: ssh-ng://omega\nTrusted: 1\n"
+        return subprocess.CompletedProcess(command, 0, output, error)
 
     monkeypatch.setattr(build_farm, "run", fake_run)
     monkeypatch.setattr(
@@ -114,14 +115,15 @@ def test_bootstrap_uses_ephemeral_credentials_and_cleans_up(monkeypatch):
 
 
 @pytest.mark.parametrize(
-    ("dns_name", "reusable"),
+    ("dns_name", "reusable", "trusted"),
     [
-        ("install-newhost.example.ts.net.", True),
-        ("somebody-else.example.ts.net.", False),
+        ("install-newhost.example.ts.net.", True, True),
+        ("install-newhost.example.ts.net.", True, False),
+        ("somebody-else.example.ts.net.", False, True),
     ],
 )
 def test_existing_identity_is_reused_only_for_same_installer(
-    monkeypatch, dns_name, reusable
+    monkeypatch, dns_name, reusable, trusted
 ):
     calls = []
 
@@ -140,20 +142,26 @@ def test_existing_identity_is_reused_only_for_same_installer(
             output = json.dumps(
                 {"BackendState": "Running", "Self": {"DNSName": dns_name}}
             )
+        error = ""
         if command[:2] == ["nix", "store"]:
-            output = "Store URL: ssh-ng://omega\nTrusted: 1\n"
-        return subprocess.CompletedProcess(command, 0, output, "")
+            error = f"Store URL: ssh-ng://omega\nTrusted: {int(trusted)}\n"
+        return subprocess.CompletedProcess(command, 0, output, error)
 
     monkeypatch.setattr(build_farm, "run", fake_run)
     monkeypatch.setattr(
         build_farm.urllib.request, "urlopen", lambda *_a, **_kw: CacheResponse()
     )
-    if reusable:
+    if reusable and trusted:
         with build_farm.bootstrap(Workspace(), "newhost", "github-token", Reporter()):
             pass
     else:
+        message = (
+            "did not grant builder access"
+            if reusable
+            else "different Tailscale identity"
+        )
         with (
-            pytest.raises(RuntimeError, match="different Tailscale identity"),
+            pytest.raises(RuntimeError, match=message),
             build_farm.bootstrap(Workspace(), "newhost", "github-token", Reporter()),
         ):
             pytest.fail("different identity should be rejected")
