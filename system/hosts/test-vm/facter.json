@@ -1142,7 +1142,7 @@
         "unix_device_names": [
           "/dev/cdrom",
           "/dev/disk/by-id/ata-QEMU_DVD-ROM_QM00001",
-          "/dev/disk/by-label/nixos-minimal-26.05-x86_64",
+          "/dev/disk/by-label/nixos-minimal-26.11-x86_64",
           "/dev/disk/by-path/pci-0000:00:1f.2-ata-1",
           "/dev/disk/by-path/pci-0000:00:1f.2-ata-1.0",
           "/dev/disk/by-uuid/1980-01-01-00-00-00-00",
@@ -1884,7 +1884,7 @@
         },
         "vendor": {
           "hex": "1d6b",
-          "name": "Linux 6.18.53 xhci-hcd",
+          "name": "Linux 6.18.48 xhci-hcd",
           "value": 7531
         },
         "device": {
@@ -1898,7 +1898,7 @@
           "value": 0
         },
         "serial": "0000:02:00.0",
-        "model": "Linux 6.18.53 xhci-hcd xHCI Host Controller",
+        "model": "Linux 6.18.48 xhci-hcd xHCI Host Controller",
         "sysfs_id": "/devices/pci0000:00/0000:00:02.1/0000:02:00.0/usb1/1-0:1.0",
         "sysfs_bus_id": "1-0:1.0",
         "resources": [
@@ -1971,7 +1971,7 @@
         },
         "vendor": {
           "hex": "1d6b",
-          "name": "Linux 6.18.53 xhci-hcd",
+          "name": "Linux 6.18.48 xhci-hcd",
           "value": 7531
         },
         "device": {
@@ -1985,7 +1985,7 @@
           "value": 0
         },
         "serial": "0000:02:00.0",
-        "model": "Linux 6.18.53 xhci-hcd xHCI Host Controller",
+        "model": "Linux 6.18.48 xhci-hcd xHCI Host Controller",
         "sysfs_id": "/devices/pci0000:00/0000:00:02.1/0000:02:00.0/usb2/2-0:1.0",
         "sysfs_bus_id": "2-0:1.0",
         "detail": {
@@ -2363,7 +2363,29 @@
     ],
     "network_interface": [
       {
-        "index": 46,
+        "index": 47,
+        "attached_to": 0,
+        "class_list": [
+          "network_interface"
+        ],
+        "base_class": {
+          "hex": "0107",
+          "name": "Network Interface",
+          "value": 263
+        },
+        "sub_class": {
+          "hex": "0000",
+          "name": "Loopback",
+          "value": 0
+        },
+        "model": "Loopback network interface",
+        "sysfs_id": "/class/net/lo",
+        "unix_device_names": [
+          "lo"
+        ]
+      },
+      {
+        "index": 48,
         "attached_to": 33,
         "class_list": [
           "network_interface"
@@ -2401,28 +2423,6 @@
         ],
         "driver_modules": [
           "virtio_net"
-        ]
-      },
-      {
-        "index": 47,
-        "attached_to": 0,
-        "class_list": [
-          "network_interface"
-        ],
-        "base_class": {
-          "hex": "0107",
-          "name": "Network Interface",
-          "value": 263
-        },
-        "sub_class": {
-          "hex": "0000",
-          "name": "Loopback",
-          "value": 0
-        },
-        "model": "Loopback network interface",
-        "sysfs_id": "/class/net/lo",
-        "unix_device_names": [
-          "lo"
         ]
       }
     ],
