@@ -23,8 +23,9 @@
     ./software/nvim.nix
     ./software/git.nix
     ./software/ollama.nix
-    ./software/nix_build_farm.nix
+    ./software/nix_build_farm_client.nix
     ./software/vial.nix
+    ./software/supernote.nix
     ./software/tailscale.nix
     ./software/fleet-monitor.nix
     ./software/office_network_drives.nix
@@ -42,6 +43,7 @@
     nvim.enable = lib.mkDefault true;
     git.enable = lib.mkDefault true;
     vial.enable = lib.mkDefault true;
+    supernote.enable = lib.mkDefault config.hyprland.enable;
     tailscale.enable = lib.mkDefault true;
     dataDrive.client.enable = lib.mkDefault true;
     virtual-machines.enable = lib.mkDefault false;

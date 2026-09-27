@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Supernote Mirror
+Comment=Open Supernote screen mirror
+Exec=supernote-mirror open
+Icon=webapp-supernote
+Terminal=false
+Categories=Graphics;Network;
+Keywords=supernote;mirror;screen;
+StartupNotify=true
+StartupWMClass=supernote-mirror
