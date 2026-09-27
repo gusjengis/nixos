@@ -7,7 +7,6 @@ hl.env("XCURSOR_THEME", cursorTheme)
 hl.env("XCURSOR_SIZE", cursorSize)
 hl.env("GTK_THEME", "Adwaita:dark")
 
-
 hl.config({
 	general = {
 		gaps_in = 5,

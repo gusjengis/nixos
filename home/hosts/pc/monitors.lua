@@ -17,6 +17,11 @@ require("monitor-modes").configure({
 	},
 })
 
+hl.config({
+	render = {
+		cm_client_protocol = false,
+	},
+})
 --                                                               🤷        🤷
 -- probably a better way to organize this... if it ain't broke    ¯\_(ツ)_/¯
 hl.exec_cmd("easyeffects --gapplication-service")
