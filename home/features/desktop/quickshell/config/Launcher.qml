@@ -134,7 +134,11 @@ PanelWindow {
                 "lastUsed": frequency.lastUsed || 0,
                 "score": fuzzyScore(app.name + " " + description, query)
             };
-        }).filter(result => result.score >= 0).sort((left, right) => right.count - left.count || right.lastUsed - left.lastUsed || right.score - left.score || left.name.localeCompare(right.name));
+        }).filter(result => result.score >= 0).sort((left, right) => {
+            if (query === "")
+                return right.count - left.count || right.lastUsed - left.lastUsed || left.name.localeCompare(right.name);
+            return right.score - left.score || left.name.localeCompare(right.name);
+        });
     }
 
     function loadUsage() {

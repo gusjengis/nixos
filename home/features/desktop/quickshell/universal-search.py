@@ -181,7 +181,10 @@ def list_projects(query):
             "lastUsed": int(frequency.get("lastUsed", 0)),
             "score": score,
         })
-    results.sort(key=lambda item: (-item["count"], -item["lastUsed"], -item["score"], item["name"].lower()))
+    if query.strip() == "":
+        results.sort(key=lambda item: (-item["count"], -item["lastUsed"], item["name"].lower()))
+    else:
+        results.sort(key=lambda item: (-item["score"], item["name"].lower()))
     for result in results:
         print(json.dumps(result), flush=True)
 
