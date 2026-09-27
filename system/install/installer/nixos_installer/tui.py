@@ -216,7 +216,7 @@ class InstallerApp(App[TuiResult]):
         self.selections: dict[str, bool] = catalog.defaults
         self.selections.update(initial.with_defaults(catalog))
         self.touched: set[str] = set(initial.modules)
-        self._suppress = False
+        self._pending_checkbox_changes: dict[str, list[bool]] = {}
 
         # None: not checked yet, or the token changed since the last check.
         # True/False: what the last check against GitHub found, for exactly
@@ -546,9 +546,13 @@ class InstallerApp(App[TuiResult]):
 
     @on(Checkbox.Changed)
     def _checkbox_changed(self, event: Checkbox.Changed) -> None:
-        if self._suppress:
-            return
         identifier = event.checkbox.id or ""
+        pending = self._pending_checkbox_changes.get(identifier, [])
+        if pending and pending[0] == event.value:
+            pending.pop(0)
+            if not pending:
+                del self._pending_checkbox_changes[identifier]
+            return
 
         if identifier.startswith("cat-"):
             category_id = identifier.removeprefix("cat-")
@@ -559,15 +563,17 @@ class InstallerApp(App[TuiResult]):
             self.touched.add(role_id)
             self._sync_category_of(role_id)
 
+    def _set_checkbox(self, identifier: str, value: bool) -> None:
+        box = self.query_one(f"#{identifier}", Checkbox)
+        if box.value != value:
+            self._pending_checkbox_changes.setdefault(identifier, []).append(value)
+            box.value = value
+
     def _set_category(self, category_id: str, value: bool) -> None:
-        self._suppress = True
-        try:
-            for role in self.catalog.roles_in(category_id):
-                self.selections[role.id] = value
-                self.touched.add(role.id)
-                self.query_one(f"#role-{role.id}", Checkbox).value = value
-        finally:
-            self._suppress = False
+        for role in self.catalog.roles_in(category_id):
+            self.selections[role.id] = value
+            self.touched.add(role.id)
+            self._set_checkbox(f"role-{role.id}", value)
 
     def _sync_category_of(self, role_id: str) -> None:
         role = self.catalog.by_id(role_id)
@@ -576,12 +582,10 @@ class InstallerApp(App[TuiResult]):
         members = self.catalog.roles_in(role.category)
         if not members:
             return
-        self._suppress = True
-        try:
-            box = self.query_one(f"#cat-{role.category}", Checkbox)
-            box.value = all(self.selections[member.id] for member in members)
-        finally:
-            self._suppress = False
+        self._set_checkbox(
+            f"cat-{role.category}",
+            all(self.selections[member.id] for member in members),
+        )
 
     # -- result -----------------------------------------------------------
 

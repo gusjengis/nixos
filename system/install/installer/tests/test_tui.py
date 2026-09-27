@@ -104,6 +104,39 @@ class TestCategoryToggles:
 
         assert drive(app, body) is False
 
+    def test_toggling_one_module_preserves_other_defaults(self, catalog, disks):
+        app = make_app(catalog, disks)
+
+        async def body(pilot):
+            from textual.widgets import Checkbox
+
+            app.query_one("#role-hyprland", Checkbox).toggle()
+            await pilot.pause()
+            return (
+                app.selections["hyprland"],
+                app.selections["desktop"],
+                app.query_one("#cat-desktop", Checkbox).value,
+                app._collect().modules,
+            )
+
+        assert drive(app, body) == (False, True, False, {"hyprland": False})
+
+    def test_header_still_changes_every_module_after_individual_toggle(
+        self, catalog, disks
+    ):
+        app = make_app(catalog, disks)
+
+        async def body(pilot):
+            from textual.widgets import Checkbox
+
+            app.query_one("#role-hyprland", Checkbox).toggle()
+            await pilot.pause()
+            app.query_one("#cat-desktop", Checkbox).toggle()
+            await pilot.pause()
+            return app._collect().modules
+
+        assert drive(app, body) == {"hyprland": True, "desktop": True}
+
     def test_only_touched_modules_are_answered(self, catalog, disks):
         app = make_app(catalog, disks)
 

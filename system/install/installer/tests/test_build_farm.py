@@ -78,6 +78,12 @@ def test_bootstrap_uses_ephemeral_credentials_and_cleans_up(monkeypatch):
             output = json.dumps({"BackendState": "NeedsLogin"})
         if command[:2] == ["bash", "-c"]:
             output = "secret"
+        if command[:2] == ["tailscale", "up"]:
+            auth_file = Path(
+                command[command.index("--auth-key") + 1].removeprefix("file:")
+            )
+            assert auth_file.read_text() == "secret"
+            assert auth_file.stat().st_mode & 0o777 == 0o600
         if command[:2] == ["nix", "store"]:
             output = "Store URL: ssh-ng://omega\nTrusted: 1\n"
         return subprocess.CompletedProcess(command, 0, output, "")
@@ -99,8 +105,61 @@ def test_bootstrap_uses_ephemeral_credentials_and_cleans_up(monkeypatch):
     assert not farm.secrets.exists()
     assert calls[-1][0] == ["tailscale", "logout"]
     assert calls[3][0][:2] == ["tailscale", "up"]
-    assert calls[3][1]["env"]["TS_AUTHKEY"] == "secret"
+    auth_file = Path(
+        calls[3][0][calls[3][0].index("--auth-key") + 1].removeprefix("file:")
+    )
+    assert not auth_file.exists()
+    assert calls[3][1].get("env") is None
     assert "secret" not in " ".join(calls[3][0])
+
+
+@pytest.mark.parametrize(
+    ("dns_name", "reusable"),
+    [
+        ("install-newhost.example.ts.net.", True),
+        ("somebody-else.example.ts.net.", False),
+    ],
+)
+def test_existing_identity_is_reused_only_for_same_installer(
+    monkeypatch, dns_name, reusable
+):
+    calls = []
+
+    def fake_run(command, **kwargs):
+        calls.append(command)
+        if command[:2] == ["git", "clone"]:
+            checkout = Path(command[-1])
+            (checkout / "ssh").mkdir(parents=True)
+            (checkout / "ssh/shared_ed25519").write_text("private-key")
+            (checkout / "api_keys").mkdir()
+            (checkout / "api_keys/env_vars").write_text("TAILSCALE_AUTH_KEY=secret")
+        output = ""
+        if command[0] == "bash":
+            output = "secret"
+        if command[:2] == ["tailscale", "status"]:
+            output = json.dumps(
+                {"BackendState": "Running", "Self": {"DNSName": dns_name}}
+            )
+        if command[:2] == ["nix", "store"]:
+            output = "Store URL: ssh-ng://omega\nTrusted: 1\n"
+        return subprocess.CompletedProcess(command, 0, output, "")
+
+    monkeypatch.setattr(build_farm, "run", fake_run)
+    monkeypatch.setattr(
+        build_farm.urllib.request, "urlopen", lambda *_a, **_kw: CacheResponse()
+    )
+    if reusable:
+        with build_farm.bootstrap(Workspace(), "newhost", "github-token", Reporter()):
+            pass
+    else:
+        with (
+            pytest.raises(RuntimeError, match="different Tailscale identity"),
+            build_farm.bootstrap(Workspace(), "newhost", "github-token", Reporter()),
+        ):
+            pytest.fail("different identity should be rejected")
+
+    assert not any(command[:2] == ["tailscale", "up"] for command in calls)
+    assert not any(command[:2] == ["tailscale", "logout"] for command in calls)
 
 
 def test_failed_remote_store_still_logs_out_before_partition(monkeypatch):

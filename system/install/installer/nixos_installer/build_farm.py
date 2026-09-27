@@ -76,28 +76,36 @@ def bootstrap(
         state = json.loads(
             run(["tailscale", "status", "--json"], reporter=reporter).stdout
         )
+        installer_name = f"install-{host}"
         if state["BackendState"] == "Running":
-            raise RuntimeError(
-                "Live environment already has a Tailscale identity; refusing to replace it."
-            )
+            dns_name = state.get("Self", {}).get("DNSName", "").rstrip(".")
+            if dns_name != f"{installer_name}.{cfg['tailnetDomain']}":
+                raise RuntimeError(
+                    "Live environment already has a different Tailscale identity; "
+                    "refusing to replace it."
+                )
+            reporter.info("Reusing this installer's existing Tailscale connection")
 
         logged_in = False
         try:
-            login_env = dict(os.environ)
-            login_env["TS_AUTHKEY"] = auth_key
-            logged_in = True
-            run(
-                [
-                    "tailscale",
-                    "up",
-                    "--hostname",
-                    f"install-{host}",
-                    "--timeout",
-                    "30s",
-                ],
-                reporter=reporter,
-                env=login_env,
-            )
+            if state["BackendState"] != "Running":
+                auth_file = root / "tailscale-auth-key"
+                auth_file.write_text(auth_key)
+                auth_file.chmod(0o600)
+                logged_in = True
+                run(
+                    [
+                        "tailscale",
+                        "up",
+                        "--auth-key",
+                        f"file:{auth_file}",
+                        "--hostname",
+                        installer_name,
+                        "--timeout",
+                        "30s",
+                    ],
+                    reporter=reporter,
+                )
             fqdn = f"{cfg['serverHost']}.{cfg['tailnetDomain']}"
             known_hosts = root / "known_hosts"
             known_hosts.write_text(f"{fqdn} {cfg['serverHostKey']}\n")
