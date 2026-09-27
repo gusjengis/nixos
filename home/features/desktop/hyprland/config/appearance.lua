@@ -5,6 +5,8 @@ hl.env("HYPRCURSOR_THEME", cursorTheme)
 hl.env("HYPRCURSOR_SIZE", cursorSize)
 hl.env("XCURSOR_THEME", cursorTheme)
 hl.env("XCURSOR_SIZE", cursorSize)
+hl.env("GTK_THEME", "Adwaita:dark")
+
 
 hl.config({
 	general = {
@@ -45,6 +47,11 @@ hl.config({
 })
 
 hl.workspace_rule({ workspace = "", blur = true })
+hl.window_rule({
+	name = "mirror-no-workspace-blur",
+	match = { title = "^Mirror$" },
+	workspace_blur = false,
+})
 
 hl.curve("easeOutQuint", { type = "bezier", points = { { 0.23, 1 }, { 0.32, 1 } } })
 hl.curve("easeInOutCubic", { type = "bezier", points = { { 0.65, 0.05 }, { 0.36, 1 } } })
