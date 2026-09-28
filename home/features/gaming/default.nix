@@ -14,7 +14,6 @@
       protonup-qt
       prismlauncher
       atlauncher
-      lutris
       solitaire-tui
     ];
   };
