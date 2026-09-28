@@ -10,7 +10,7 @@ logo.image = logo.original.Scale(logo.width, logo.width * logo.original.GetHeigh
 logo.sprite = SpriteNew();
 logo.sprite.SetImage(logo.image);
 logo.sprite.SetPosition(Window.GetX() + (Window.GetWidth() - logo.image.GetWidth()) / 2,
-                        Window.GetY() + Window.GetHeight() * 0.370833333 - logo.width * 0.010453, 1);
+                        Window.GetY() + Window.GetHeight() * 0.446667 - logo.width * 0.12079, 1);
 
 track.original = ImageNew("progress_box.png");
 track.width = Window.GetWidth() * 0.155;
@@ -27,6 +27,12 @@ fill.sprite = SpriteNew();
 fill.sprite.SetPosition(Window.GetX() + (Window.GetWidth() - fill.width) / 2,
                         Window.GetY() + Window.GetHeight() * 0.645 - fill.height / 2, 2);
 fill.progress = 0;
+blank_screen = Plymouth.GetMode() == "shutdown" || Plymouth.GetMode() == "reboot";
+if (blank_screen) {
+  logo.sprite.SetOpacity(0);
+  track.sprite.SetOpacity(0);
+  fill.sprite.SetOpacity(0);
+}
 
 fun progress_callback(duration, progress) {
   progress = Math.Max(0, Math.Min(1, progress));
@@ -55,8 +61,10 @@ fun password_callback(text, bullets) {
 }
 fun normal_callback() {
   prompt.sprite.SetOpacity(0);
-  fill.sprite.SetOpacity(1);
-  track.sprite.SetOpacity(1);
+  if (!blank_screen) {
+    fill.sprite.SetOpacity(1);
+    track.sprite.SetOpacity(1);
+  }
 }
 Plymouth.SetDisplayPasswordFunction(password_callback);
 Plymouth.SetDisplayNormalFunction(normal_callback);
