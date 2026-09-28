@@ -67,14 +67,15 @@ letting that placeholder reach the network.
 
 | Tier | Typical work | Configured pool |
 | --- | --- | --- |
-| `trivial` | Greetings and standalone acknowledgements | Haiku 4.5, GPT-5.6 Luna-fast |
-| `simple` | Mechanical edits and bounded lookups | GPT-5.6 Luna-fast, Haiku 4.5 |
-| `medium` | Routine features and focused explanations | GPT-5.6 Sol-fast, Sonnet 5 |
-| `complex` | Unknown causes, new components, integrations | GPT-5.6 Sol, Sonnet 5 |
-| `reasoning` | Concurrency, security, difficult design | Opus 5, GPT-5.6 Sol |
+| `trivial` | Greetings and standalone acknowledgements | Haiku 4.5, GPT-6 Luna-fast |
+| `simple` | Mechanical edits and bounded lookups | GPT-6 Luna-fast, Haiku 4.5 |
+| `medium` | Routine features and focused explanations | GPT-6 Sol-fast, Sonnet 5 |
+| `complex` | Unknown causes, new components, integrations | GPT-6 Sol, Sonnet 5 |
+| `reasoning` | Concurrency, security, difficult design | Opus 5.5, GPT-6 Sol |
 
 Trivial and simple currently share models and effort. Their distinction is
 semantic, not a guaranteed difference in consumption.
+GPT-6 Astra is blocked from Auto routing; it remains available for manual selection.
 
 The local classifier is `qwen3:4b-instruct-2507-q8_0` on `omega:11434`. It sees
 the current user's text and attachment count, not the full conversation, file

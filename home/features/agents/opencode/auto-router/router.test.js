@@ -97,6 +97,19 @@ test("blocked fallback stays blocked", async (t) => {
   await assert.rejects(f.send("!deep work"), /no usable model/)
 })
 
+test("reasoning falls back to Sol, never Astra, when Opus is unavailable", async (t) => {
+  const f = await fixture(t, { blocked: ["anthropic/claude-opus-5-5", "openai/gpt-6-astra"] })
+  const result = await f.send("!deep work")
+  assert.equal(result.state.tier, "reasoning")
+  assert.equal(result.output.message.model.modelID, "gpt-6-sol")
+  assert.equal(result.output.message.model.variant, "high")
+})
+
+test("blocked Astra cannot be routed even if added to a pool", async (t) => {
+  const f = await fixture(t, { tiers: { reasoning: ["openai/gpt-6-astra"] } })
+  assert.equal((await f.send("!deep work")).output.message.model.modelID, "claude-sonnet-5")
+})
+
 test("near-quality model remains sticky after headroom changes", async (t) => {
   let openai = 80
   const usage = usageOptions(0, 10)

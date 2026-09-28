@@ -59,7 +59,7 @@ const DEFAULTS = {
     simple: ["openai/gpt-6-luna-fast", "anthropic/claude-haiku-4-5"],
     medium: ["openai/gpt-6-sol-fast", "anthropic/claude-sonnet-5"],
     complex: ["openai/gpt-6-sol", "anthropic/claude-sonnet-5"],
-    reasoning: ["anthropic/claude-opus-5-5", "openai/gpt-6-astra"],
+    reasoning: ["anthropic/claude-opus-5-5", "openai/gpt-6-sol"],
   },
 
   // Reasoning effort per tier, for models that pick their own thinking budget
@@ -88,9 +88,9 @@ const DEFAULTS = {
 
   fallback: "anthropic/claude-sonnet-5",
 
-  // Models never to route to, whatever the catalog advertises. For models that
-  // are listed but permanently unusable on this machine's credentials.
-  blocked: [],
+  // Models never to route to, whatever the catalog advertises. Manual model
+  // selection bypasses this list.
+  blocked: ["openai/gpt-6-astra"],
 
   // A model that answers a routed turn with a fatal error is taken out of the
   // pools for a while, so the same dead model is not picked again on the next
@@ -198,7 +198,7 @@ const MODEL_INTELLIGENCE = {
   },
   reasoning: {
     "anthropic/claude-opus-5-5": 58, // adaptive max reference
-    "openai/gpt-6-astra": 53, // max benchmark; routed at high effort
+    "openai/gpt-6-sol": 48, // max benchmark; routed at high effort
   },
 }
 

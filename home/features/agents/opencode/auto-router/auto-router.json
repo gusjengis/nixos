@@ -19,7 +19,7 @@
     ],
     "reasoning": [
       "anthropic/claude-opus-5-5",
-      "openai/gpt-6-astra"
+      "openai/gpt-6-sol"
     ]
   },
   "effort": {
@@ -37,7 +37,7 @@
     "reasoning": "high"
   },
   "fallback": "anthropic/claude-sonnet-5",
-  "blocked": [],
+  "blocked": ["openai/gpt-6-astra"],
   "quarantine": {
     "enabled": true,
     "minutes": 60,
