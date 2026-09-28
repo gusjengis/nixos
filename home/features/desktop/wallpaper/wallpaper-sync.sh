@@ -4,8 +4,8 @@
 #
 # Two callers share this script. Ctrl+D in the picker runs it so a hide reaches
 # the other machines promptly, and an hourly timer runs it to pick up new
-# wallpapers from the GitHub Actions job. flock serialises the two, so a hide
-# landing mid-pull cannot leave a half-rebased tree.
+# wallpapers from omega's nightly wallpaper-fetch job. flock serialises the two,
+# so a hide landing mid-pull cannot leave a half-rebased tree.
 #
 # Only curation.json is ever authored here. Images and metadata.json belong to
 # the fetcher, and committing those from a workstation would race it.

@@ -177,10 +177,11 @@ in
     # files without breaking repository-backed configuration.
     xdg.configFile."quickshell".source = config.lib.file.mkOutOfStoreSymlink configRoot;
 
-    # ~/Wallpapers is updated by a scheduled GitHub Actions job rather than by
-    # hand, so it needs a pull that is not tied to login. repo-sync only runs on
-    # first network after boot, which would leave a machine that stays up for
-    # days on a stale library.
+    # ~/Wallpapers is updated nightly by omega's wallpaper-fetch timer
+    # (system/hosts/omega/wallpaper_fetch.nix) rather than by hand, so it needs a
+    # pull that is not tied to login. repo-sync only runs on first network after
+    # boot, which would leave a machine that stays up for days on a stale
+    # library.
     systemd.user.services.wallpaper-sync = {
       Unit = {
         Description = "Sync ~/Wallpapers with its git remote";

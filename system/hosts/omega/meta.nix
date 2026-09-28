@@ -7,5 +7,13 @@
       unit = "docker.service";
       label = "Container runtime";
     }
+    {
+      unit = "forgejo.service";
+      label = "Private git forge";
+    }
+    {
+      unit = "wallpaper-fetch.timer";
+      label = "Nightly wallpaper collection";
+    }
   ];
 }

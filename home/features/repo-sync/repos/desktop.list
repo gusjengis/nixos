@@ -1,2 +1,7 @@
 # Repositories that should only sync when desktopEnv.enable is true.
-$HOME/;https://github.com/gusjengis/Wallpapers.git
+#
+# Wallpapers lives on omega's own Forgejo (system/hosts/omega/forgejo.nix)
+# rather than GitHub, because GitHub bills git-LFS storage past 1 GB and this
+# library is tens of gigabytes of it. Reachable on the tailnet only, and
+# authenticated with the fleet key the ssh config already offers everywhere.
+$HOME/;ssh://git@omega.tail29bd65.ts.net:2222/gusjengis/Wallpapers.git

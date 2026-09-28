@@ -42,6 +42,19 @@ clone_repo() {
             set +e
             cd "$repo_name" 2>/dev/null || { echo "cd failed: $repo_name"; return 0; }
 
+            # The repository lists are the source of truth for where a
+            # repository lives, so adopt a changed URL rather than fetching
+            # forever from wherever this checkout was originally cloned.
+            # Without this, moving a repository to another host would silently
+            # only affect machines that had never cloned it. Deliberately
+            # quiet: sync_repo treats any output as a failure to report, and a
+            # move recorded in the list file is not a failure.
+            local current_url
+            current_url=$(git remote get-url origin 2>/dev/null)
+            if [ -n "$current_url" ] && [ "$current_url" != "$repo_url" ]; then
+                git remote set-url origin "$repo_url" 2>/dev/null
+            fi
+
             # --ignore-submodules=all: the Neovim config submodule sits on its
             # own branch and is routinely a commit or two away from the pin.
             # Counting submodule drift as an uncommitted change would prevent
