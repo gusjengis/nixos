@@ -127,6 +127,7 @@
       alsa.support32Bit = true;
       pulse.enable = true;
     };
+    systemd.user.services.pipewire.serviceConfig.TimeoutStopSec = "15s";
     environment.sessionVariables.NIXOS_OZONE_WL = "1";
     services.gnome.core-apps.enable = false;
 

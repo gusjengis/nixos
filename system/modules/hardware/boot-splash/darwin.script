@@ -28,6 +28,7 @@ fill.cap = SpriteNew();
 fill.cap.SetImage(fill.original.Crop(fill.width - 6, 0, 6, fill.height));
 fill.cap.SetOpacity(0);
 fill.progress = 0;
+session_ready = false;
 blank_screen = Plymouth.GetMode() == "shutdown" || Plymouth.GetMode() == "reboot";
 if (blank_screen) {
   logo.sprite.SetOpacity(0);
@@ -36,6 +37,11 @@ if (blank_screen) {
 }
 
 fun progress_callback(duration, progress) {
+  # Plymouth can report 100% at the initrd handoff, then resume from a lower value.
+  if (session_ready)
+    progress = 1;
+  else if (progress >= 1)
+    progress = fill.progress / fill.width;
   progress = Math.Max(0, Math.Min(1, progress));
   width = Math.Int(fill.width * progress);
   if (width > 0)
@@ -50,8 +56,10 @@ fun progress_callback(duration, progress) {
 Plymouth.SetBootProgressFunction(progress_callback);
 
 fun message_callback(text) {
-  if (text == "darwin-session-ready")
+  if (text == "darwin-session-ready") {
+    session_ready = true;
     progress_callback(0, 1);
+  }
 }
 Plymouth.SetDisplayMessageFunction(message_callback);
 
