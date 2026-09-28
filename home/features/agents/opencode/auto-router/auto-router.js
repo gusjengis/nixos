@@ -49,17 +49,17 @@ const DEFAULTS = {
   // remaining headroom. Top-quality picks stay sticky for
   // the session so live conversations preserve their prompt cache.
   //
-  // Intelligence scores are from Artificial Analysis Intelligence Index v4.3 (Sept 2026).
+  // Intelligence scores are from Artificial Analysis Intelligence Index v4.3.2 (Sept 2026).
   // Models are ordered by intelligence descending within each tier.
   //
    // `trivial` is for turns that are short, attachment-free, and carry no work,
    // where a lightweight model is cost-effective.
    tiers: {
-     trivial: ["anthropic/claude-haiku-4-5", "openai/gpt-5.6-luna-fast"],
-    simple: ["openai/gpt-5.6-luna-fast", "anthropic/claude-haiku-4-5"],
-    medium: ["openai/gpt-5.6-sol-fast", "anthropic/claude-sonnet-5"],
-    complex: ["openai/gpt-5.6-sol", "anthropic/claude-sonnet-5"],
-    reasoning: ["anthropic/claude-opus-5", "openai/gpt-5.6-sol"],
+     trivial: ["anthropic/claude-haiku-4-5", "openai/gpt-6-luna-fast"],
+    simple: ["openai/gpt-6-luna-fast", "anthropic/claude-haiku-4-5"],
+    medium: ["openai/gpt-6-sol-fast", "anthropic/claude-sonnet-5"],
+    complex: ["openai/gpt-6-sol", "anthropic/claude-sonnet-5"],
+    reasoning: ["anthropic/claude-opus-5-5", "openai/gpt-6-astra"],
   },
 
   // Reasoning effort per tier, for models that pick their own thinking budget
@@ -176,29 +176,29 @@ const DEFAULTS = {
   log: true,
 }
 
-// Artificial Analysis Intelligence Index v4.3 scores (Sept 2026), matched to
+// Artificial Analysis Intelligence Index v4.3.2 scores (Sept 2026), matched to
 // each tier's configured effort where a directly comparable result exists.
 // Tier-aware scores matter because one model can run at different effort levels.
 const MODEL_INTELLIGENCE = {
    trivial: {
      "anthropic/claude-haiku-4-5": 15,
-     "openai/gpt-5.6-luna-fast": 16,
+     "openai/gpt-6-luna-fast": 37,
    },
   simple: {
-    "openai/gpt-5.6-luna-fast": 16, // non-reasoning
+    "openai/gpt-6-luna-fast": 37, // max benchmark; routed without reasoning
     "anthropic/claude-haiku-4-5": 15, // non-reasoning
   },
   medium: {
-    "openai/gpt-5.6-sol-fast": 34, // low
+    "openai/gpt-6-sol-fast": 48, // max benchmark; routed at low effort
     "anthropic/claude-sonnet-5": 25, // low
   },
   complex: {
-    "openai/gpt-5.6-sol": 39, // medium
+    "openai/gpt-6-sol": 48, // max benchmark; routed at medium effort
     "anthropic/claude-sonnet-5": 38, // adaptive; max score used as upper bound
   },
   reasoning: {
-    "anthropic/claude-opus-5": 48, // high reference for adaptive mode
-    "openai/gpt-5.6-sol": 42, // high
+    "anthropic/claude-opus-5-5": 58, // adaptive max reference
+    "openai/gpt-6-astra": 53, // max benchmark; routed at high effort
   },
 }
 

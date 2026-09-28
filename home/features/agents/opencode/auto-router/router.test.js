@@ -7,7 +7,7 @@ import { AutoRouterPlugin } from "./auto-router.js"
 import { continuationKind } from "./classify.js"
 
 const A = "anthropic/claude-sonnet-5"
-const O = "openai/gpt-5.6-sol"
+const O = "openai/gpt-6-sol"
 
 async function fixture(t, overrides = {}) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "router-test-"))
@@ -16,8 +16,8 @@ async function fixture(t, overrides = {}) {
   const client = {
     app: { log: async () => {} },
     config: { providers: async () => ({ data: { providers: [
-      { id: "anthropic", models: { "claude-sonnet-5": { variants: { low: {}, high: {}, xhigh: {} } }, "claude-opus-5": { variants: { xhigh: {} } }, "claude-haiku-4-5": {} } },
-      { id: "openai", models: { "gpt-5.6-sol": { variants: { medium: {}, high: {} } }, "gpt-5.6-sol-fast": { variants: { low: {} } }, "gpt-5.6-luna-fast": {} } },
+      { id: "anthropic", models: { "claude-sonnet-5": { variants: { low: {}, high: {}, xhigh: {} } }, "claude-opus-5-5": { variants: { xhigh: {} } }, "claude-haiku-4-5": {} } },
+      { id: "openai", models: { "gpt-6-astra": { variants: { high: {} } }, "gpt-6-sol": { variants: { medium: {}, high: {} } }, "gpt-6-sol-fast": { variants: { low: {} } }, "gpt-6-luna-fast": {} } },
     ] } }) },
   }
   const hooks = await AutoRouterPlugin({ client }, {
@@ -106,7 +106,7 @@ test("near-quality model remains sticky after headroom changes", async (t) => {
     data.providers[0].windows[0].used = openai
     return data
   }
-  const f = await fixture(t, { usage })
+  const f = await fixture(t, { usage, intelligenceTolerance: 10 })
   const first = await f.send("!complex work")
   assert.equal(first.state.providerID, "anthropic")
   openai = 0
