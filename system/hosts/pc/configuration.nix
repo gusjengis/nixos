@@ -13,6 +13,11 @@
   vial.enable = true;
   networking.networkmanager.wifi.backend = "iwd";
   networking.networkmanager.wifi.powersave = false;
+  networking.wireless.iwd.settings.Settings.AutoConnect = true;
+  systemd.services.NetworkManager = {
+    after = [ "iwd.service" ];
+    requires = [ "iwd.service" ];
+  };
   nvidia.enable = true;
   virtual-machines.enable = true;
   programs.steam.enable = true;
