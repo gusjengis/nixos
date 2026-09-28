@@ -31,11 +31,16 @@ in
 
   config = lib.mkIf (config.bootSplash.enable && config.grub.enable) {
     boot.loader.grub = {
-      theme = ./boot-splash/grub;
-      # GRUB does not draw its theme until the menu opens; gfxterm displays this during hidden timeout.
-      splashImage = ./boot-splash/grub/background.png;
-      backgroundColor = "#000000";
+      # GRUB cannot center an unscaled image during the hidden countdown.
+      # Keep that frame black instead of stretching a low-resolution bitmap.
+      theme = null;
+      splashImage = null;
       timeoutStyle = "hidden";
+      extraConfig = ''
+        background_color '#000000'
+        set color_normal=white/black
+        set color_highlight=black/white
+      '';
     };
     boot.plymouth = {
       enable = true;

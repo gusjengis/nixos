@@ -5,27 +5,28 @@ Window.SetBackgroundTopColor(0, 0, 0);
 Window.SetBackgroundBottomColor(0, 0, 0);
 
 logo.original = ImageNew("logo.png");
-# Match the 826x285 logo at y=436 in GRUB's stretched 1920x1200 background.
-logo.image = logo.original.Scale(Window.GetWidth() * 0.430208333, Window.GetHeight() * 0.2375);
+logo.image = logo.original.Scale(480, 166);
 logo.sprite = SpriteNew();
 logo.sprite.SetImage(logo.image);
 logo.sprite.SetPosition(Window.GetX() + (Window.GetWidth() - logo.image.GetWidth()) / 2,
-                        Window.GetY() + Window.GetHeight() * 0.363333333, 1);
+                        Window.GetY() + Window.GetHeight() / 2 - 98, 1);
 
-track.original = ImageNew("progress_box.png");
-track.width = Window.GetWidth() * 0.155;
-track.image = track.original.Scale(track.width, track.width * track.original.GetHeight() / track.original.GetWidth());
+track.image = ImageNew("progress_box.png");
 track.sprite = SpriteNew();
 track.sprite.SetImage(track.image);
 track.sprite.SetPosition(Window.GetX() + (Window.GetWidth() - track.image.GetWidth()) / 2,
-                         Window.GetY() + Window.GetHeight() * 0.645 - track.image.GetHeight() / 2, 1);
+                         Window.GetY() + Window.GetHeight() / 2 + 110 - track.image.GetHeight() / 2, 1);
 
 fill.original = ImageNew("progress_bar.png");
-fill.width = track.width * 0.96;
-fill.height = track.image.GetHeight() * 0.75;
+fill.width = fill.original.GetWidth();
+fill.height = fill.original.GetHeight();
+fill.x = Window.GetX() + (Window.GetWidth() - fill.width) / 2;
+fill.y = Window.GetY() + Window.GetHeight() / 2 + 110 - fill.height / 2;
 fill.sprite = SpriteNew();
-fill.sprite.SetPosition(Window.GetX() + (Window.GetWidth() - fill.width) / 2,
-                        Window.GetY() + Window.GetHeight() * 0.645 - fill.height / 2, 2);
+fill.sprite.SetPosition(fill.x, fill.y, 2);
+fill.cap = SpriteNew();
+fill.cap.SetImage(fill.original.Crop(fill.width - 6, 0, 6, fill.height));
+fill.cap.SetOpacity(0);
 fill.progress = 0;
 blank_screen = Plymouth.GetMode() == "shutdown" || Plymouth.GetMode() == "reboot";
 if (blank_screen) {
@@ -37,8 +38,12 @@ if (blank_screen) {
 fun progress_callback(duration, progress) {
   progress = Math.Max(0, Math.Min(1, progress));
   width = Math.Int(fill.width * progress);
-  if (width > 0 && width != fill.progress) {
-    fill.sprite.SetImage(fill.original.Scale(width, fill.height));
+  if (width > 0)
+    width = Math.Max(12, width);
+  if (!blank_screen && width > 0 && width != fill.progress) {
+    fill.sprite.SetImage(fill.original.Crop(0, 0, width - 6, fill.height));
+    fill.cap.SetPosition(fill.x + width - 6, fill.y, 2);
+    fill.cap.SetOpacity(1);
     fill.progress = width;
   }
 }
@@ -57,12 +62,15 @@ fun password_callback(text, bullets) {
   prompt.sprite.SetImage(Image.Text(text, 1, 1, 1));
   prompt.sprite.SetOpacity(1);
   fill.sprite.SetOpacity(0);
+  fill.cap.SetOpacity(0);
   track.sprite.SetOpacity(0);
 }
 fun normal_callback() {
   prompt.sprite.SetOpacity(0);
   if (!blank_screen) {
     fill.sprite.SetOpacity(1);
+    if (fill.progress > 0)
+      fill.cap.SetOpacity(1);
     track.sprite.SetOpacity(1);
   }
 }
