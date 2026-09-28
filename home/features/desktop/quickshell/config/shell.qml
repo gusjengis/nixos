@@ -16,7 +16,14 @@ import "theme"
 ShellRoot {
     id: root
 
-    Bar { }
+    Bar {
+        openLauncher: () => {
+            if (localLauncher.visible)
+                localLauncher.visible = false;
+            else
+                localLauncher.open("local");
+        }
+    }
 
     IpcHandler {
         target: "focusGuard"

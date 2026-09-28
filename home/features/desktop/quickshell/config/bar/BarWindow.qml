@@ -20,6 +20,7 @@ PanelWindow {
     required property var battery
     required property var systemControls
     required property var notificationService
+    required property var openLauncher
 
     readonly property var monitor: Hyprland.monitorFor(screen)
     readonly property var activeWorkspace: monitor ? monitor.activeWorkspace : null
@@ -34,7 +35,7 @@ PanelWindow {
         const state = toplevel.lastIpcObject;
         return state && state.fullscreen > 0 && state.fullscreenClient === 2;
     })
-    readonly property bool popupVisible: media.popupVisible || usage.popupVisible || tray.popupVisible || wifi.popupVisible || bluetooth.popupVisible || volume.popupVisible || battery.popupVisible || clock.popupVisible
+    readonly property bool popupVisible: media.popupVisible || usage.popupVisible || tray.popupVisible || wifi.popupVisible || battery.popupVisible || controlCenter.popupVisible || clock.popupVisible
 
     visible: shown || notchFullscreen
     // Taller than the bar itself so the tint can keep fading past the content.
@@ -148,14 +149,19 @@ PanelWindow {
             visible: false
         }
 
+        // Right side, in macOS menu bar order: third-party status items,
+        // system status (Wi-Fi, battery), Spotlight, Control Center, clock.
         RowLayout {
             anchors {
                 right: parent.right
                 rightMargin: 10
                 verticalCenter: parent.verticalCenter
             }
-            spacing: Theme.spacing
+            spacing: 4
 
+            Tray {
+                id: tray
+            }
             Usage {
                 id: usage
                 usage: bar.usage
@@ -164,24 +170,20 @@ PanelWindow {
                 onRefreshRequested: bar.refreshUsage()
                 onAccountRequested: (profile, saved) => bar.accountAction(profile, saved)
             }
-            Tray {
-                id: tray
-            }
             Wifi {
                 id: wifi
-                controls: bar.systemControls
-            }
-            Bluetooth {
-                id: bluetooth
-                controls: bar.systemControls
-            }
-            Volume {
-                id: volume
                 controls: bar.systemControls
             }
             Battery {
                 id: battery
                 batteryService: bar.battery
+            }
+            Spotlight {
+                onActivated: bar.openLauncher()
+            }
+            ControlCenter {
+                id: controlCenter
+                controls: bar.systemControls
             }
             Clock {
                 id: clock

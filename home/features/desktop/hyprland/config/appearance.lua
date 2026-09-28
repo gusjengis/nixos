@@ -94,6 +94,13 @@ hl.layer_rule({
 })
 
 hl.layer_rule({
+	name = "quickshell-notifications-blur",
+	match = { namespace = "^quickshell-notifications$" },
+	blur = true,
+	ignore_alpha = 0.2,
+})
+
+hl.layer_rule({
 	name = "quickshell-launcher-blur",
 	match = { namespace = "^quickshell-(tools-)?launcher$" },
 	blur = true,

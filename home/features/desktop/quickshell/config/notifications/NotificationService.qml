@@ -11,6 +11,8 @@ Scope {
     property var entries: []
     property var history: []
     property var popups: []
+    // Set by Notification Center; banners stay hidden while it is open.
+    property bool centerOpen: false
 
     function forget(key) {
         const entry = entries.find(item => item.key === key);

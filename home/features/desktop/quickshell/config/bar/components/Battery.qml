@@ -1,61 +1,122 @@
 import QtQuick
-import QtQuick.Layouts
+import QtQuick.Effects
 import "../../theme"
+import "../../widgets"
 
+// macOS battery menu extra: the SF "battery.0" outline with a level fill
+// inset inside it, and a bolt knocked out of both while charging.
 Rectangle {
     id: root
 
     property var batteryService: null
     readonly property bool popupVisible: popup.visible
+    readonly property real level: batteryService ? Math.max(0, Math.min(100, batteryService.percentage)) / 100 : 0
+    readonly property bool charging: !!batteryService && batteryService.charging
 
     visible: !!batteryService && batteryService.available
-    implicitWidth: 34
-    implicitHeight: 28
-    radius: Theme.radius
-    color: hover.hovered ? Theme.barHoverFill : "transparent"
+    implicitWidth: 36
+    implicitHeight: 24
+    radius: 6
+    color: popup.visible ? Theme.barHoverFill : "transparent"
 
     Item {
-        anchors.centerIn: parent
-        implicitWidth: 22
-        implicitHeight: 14
+        id: icon
 
-        Rectangle {
-            x: 1
-            y: 2
-            width: 18
-            height: 11
-            radius: 2
-            color: "transparent"
-            border { width: 1; color: Theme.barText }
+        readonly property rect bounds: metrics.tightBoundingRect
+        // Interior of the outline as fractions of the glyph's tight bounds,
+        // measured from the font; the nub sits right of bodyRight.
+        readonly property real innerLeft: 0.0553
+        readonly property real innerRight: 0.8377
+        readonly property real innerTop: 0.1203
+        readonly property real innerBottom: 0.8797
+        readonly property real bodyCenterX: 0.4456
+        readonly property real gap: 1
+
+        anchors.centerIn: parent
+        width: bounds.width
+        height: bounds.height
+
+        TextMetrics {
+            id: metrics
+            font: outline.font
+            text: outline.text
+        }
+
+        TextMetrics {
+            id: boltMetrics
+            font: bolt.font
+            text: bolt.text
+        }
+
+        Item {
+            anchors.fill: parent
+            layer.enabled: true
+            layer.effect: MultiEffect {
+                maskEnabled: root.charging
+                maskInverted: true
+                maskSource: boltMask
+                maskThresholdMin: 0.3
+                maskSpreadAtMin: 0.2
+            }
+
+            SFSymbol {
+                id: outline
+                x: -icon.bounds.x
+                y: -(baselineOffset + icon.bounds.y)
+                symbol: "battery.0"
+                size: 17
+                color: Theme.barText
+            }
 
             Rectangle {
-                anchors { left: parent.left; top: parent.top; bottom: parent.bottom; margins: 2 }
-                width: Math.max(1, (parent.width - 4)
-                    * (root.batteryService ? root.batteryService.percentage : 0) / 100)
-                radius: 1
+                readonly property real maxWidth: icon.width * (icon.innerRight - icon.innerLeft) - icon.gap * 2
+                x: icon.width * icon.innerLeft + icon.gap
+                y: icon.height * icon.innerTop + icon.gap
+                width: Math.max(1.5, maxWidth * root.level)
+                height: icon.height * (icon.innerBottom - icon.innerTop) - icon.gap * 2
+                radius: 1.5
                 color: Theme.barText
             }
         }
 
-        Rectangle {
-            x: 19
-            y: 5
-            width: 2
-            height: 5
-            radius: 1
+        // Heavier copy of the bolt, used only as the knockout mask so the
+        // visible bolt gets a thin transparent gap around it.
+        Item {
+            id: boltMask
+            anchors.fill: parent
+            layer.enabled: true
+            visible: false
+
+            TextMetrics {
+                id: maskMetrics
+                font: boltKnockout.font
+                text: boltKnockout.text
+            }
+
+            SFSymbol {
+                id: boltKnockout
+                x: icon.width * icon.bodyCenterX - maskMetrics.tightBoundingRect.width / 2 - maskMetrics.tightBoundingRect.x
+                y: icon.height / 2 - maskMetrics.tightBoundingRect.height / 2 - maskMetrics.tightBoundingRect.y - baselineOffset
+                symbol: "bolt.fill"
+                size: bolt.size + 2
+                font.weight: Font.Black
+                color: "white"
+            }
+        }
+
+        SFSymbol {
+            id: bolt
+            visible: root.charging
+            x: icon.width * icon.bodyCenterX - boltMetrics.tightBoundingRect.width / 2 - boltMetrics.tightBoundingRect.x
+            y: icon.height / 2 - boltMetrics.tightBoundingRect.height / 2 - boltMetrics.tightBoundingRect.y - baselineOffset
+            symbol: "bolt.fill"
+            size: 13
             color: Theme.barText
         }
     }
 
-    HoverHandler {
-        id: hover
-        blocking: false
-    }
-
     MouseArea {
-        id: mouse
         anchors.fill: parent
-        hoverEnabled: true
         onClicked: popup.toggle(root)
     }
 
@@ -63,5 +124,4 @@ Rectangle {
         id: popup
         batteryService: root.batteryService
     }
-
 }

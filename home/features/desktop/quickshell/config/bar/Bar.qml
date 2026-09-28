@@ -9,6 +9,8 @@ Scope {
 
     property bool shown: true
     property string notchMonitor: ""
+    // Supplied by shell.qml, which owns the launcher window.
+    property var openLauncher: () => {}
 
     function syncHyprlandBarState(): void {
         Quickshell.execDetached([
@@ -91,6 +93,7 @@ Scope {
                 battery: batteryService
                 systemControls: systemControlsService
                 notificationService: notifications
+                openLauncher: root.openLauncher
             }
         }
     }

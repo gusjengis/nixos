@@ -14,10 +14,10 @@ Rectangle {
     signal refreshRequested()
     signal accountRequested(string profile, bool saved)
 
-    implicitWidth: 28
-    implicitHeight: 28
-    radius: Theme.radius
-    color: hover.hovered ? Theme.barHoverFill : "transparent"
+    implicitWidth: 30
+    implicitHeight: 24
+    radius: 6
+    color: popup.visible ? Theme.barHoverFill : "transparent"
 
     Image {
         id: aiIcon
@@ -34,11 +34,6 @@ Rectangle {
             colorization: 1
             colorizationColor: Theme.barText
         }
-    }
-
-    HoverHandler {
-        id: hover
-        blocking: false
     }
 
     MouseArea {
