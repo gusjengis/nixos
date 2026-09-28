@@ -14,6 +14,9 @@
     initExtra = lib.optionalString config.desktopEnv.enable ''
       if [ -z "$WAYLAND_DISPLAY" ] && [ "x$XDG_VTNR" = "x1" ]; then
         export HYPRLAND_NO_RT=1
+        if command -v finish-boot-splash >/dev/null 2>&1; then
+          finish-boot-splash --prepare
+        fi
         if command -v start-hyprland >/dev/null 2>&1; then
           exec start-hyprland
         elif command -v Hyprland >/dev/null 2>&1; then

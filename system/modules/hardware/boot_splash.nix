@@ -5,6 +5,17 @@
   ...
 }:
 let
+  finishSplash = pkgs.writeShellScriptBin "finish-boot-splash" ''
+    if /run/wrappers/bin/sudo -n ${config.boot.plymouth.package}/bin/plymouth --ping >/dev/null 2>&1; then
+      if [ "$#" -gt 0 ] && [ "$1" = "--prepare" ]; then
+        /run/wrappers/bin/sudo -n ${config.boot.plymouth.package}/bin/plymouth display-message --text=darwin-session-ready
+        sleep 0.25
+        /run/wrappers/bin/sudo -n ${config.boot.plymouth.package}/bin/plymouth deactivate
+      else
+        /run/wrappers/bin/sudo -n ${config.boot.plymouth.package}/bin/plymouth quit --retain-splash
+      fi
+    fi
+  '';
   theme = pkgs.runCommand "darwin-plymouth-theme" { } ''
     mkdir -p "$out/share/plymouth/themes/darwin"
     destination="$out/share/plymouth/themes/darwin"
@@ -39,5 +50,18 @@ in
     ];
     boot.consoleLogLevel = 0;
     boot.initrd.verbose = false;
+    environment.systemPackages = [ finishSplash ];
+
+    # getty@tty1 must start before Hyprland can signal readiness.
+    systemd.services."getty@".serviceConfig.TTYVTDisallocate = false;
+    systemd.services.plymouth-quit.wantedBy = lib.mkForce [ ];
+    systemd.services.plymouth-quit-wait.wantedBy = lib.mkForce [ ];
+    systemd.timers.plymouth-boot-fallback = {
+      wantedBy = [ "multi-user.target" ];
+      timerConfig = {
+        OnActiveSec = "45s";
+        Unit = "plymouth-quit.service";
+      };
+    };
   };
 }

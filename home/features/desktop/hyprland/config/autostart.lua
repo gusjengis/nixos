@@ -1,4 +1,5 @@
 hl.on("hyprland.start", function()
+	hl.exec_cmd("finish-boot-splash")
 	hl.exec_cmd("xset r rate 190 50")
 	hl.exec_cmd("hyprctl setcursor $cursor_theme $cursor_size")
 	-- Refreshes the systemd/D-Bus copies of WAYLAND_DISPLAY and friends before

@@ -10,7 +10,7 @@ logo.image = logo.original.Scale(logo.width, logo.width * logo.original.GetHeigh
 logo.sprite = SpriteNew();
 logo.sprite.SetImage(logo.image);
 logo.sprite.SetPosition(Window.GetX() + (Window.GetWidth() - logo.image.GetWidth()) / 2,
-                        Window.GetY() + Window.GetHeight() * 0.363, 1);
+                        Window.GetY() + Window.GetHeight() * 0.370833333 - logo.width * 0.010453, 1);
 
 track.original = ImageNew("progress_box.png");
 track.width = Window.GetWidth() * 0.155;
@@ -37,6 +37,12 @@ fun progress_callback(duration, progress) {
   }
 }
 Plymouth.SetBootProgressFunction(progress_callback);
+
+fun message_callback(text) {
+  if (text == "darwin-session-ready")
+    progress_callback(0, 1);
+}
+Plymouth.SetDisplayMessageFunction(message_callback);
 
 prompt.sprite = SpriteNew();
 prompt.sprite.SetPosition(Window.GetX() + Window.GetWidth() * 0.25,
