@@ -49,7 +49,7 @@ Rectangle {
     Text {
         anchors.centerIn: parent
         text: root.state.powered ? (root.connected ? "󰂱" : "󰂯") : "󰂲"
-        color: root.connected ? Theme.barAccent : root.state.powered ? Theme.barText : Theme.barMuted
+        color: root.state.powered ? Theme.barText : Theme.barMuted
         opacity: root.state.powered ? 1 : 0.45
         font { family: Theme.iconFontFamily; pixelSize: 17 }
     }

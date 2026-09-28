@@ -42,12 +42,27 @@ let
     runtimeInputs = [ pkgs.dbus ];
     text = builtins.readFile ./session-env-sync.sh;
   };
+  mailspringAfterTray = pkgs.writeShellApplication {
+    name = "mailspring-after-tray";
+    runtimeInputs = [ pkgs.systemd pkgs.coreutils ];
+    text = ''
+      for ((attempt = 0; attempt < 150; attempt++)); do
+        if busctl --user get-property org.kde.StatusNotifierWatcher /StatusNotifierWatcher org.kde.StatusNotifierWatcher RegisteredStatusNotifierItems >/dev/null 2>&1; then
+          exec mailspring --background
+        fi
+        sleep 0.2
+      done
+      printf 'mailspring-after-tray: tray watcher not ready after 30 seconds\n' >&2
+      exit 1
+    '';
+  };
 in
 {
   config = lib.mkIf config.desktopEnv.enable {
     home.packages = [
       hyprlandPackages.hyprland
       sessionEnvSync
+      mailspringAfterTray
     ]
     ++ (with pkgs; [
       hypridle

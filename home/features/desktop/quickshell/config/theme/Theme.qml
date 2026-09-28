@@ -67,23 +67,13 @@ QtObject {
     readonly property real barCrossover: barTargetLuminance / (1 - barScrimMax)
     readonly property bool barContentIsDark: barLuminance >= barCrossover
     readonly property real barScrimAlpha: barContentIsDark ? 0 : Math.max(0, Math.min(barScrimMax, 1 - barTargetLuminance / Math.max(barLuminance, 0.0001)))
-    readonly property color barText: barContentIsDark ? "#1d1d1f" : "#ffffff"
+    readonly property color barText: barContentIsDark ? "#000000" : "#ffffff"
+    // For content drawn on a barText-filled shape (e.g. the active workspace).
+    readonly property color barTextInverse: barContentIsDark ? "#ffffff" : "#000000"
     readonly property color barMuted: Qt.rgba(barText.r, barText.g, barText.b, 0.62)
     // A faint wash of barText itself, so a hovered pill's highlight always
     // reads correctly against the barText/barMuted drawn on top of it.
     readonly property color barHoverFill: Qt.rgba(barText.r, barText.g, barText.b, 0.14)
-    // Accent colors are tuned for the always-dark popup theme, so on bright
-    // wallpapers (dark content) they're pulled toward black to stay legible;
-    // on dark wallpapers they're used as matugen generated them.
-    readonly property color barAccent: barContentIsDark ? mix(accent, "#000000", 0.4) : accent
-    // The color for content drawn on top of a barAccent-filled shape (e.g. the
-    // battery's charging bolt), which needs the opposite of barText: barAccent
-    // stays light on dark wallpapers and gets pulled dark on bright ones.
-    readonly property color barAccentContrast: barContentIsDark ? "#ffffff" : backgroundBase
-
-    function mix(from, to, amount) {
-        return Qt.rgba(from.r + (to.r - from.r) * amount, from.g + (to.g - from.g) * amount, from.b + (to.b - from.b) * amount, from.a + (to.a - from.a) * amount);
-    }
 
     readonly property int popupGap: 4
     readonly property int radius: 8

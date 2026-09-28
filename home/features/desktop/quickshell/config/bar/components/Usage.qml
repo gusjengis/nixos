@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Effects
 import "../../theme"
 
 Rectangle {
@@ -18,11 +19,21 @@ Rectangle {
     radius: Theme.radius
     color: hover.hovered ? Theme.barHoverFill : "transparent"
 
-    Text {
+    Image {
+        id: aiIcon
         anchors.centerIn: parent
-        text: "AI"
-        color: Theme.barAccent
-        font { family: Theme.fontFamily; pixelSize: Theme.fontSize; weight: Font.DemiBold }
+        width: 18
+        height: 18
+        source: "icons/openai-blossom.svg"
+        cache: false
+        sourceSize: Qt.size(72, 72)
+        fillMode: Image.PreserveAspectFit
+        mipmap: true
+        layer.enabled: true
+        layer.effect: MultiEffect {
+            colorization: 1
+            colorizationColor: Theme.barText
+        }
     }
 
     HoverHandler {

@@ -15,7 +15,9 @@ RowLayout {
     readonly property var specialWorkspaces: [
         {
             "name": "terminal",
-            "glyph": "\uf120"
+            "glyph": "\uf489",
+            // Octicon draws its frame well inside the em box.
+            "glyphSize": 20
         },
         {
             "name": "browser",
@@ -141,18 +143,17 @@ RowLayout {
             implicitWidth: number === 10 ? 28 : 24
             implicitHeight: 26
             radius: Theme.radius
-            color: active ? Theme.accentStrong : mouse.containsMouse ? Theme.surfaceHover : occupied ? Theme.surface : "transparent"
-            border.color: occupied && !active ? Theme.border : "transparent"
+            // Monochrome, following the wallpaper: the active workspace is a
+            // solid barText chip with an inverted number; everything else
+            // floats on the wallpaper. Occupied numbers are full strength,
+            // empty ones muted.
+            color: active ? Theme.barText : mouse.containsMouse ? Theme.barHoverFill : "transparent"
 
             Text {
                 anchors.centerIn: parent
                 // text: ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十"][parent.index]
                 text: parent.number
-                // Occupied/hovered numbers sit on their own Theme.surface(Hover)
-                // chip, unaffected by the wallpaper. An idle, unoccupied number
-                // has no chip at all though - it floats directly on the
-                // wallpaper - so it needs the reactive bar color instead.
-                color: parent.active ? Theme.background : parent.occupied ? Theme.text : (mouse.containsMouse ? Theme.muted : Theme.barMuted)
+                color: parent.active ? Theme.barTextInverse : parent.occupied ? Theme.barText : Theme.barMuted
                 font {
                     family: Theme.fontFamily
                     pixelSize: Theme.fontSize
@@ -189,17 +190,17 @@ RowLayout {
                 implicitWidth: 28
                 implicitHeight: 26
                 radius: Theme.radius
-                color: active ? Theme.accentStrong : specialMouse.containsMouse ? Theme.surfaceHover : Theme.surface
-                border.color: !active ? Theme.border : "transparent"
+                // Chip only while the special workspace is shown.
+                color: active ? Theme.barText : specialMouse.containsMouse ? Theme.barHoverFill : "transparent"
 
                 Text {
                     anchors.centerIn: parent
                     text: typeof parent.modelData.glyph === "string" ? parent.modelData.glyph : ""
                     visible: text !== ""
-                    color: parent.active ? Theme.background : Theme.text
+                    color: parent.active ? Theme.barTextInverse : Theme.barText
                     font {
                         family: Theme.iconFontFamily
-                        pixelSize: 16
+                        pixelSize: parent.modelData.glyphSize || 16
                     }
                 }
 
@@ -215,7 +216,7 @@ RowLayout {
                     layer.enabled: true
                     layer.effect: MultiEffect {
                         colorization: 1
-                        colorizationColor: brandIcon.parent.active ? Theme.background : Theme.text
+                        colorizationColor: brandIcon.parent.active ? Theme.barTextInverse : Theme.barText
                     }
                 }
 

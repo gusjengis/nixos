@@ -76,6 +76,14 @@ let
       exec bash "${wallpaperDir}/wallpaper-hide.sh" "$@"
     '';
   };
+  # Qt 6 ShaderEffect only loads precompiled .qsb, so the GLSL source kept in
+  # the config tree is baked here and linked into the data dir below.
+  trayMonoShader = pkgs.runCommand "quickshell-tray-mono-shader" {
+    nativeBuildInputs = [ pkgs.qt6.qtshadertools ];
+  } ''
+    mkdir -p $out
+    qsb --qt6 -o $out/tray-mono.frag.qsb ${./config/bar/components/shaders/tray-mono.frag}
+  '';
   aiUsage = pkgs.writeShellApplication {
     name = "quickshell-ai-usage";
     runtimeInputs = [ pkgs.python3 ];
@@ -154,6 +162,8 @@ in
 {
   config = lib.mkIf config.desktopEnv.enable {
     xdg.dataFile."quickshell/laptop".text = if config.laptop.enable then "1" else "0";
+    # Build artifact, so store-backed on purpose: edit the .frag and rebuild.
+    xdg.dataFile."quickshell/shaders/tray-mono.frag.qsb".source = "${trayMonoShader}/tray-mono.frag.qsb";
 
     # Waypipe starts its remote server before the metadata helper's wrapper runs.
     home.packages = [

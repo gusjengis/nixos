@@ -33,17 +33,7 @@ Rectangle {
                 width: Math.max(1, (parent.width - 4)
                     * (root.batteryService ? root.batteryService.percentage : 0) / 100)
                 radius: 1
-                color: root.batteryService && root.batteryService.percentage <= 15
-                    ? Theme.danger
-                    : root.batteryService && root.batteryService.charging ? Theme.barAccent : Theme.barText
-            }
-
-            Text {
-                anchors.centerIn: parent
-                visible: !!root.batteryService && root.batteryService.charging
-                text: ""
-                color: Theme.barAccentContrast
-                font { family: Theme.iconFontFamily; pixelSize: 9 }
+                color: Theme.barText
             }
         }
 
