@@ -51,7 +51,10 @@
         "network-pre.target"
         "tailscaled.service"
       ];
-      wantedBy = [ "multi-user.target" ];
+      # Authentication can wait for Wi-Fi without holding up the login target.
+      unitConfig.OnSuccess = lib.optionals (config.tailscale.advertiseRoutes != [ ]) [
+        "tailscale-advertise-routes.service"
+      ];
 
       # set this service as a oneshot job
       serviceConfig.Type = "oneshot";
@@ -92,6 +95,11 @@
       '';
     };
 
+    systemd.timers.tailscale-autoconnect = {
+      wantedBy = [ "timers.target" ];
+      timerConfig.OnBootSec = "5s";
+    };
+
     # single writer for --advertise-routes; consumers append to
     # tailscale.advertiseRoutes instead of running `tailscale set` themselves
     systemd.services.tailscale-advertise-routes = lib.mkIf (config.tailscale.advertiseRoutes != [ ]) {
@@ -101,7 +109,6 @@
         "tailscale-autoconnect.service"
       ];
       requires = [ "tailscaled.service" ];
-      wantedBy = [ "multi-user.target" ];
       serviceConfig = {
         Type = "oneshot";
         ExecStart = "${pkgs.tailscale}/bin/tailscale set --advertise-routes=${lib.concatStringsSep "," config.tailscale.advertiseRoutes}";

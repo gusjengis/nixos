@@ -66,6 +66,7 @@
     zramSwap.enable = true;
     time.timeZone = "America/Los_Angeles";
     networking.networkmanager.enable = config.repo.networkmanager.enable;
+    networking.dhcpcd.enable = lib.mkIf config.networking.networkmanager.enable false;
     networking.firewall = {
       allowedTCPPortRanges = [
         {
