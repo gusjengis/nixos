@@ -28,8 +28,8 @@ hl.window_rule({
 	match = { class = "mpv", title = "^Mirror$" },
 	monitor = "HDMI-A-1",
 	float = true,
-	size = "688 518",
-	move = "3119 55",
+	size = "690 517",
+	move = "3119 56",
 	pin = true,
 })
 
