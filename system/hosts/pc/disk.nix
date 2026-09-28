@@ -18,7 +18,7 @@
             type = "filesystem";
             format = "vfat";
             extraArgs = [ "-i" "3216E304" ];
-            mountpoint = "/boot";
+            mountpoint = "/boot/efi";
             mountOptions = [ "umask=0022" ];
           };
         };

@@ -21,6 +21,7 @@
   nvidia.enable = true;
   virtual-machines.enable = true;
   programs.steam.enable = true;
+  boot.loader.efi.efiSysMountPoint = "/boot/efi";
   system.stateVersion = "25.05";
 
   environment.systemPackages = [ pkgs.iwd ];
