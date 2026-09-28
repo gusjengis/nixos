@@ -7,7 +7,7 @@
 
 # Forgejo, omega's private git forge on the tailnet.
 #
-# Exists because GitHub bills git-LFS storage past 1 GB and the wallpaper
+# Exists because GitHub Free meters git-LFS storage past 10 GiB and the wallpaper
 # library is tens of gigabytes of it, growing daily. Self-hosting removes the
 # meter entirely; see wallpaper_fetch.nix for the job that feeds it.
 #

@@ -1,0 +1,103 @@
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -19,6 +19,5 @@
+ use std::fs;
+ use std::io;
+-use std::os::unix::process::CommandExt;
+ use std::path::{Path, PathBuf};
+ use std::process::{Command, Stdio};
+ use std::time::Duration;
+@@ -95,9 +94,3 @@
+ }
+ 
+-#[derive(Debug, Deserialize)]
+-struct HyprlandInstance {
+-    instance: String,
+-    wl_socket: String,
+-}
+-
+ struct Paths {
+@@ -359,54 +352,19 @@
+-fn active_hyprland_instance() -> Result<String, String> {
+-    let output = Command::new("hyprctl")
+-        .args(["instances", "-j"])
+-        .output()
+-        .map_err(|e| format!("failed to list Hyprland instances: {e}"))?;
+-    if !output.status.success() {
+-        return Err("failed to list Hyprland instances".to_string());
+-    }
+-
+-    let instances: Vec<HyprlandInstance> =
+-        serde_json::from_slice(&output.stdout).map_err(|e| format!("invalid Hyprland instance list: {e}"))?;
+-    let wayland_display = env::var("WAYLAND_DISPLAY").ok();
+-    instances
+-        .iter()
+-        .find(|instance| wayland_display.as_deref() == Some(instance.wl_socket.as_str()))
+-        .or_else(|| (instances.len() == 1).then(|| &instances[0]))
+-        .map(|instance| instance.instance.clone())
+-        .ok_or_else(|| "cannot identify the active Hyprland instance".to_string())
+-}
+-
+-fn hyprpaper_socket_path(instance: &str) -> Result<PathBuf, String> {
+-    let runtime_dir = env::var("XDG_RUNTIME_DIR").map_err(|_| "XDG_RUNTIME_DIR is not set")?;
+-    Ok(PathBuf::from(runtime_dir).join("hypr").join(instance).join(".hyprpaper.sock"))
+-}
+-
+-/// Existence alone isn't enough: a hyprpaper that died without cleaning up
+-/// leaves a stale socket *file* behind, which still passes `.exists()` but
+-/// refuses connections. Only a real connect attempt tells the truth.
+-fn socket_alive(socket: &Path) -> bool {
+-    std::os::unix::net::UnixStream::connect(socket).is_ok()
+-}
+-
+-fn ensure_daemon(instance: &str) -> Result<(), String> {
+-    let socket = hyprpaper_socket_path(instance)?;
+-    if socket_alive(&socket) {
++fn ensure_daemon() -> Result<(), String> {
++    if Command::new("awww").arg("query").output().is_ok_and(|output| output.status.success()) {
+         return Ok(());
+     }
+ 
+-    Command::new("hyprpaper")
+-        .env("HYPRLAND_INSTANCE_SIGNATURE", instance)
++    Command::new("awww-daemon")
+         .stdout(Stdio::null())
+         .stderr(Stdio::null())
+-        .process_group(0)
+         .spawn()
+-        .map_err(|e| format!("failed to start hyprpaper: {e}"))?;
++        .map_err(|e| format!("failed to start awww-daemon: {e}"))?;
+ 
+     for _ in 0..40 {
+         std::thread::sleep(Duration::from_millis(50));
+-        if socket_alive(&socket) {
++        if Command::new("awww").arg("query").output().is_ok_and(|output| output.status.success()) {
+             return Ok(());
+         }
+     }
+-    Err("hyprpaper did not become ready".to_string())
++    Err("awww-daemon did not become ready".to_string())
+ }
+@@ -542,15 +500,14 @@
+ fn set_wallpaper(paths: &Paths, available: &[PathBuf], raw_path: &str, persist: bool) -> Result<PathBuf, String> {
+     let requested = resolve_wallpaper(paths, available, raw_path)?;
+-    let instance = active_hyprland_instance()?;
+ 
+-    ensure_daemon(&instance)?;
++    ensure_daemon()?;
+ 
+-    let arg = format!(",{},cover", requested.display());
+-    let status = Command::new("hyprctl")
+-        .env("HYPRLAND_INSTANCE_SIGNATURE", &instance)
+-        .args(["hyprpaper", "wallpaper", &arg])
++    let status = Command::new("awww")
++        .arg("img")
++        .arg(&requested)
++        .args(["--resize", "crop", "--transition-type", "none"])
+         .status()
+-        .map_err(|e| format!("failed to run hyprctl: {e}"))?;
++        .map_err(|e| format!("failed to run awww: {e}"))?;
+     if !status.success() {
+-        return Err(format!("hyprctl hyprpaper wallpaper failed for {}", requested.display()));
++        return Err(format!("awww img failed for {}", requested.display()));
+     }

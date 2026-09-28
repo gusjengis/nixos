@@ -77,6 +77,14 @@
   background-color: @view_bg_color;
 }
 
+/* Drag-selection rubber band. The opaque pane rule above out-specifies the
+   theme's `.rubberband` fill (GTK renders the band with the iconview context
+   plus the rubberband class), so restate the fill with higher specificity. */
+.standard-view .view.rubberband {
+  border: 1px solid @accent_bg_color;
+  background-color: alpha(@accent_bg_color, 0.2);
+}
+
 .standard-view .view:selected,
 .standard-view iconview:selected,
 .standard-view treeview.view:selected {
