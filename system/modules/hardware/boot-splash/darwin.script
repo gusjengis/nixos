@@ -5,12 +5,12 @@ Window.SetBackgroundTopColor(0, 0, 0);
 Window.SetBackgroundBottomColor(0, 0, 0);
 
 logo.original = ImageNew("logo.png");
-logo.width = Window.GetWidth() * 0.43;
-logo.image = logo.original.Scale(logo.width, logo.width * logo.original.GetHeight() / logo.original.GetWidth());
+# Match the 826x285 logo at y=436 in GRUB's stretched 1920x1200 background.
+logo.image = logo.original.Scale(Window.GetWidth() * 0.430208333, Window.GetHeight() * 0.2375);
 logo.sprite = SpriteNew();
 logo.sprite.SetImage(logo.image);
 logo.sprite.SetPosition(Window.GetX() + (Window.GetWidth() - logo.image.GetWidth()) / 2,
-                        Window.GetY() + Window.GetHeight() * 0.446667 - logo.width * 0.12079, 1);
+                        Window.GetY() + Window.GetHeight() * 0.363333333, 1);
 
 track.original = ImageNew("progress_box.png");
 track.width = Window.GetWidth() * 0.155;

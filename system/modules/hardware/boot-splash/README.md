@@ -4,3 +4,5 @@ from https://github.com/libredeb/darwin-plymouth by Lozano Juan Pablo, GPL-3.0.
 GRUB scales the hidden-timeout image to the EFI framebuffer; its menu theme
 scales the same image proportionally to the display height. On non-16:10
 screens the brief hidden image can stretch horizontally.
+Plymouth scales the logo by both screen axes to match that hidden image during
+the GRUB-to-Plymouth handoff, including on non-16:10 screens.
