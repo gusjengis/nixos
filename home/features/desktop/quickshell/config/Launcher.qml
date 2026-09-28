@@ -8,6 +8,7 @@ import Quickshell.Wayland
 import Quickshell.Widgets
 import "state"
 import "theme"
+import "widgets"
 
 PanelWindow {
     id: launcher
@@ -62,9 +63,20 @@ PanelWindow {
     visible: false
     focusable: true
     exclusionMode: ExclusionMode.Ignore
-    implicitWidth: Math.min(580, screen.width * 0.8)
-    implicitHeight: Math.min(540, screen.height * 0.7)
+    // Spotlight sits in the upper third, centred. The surface is sized for
+    // the tallest results list; everything outside the glass shapes is
+    // transparent, unblurred (ignore_alpha) and masked out of input.
+    anchors.top: true
+    margins.top: Math.round(screen.height * 0.2)
+    implicitWidth: Math.min(680, screen.width * 0.8)
+    implicitHeight: Math.min(600, screen.height * 0.7)
     color: "transparent"
+    mask: Region { item: spotlight }
+
+    // Local mode behaves like Spotlight: just the field until you type.
+    // The other modes are pickers, so they always list their entries.
+    readonly property bool showResults: mode !== "local" || search.text.trim() !== ""
+    readonly property color selectionBlue: "#0a84ff"
     WlrLayershell.namespace: initialMode === "tools" ? "quickshell-tools-launcher" : "quickshell-launcher"
 
     function appKey(app) {
@@ -380,159 +392,228 @@ PanelWindow {
         onLoaded: launcher.loadUsage()
     }
 
-    Rectangle {
-        anchors.fill: parent
+    function sectionTitle(index) {
+        const result = results[index];
+        if (!result)
+            return "";
+        if (mode === "local" && index === 0)
+            return "Top Hit";
+        if (mode === "hosts")
+            return "Machines";
+        if (mode === "tools")
+            return "Tools";
+        return {
+            "app": "Applications",
+            "remote": "Applications",
+            "project": "Projects",
+            "web": "Search the Web"
+        }[result.kind] || "";
+    }
+
+    component Glass: Rectangle {
         color: Theme.background
-        radius: Theme.radius * 2
-        border.width: 1
-        border.color: Theme.border
-        clip: true
+        border { width: 1; color: Qt.rgba(1, 1, 1, 0.14) }
+    }
 
-        ColumnLayout {
-            anchors.fill: parent
-            anchors.margins: 18
-            spacing: 12
+    Column {
+        id: spotlight
+        width: parent.width
+        spacing: 8
 
-            TextField {
-                id: search
-                Layout.fillWidth: true
-                Layout.preferredHeight: 50
-                placeholderText: mode === "hosts" ? "Search machines" : mode === "remote" ? "Search remote applications" : mode === "tools" ? "Search tools" : "Search apps, projects, and the web"
-                placeholderTextColor: Theme.muted
-                color: Theme.text
-                selectionColor: Theme.accentStrong
-                selectedTextColor: Theme.background
-                leftPadding: 16
-                rightPadding: 16
-                font.family: Theme.fontFamily
-                font.pixelSize: 16
-                focus: true
-                background: Rectangle {
-                    radius: Theme.radius
-                    color: Theme.surface
-                    border.width: 1
-                    border.color: search.activeFocus ? Theme.accentStrong : Theme.border
+        // Search field: a free-floating glass capsule.
+        Glass {
+            width: parent.width
+            height: 54
+            radius: height / 2
+
+            RowLayout {
+                anchors { fill: parent; leftMargin: 18; rightMargin: 14 }
+                spacing: 12
+
+                SFSymbol {
+                    symbol: "magnifyingglass"
+                    size: 20
+                    color: Theme.muted
                 }
-                onTextChanged: {
-                    list.currentIndex = 0;
-                    searchTimer.restart();
-                }
-                Keys.onDownPressed: list.incrementCurrentIndex()
-                Keys.onUpPressed: list.decrementCurrentIndex()
-                Keys.onEscapePressed: launcher.visible = false
-                Keys.onPressed: event => {
-                    if (event.key === Qt.Key_N && (event.modifiers & Qt.ControlModifier) && launcher.selectedResult && launcher.selectedResult.kind === "project") {
-                        launcher.activateCurrentWorkspace();
-                        event.accepted = true;
-                    } else if (event.key === Qt.Key_Left && (event.modifiers & Qt.AltModifier)) {
-                        if (mode === "remote")
-                            launcher.open("hosts");
-                        else if (mode === "hosts")
+
+                TextField {
+                    id: search
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    placeholderText: mode === "hosts" ? "Search Machines" : mode === "remote" ? "Search Remote Applications" : mode === "tools" ? "Search Tools" : "Spotlight Search"
+                    placeholderTextColor: Theme.muted
+                    color: Theme.text
+                    selectionColor: launcher.selectionBlue
+                    selectedTextColor: "#ffffff"
+                    padding: 0
+                    verticalAlignment: TextInput.AlignVCenter
+                    font { family: Theme.fontFamily; pixelSize: 22 }
+                    focus: true
+                    background: null
+                    onTextChanged: {
+                        list.currentIndex = 0;
+                        searchTimer.restart();
+                    }
+                    Keys.onDownPressed: list.incrementCurrentIndex()
+                    Keys.onUpPressed: list.decrementCurrentIndex()
+                    Keys.onEscapePressed: {
+                        if (text !== "")
+                            text = "";
+                        else
                             launcher.visible = false;
-                        event.accepted = true;
+                    }
+                    Keys.onPressed: event => {
+                        if (event.key === Qt.Key_N && (event.modifiers & Qt.ControlModifier) && launcher.selectedResult && launcher.selectedResult.kind === "project") {
+                            launcher.activateCurrentWorkspace();
+                            event.accepted = true;
+                        } else if (event.key === Qt.Key_Left && (event.modifiers & Qt.AltModifier)) {
+                            if (mode === "remote")
+                                launcher.open("hosts");
+                            else if (mode === "hosts")
+                                launcher.visible = false;
+                            event.accepted = true;
+                        }
+                    }
+                    onAccepted: launcher.activate(list.currentIndex, false)
+                }
+
+                // Clear button, like xmark.circle.fill.
+                Rectangle {
+                    visible: search.text !== ""
+                    implicitWidth: 18
+                    implicitHeight: 18
+                    radius: 9
+                    color: Theme.muted
+                    opacity: clearMouse.containsMouse ? 1 : 0.7
+
+                    SFSymbol {
+                        anchors.centerIn: parent
+                        symbol: "xmark"
+                        size: 8
+                        font.weight: Font.Bold
+                        color: Theme.backgroundBase
+                    }
+
+                    MouseArea {
+                        id: clearMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        onClicked: {
+                            search.text = "";
+                            search.forceActiveFocus();
+                        }
                     }
                 }
-                onAccepted: launcher.activate(list.currentIndex, false)
             }
+        }
 
-            Rectangle {
-                Layout.fillWidth: true
-                implicitHeight: statusText.implicitHeight + 20
+        // Results: a separate glass panel under the field.
+        Glass {
+            width: parent.width
+            visible: launcher.showResults && (list.count > 0 || statusText.visible)
+            height: Math.min(list.contentHeight + 16, 440) + (statusText.visible ? statusText.implicitHeight + 24 : 0)
+            radius: 22
+            clip: true
+
+            Text {
+                id: statusText
+                anchors { left: parent.left; right: parent.right; top: parent.top; margins: 16; topMargin: 12 }
                 visible: launcher.error !== "" || launcher.providerError !== "" || (!launcher.loading && launcher.results.length === 0)
-                radius: Theme.radius
-                color: Theme.surfaceHover
-                border.width: 1
-                border.color: launcher.error !== "" || launcher.providerError !== "" ? Theme.danger : Theme.border
-
-                Text {
-                    id: statusText
-                    anchors.fill: parent
-                    anchors.margins: 10
-                    text: launcher.error || launcher.providerError || "No matches"
-                    color: launcher.error !== "" || launcher.providerError !== "" ? Theme.danger : Theme.muted
-                    wrapMode: Text.Wrap
-                    font.family: Theme.fontFamily
-                }
+                text: launcher.error || launcher.providerError || "No Results"
+                color: launcher.error !== "" || launcher.providerError !== "" ? Theme.danger : Theme.muted
+                wrapMode: Text.Wrap
+                font { family: Theme.fontFamily; pixelSize: 13 }
             }
 
             ListView {
                 id: list
-                Layout.fillWidth: true
-                Layout.fillHeight: true
+                anchors { left: parent.left; right: parent.right; bottom: parent.bottom; top: statusText.visible ? statusText.bottom : parent.top; margins: 8 }
                 clip: true
-                spacing: 4
                 boundsBehavior: Flickable.StopAtBounds
                 model: launcher.results
                 currentIndex: 0
                 highlightMoveDuration: 0
-                ScrollBar.vertical: ScrollBar {}
+                ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
 
-                delegate: Rectangle {
-                    id: resultRow
+                delegate: Column {
+                    id: entry
+
                     required property var modelData
                     required property int index
+                    readonly property bool selected: ListView.isCurrentItem
+                    readonly property bool topHit: launcher.mode === "local" && index === 0
+                    readonly property string header: launcher.sectionTitle(index)
+                    readonly property bool firstInSection: index === 0 || header !== launcher.sectionTitle(index - 1)
+
                     width: ListView.view.width
-                    height: 62
-                    radius: Theme.radius
-                    color: resultRow.ListView.isCurrentItem || rowMouse.containsMouse ? Theme.surfaceHover : "transparent"
-                    border.width: resultRow.ListView.isCurrentItem ? 1 : 0
-                    border.color: Theme.accentStrong
 
-                    RowLayout {
-                        anchors.fill: parent
-                        anchors.margins: 8
-                        spacing: 10
+                    Text {
+                        visible: entry.firstInSection && entry.header !== ""
+                        leftPadding: 10
+                        topPadding: entry.index === 0 ? 4 : 10
+                        bottomPadding: 4
+                        text: entry.header
+                        color: Theme.muted
+                        font { family: Theme.fontFamily; pixelSize: 12; weight: Font.DemiBold }
+                    }
 
-                        Rectangle {
-                            implicitWidth: 42
-                            implicitHeight: 42
-                            radius: Theme.radius
-                            color: "transparent"
+                    Rectangle {
+                        width: parent.width
+                        height: entry.topHit ? 52 : 34
+                        radius: 10
+                        color: entry.selected ? launcher.selectionBlue : "transparent"
 
-                            IconImage {
-                                anchors.centerIn: parent
-                                visible: modelData.kind === "app" || modelData.kind === "remote" || modelData.kind === "tool"
-                                source: modelData.iconData || Quickshell.iconPath(modelData.icon || "application-x-executable", true)
-                                implicitSize: 29
+                        RowLayout {
+                            anchors { fill: parent; leftMargin: 10; rightMargin: 12 }
+                            spacing: 10
+
+                            Item {
+                                readonly property string appIcon: entry.modelData.iconData || Quickshell.iconPath(entry.modelData.icon || "application-x-executable", true)
+                                implicitWidth: entry.topHit ? 36 : 22
+                                implicitHeight: implicitWidth
+
+                                IconImage {
+                                    anchors.fill: parent
+                                    visible: entry.modelData.kind !== "tool" && parent.appIcon !== ""
+                                    source: parent.appIcon
+                                    implicitSize: parent.width
+                                }
+
+                                SFSymbol {
+                                    anchors.centerIn: parent
+                                    visible: entry.modelData.kind === "project" || entry.modelData.kind === "web" || entry.modelData.kind === "tool" || parent.appIcon === ""
+                                    symbol: entry.modelData.kind === "project" ? "folder.fill" : entry.modelData.kind === "web" ? "globe" : entry.modelData.kind === "tool" ? (entry.modelData.name === "Color Picker" ? "eyedropper" : "camera.fill") : "square.grid.2x2.fill"
+                                    size: parent.width * 0.8
+                                    color: entry.selected ? "#ffffff" : Theme.muted
+                                }
                             }
 
                             Text {
-                                anchors.centerIn: parent
-                                visible: modelData.kind !== "app" && modelData.kind !== "remote" && modelData.kind !== "tool"
-                                text: modelData.kind === "project" ? "/" : ">"
-                                color: modelData.kind === "web" ? Theme.accent : Theme.muted
-                                font.family: Theme.fontFamily
-                                font.pixelSize: 18
-                                font.bold: true
+                                Layout.fillWidth: true
+                                text: entry.modelData.name
+                                textFormat: Text.PlainText
+                                color: entry.selected ? "#ffffff" : Theme.text
+                                elide: Text.ElideRight
+                                font { family: Theme.fontFamily; pixelSize: entry.topHit ? 15 : 14; weight: entry.topHit ? Font.DemiBold : Font.Normal }
+                            }
+
+                            Text {
+                                Layout.maximumWidth: entry.width * 0.4
+                                visible: text !== ""
+                                text: entry.modelData.description || ""
+                                textFormat: Text.PlainText
+                                color: entry.selected ? Qt.rgba(1, 1, 1, 0.75) : Theme.muted
+                                elide: Text.ElideMiddle
+                                font { family: Theme.fontFamily; pixelSize: 12 }
                             }
                         }
 
-                        Text {
-                            Layout.fillWidth: true
-                            text: modelData.name
-                            textFormat: Text.PlainText
-                            color: Theme.text
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 14
-                            font.weight: Font.DemiBold
-                            elide: Text.ElideRight
+                        MouseArea {
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            onEntered: list.currentIndex = entry.index
+                            onClicked: launcher.activate(entry.index, false)
                         }
-
-                        Text {
-                            text: modelData.kind.toUpperCase()
-                            color: modelData.kind === "web" ? Theme.accent : Theme.muted
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 9
-                            font.bold: true
-                        }
-                    }
-
-                    MouseArea {
-                        id: rowMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        onEntered: list.currentIndex = index
-                        onClicked: launcher.activate(index, false)
                     }
                 }
             }
