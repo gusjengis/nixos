@@ -58,8 +58,7 @@ in
 
   # Autologin must not open a bare shell while recovery activation is still
   # linking the Bash configuration that starts Hyprland on tty1.
-  systemd.services."getty@tty1" = {
-    overrideStrategy = "asDropin";
-    after = [ "nixos-first-boot.service" ];
-  };
+  # Attach ordering to the existing template: an instance drop-in with the
+  # same name masks NixOS's template override that supplies the agetty path.
+  systemd.services."getty@".after = [ "nixos-first-boot.service" ];
 }
