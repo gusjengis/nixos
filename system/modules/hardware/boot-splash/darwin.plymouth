@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=Darwin boot splash
+Description=Apple logo and progress bar on black
+ModuleName=script
+
+[script]
+ImageDir=@out@/share/plymouth/themes/darwin
+ScriptFile=@out@/share/plymouth/themes/darwin/darwin.script

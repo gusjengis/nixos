@@ -16,6 +16,7 @@
     ./hardware/facter-policy.nix
     ./hardware/gpu_drivers.nix
     ./hardware/grub.nix
+    ./hardware/boot_splash.nix
     ./desktop_env/hyprland.nix
     ./desktop_env/bedtime_lockout.nix
     ./desktop_env/usb-sounds.nix
@@ -36,6 +37,7 @@
 
   config = {
     grub.enable = lib.mkDefault true;
+    bootSplash.enable = lib.mkDefault config.hyprland.enable;
     nvidia.enable = lib.mkDefault false;
     hyprland.enable = lib.mkDefault true;
     # Keep lockout enabled on every managed machine, including headless hosts.

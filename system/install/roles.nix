@@ -71,6 +71,7 @@
     "vial.enable" = "core";
 
     "desktopEnv.enable" = "desktop";
+    "bootSplash.enable" = "desktop";
     "hyprland.enable" = "desktop";
 
     "dev.enable" = "development";
@@ -118,6 +119,7 @@
     "dataDrive.client.enable" = "Mount the fleet's shared data drive at /data.";
     "dev.enable" = "Development tooling and the repositories that go with it.";
     "desktopEnv.enable" = "Desktop applications, fonts, and user-level graphical setup.";
+    "bootSplash.enable" = "Apple logo and Plymouth progress bar during graphical startup.";
     "fleetMonitor.enable" = "Report this machine's hardware and workloads to the fleet dashboard.";
     "fleetMonitor.server.enable" = "Host the fleet dashboard itself. One machine only.";
     "gameDev.enable" = "Game development toolchains.";

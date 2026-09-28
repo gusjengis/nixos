@@ -1,0 +1,13 @@
+desktop-color: "#000000"
+desktop-image: "background.png"
+desktop-image-scale-method: "fitheight"
+
++ boot_menu {
+  left = 20%
+  top = 18%
+  width = 60%
+  height = 64%
+  item_color = "#ffffff"
+  selected_item_color = "#000000"
+  selected_item_pixmap_style = "selected_*.png"
+}

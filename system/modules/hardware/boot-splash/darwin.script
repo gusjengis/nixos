@@ -1,0 +1,56 @@
+# Based on darwin-plymouth by Lozano Juan Pablo (GPL-3.0).
+# https://github.com/libredeb/darwin-plymouth
+
+Window.SetBackgroundTopColor(0, 0, 0);
+Window.SetBackgroundBottomColor(0, 0, 0);
+
+logo.original = ImageNew("logo.png");
+logo.width = Window.GetWidth() * 0.43;
+logo.image = logo.original.Scale(logo.width, logo.width * logo.original.GetHeight() / logo.original.GetWidth());
+logo.sprite = SpriteNew();
+logo.sprite.SetImage(logo.image);
+logo.sprite.SetPosition(Window.GetX() + (Window.GetWidth() - logo.image.GetWidth()) / 2,
+                        Window.GetY() + Window.GetHeight() * 0.363, 1);
+
+track.original = ImageNew("progress_box.png");
+track.width = Window.GetWidth() * 0.155;
+track.image = track.original.Scale(track.width, track.width * track.original.GetHeight() / track.original.GetWidth());
+track.sprite = SpriteNew();
+track.sprite.SetImage(track.image);
+track.sprite.SetPosition(Window.GetX() + (Window.GetWidth() - track.image.GetWidth()) / 2,
+                         Window.GetY() + Window.GetHeight() * 0.645 - track.image.GetHeight() / 2, 1);
+
+fill.original = ImageNew("progress_bar.png");
+fill.width = track.width * 0.96;
+fill.height = track.image.GetHeight() * 0.75;
+fill.sprite = SpriteNew();
+fill.sprite.SetPosition(Window.GetX() + (Window.GetWidth() - fill.width) / 2,
+                        Window.GetY() + Window.GetHeight() * 0.645 - fill.height / 2, 2);
+fill.progress = 0;
+
+fun progress_callback(duration, progress) {
+  progress = Math.Max(0, Math.Min(1, progress));
+  width = Math.Int(fill.width * progress);
+  if (width > 0 && width != fill.progress) {
+    fill.sprite.SetImage(fill.original.Scale(width, fill.height));
+    fill.progress = width;
+  }
+}
+Plymouth.SetBootProgressFunction(progress_callback);
+
+prompt.sprite = SpriteNew();
+prompt.sprite.SetPosition(Window.GetX() + Window.GetWidth() * 0.25,
+                          Window.GetY() + Window.GetHeight() * 0.73, 3);
+fun password_callback(text, bullets) {
+  prompt.sprite.SetImage(Image.Text(text, 1, 1, 1));
+  prompt.sprite.SetOpacity(1);
+  fill.sprite.SetOpacity(0);
+  track.sprite.SetOpacity(0);
+}
+fun normal_callback() {
+  prompt.sprite.SetOpacity(0);
+  fill.sprite.SetOpacity(1);
+  track.sprite.SetOpacity(1);
+}
+Plymouth.SetDisplayPasswordFunction(password_callback);
+Plymouth.SetDisplayNormalFunction(normal_callback);
