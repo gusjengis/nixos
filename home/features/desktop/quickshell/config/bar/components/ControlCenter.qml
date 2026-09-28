@@ -14,6 +14,7 @@ Rectangle {
     id: root
 
     required property var controls
+    required property Item popupAnchor
     readonly property bool popupVisible: popup.visible
 
     readonly property var wifi: controls.wifi
@@ -225,7 +226,9 @@ Rectangle {
             page = name;
         }
 
-        anchor.rect.x: root.width - width
+        anchor.rect.x: root.popupAnchor.width
+            - (anchor.item ? anchor.item.mapToItem(root.popupAnchor, 0, 0).x : 0)
+            - width - 10
         anchor.rect.y: Theme.barPopupY(anchor.item)
         implicitWidth: 340
         implicitHeight: Math.min(720, currentPage.implicitHeight + 24)

@@ -184,6 +184,7 @@ PanelWindow {
             ControlCenter {
                 id: controlCenter
                 controls: bar.systemControls
+                popupAnchor: barArea
             }
             Clock {
                 id: clock
