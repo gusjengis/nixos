@@ -9,6 +9,8 @@
   ];
 
   bedtimeLockout.enable = false;
+  # Vial keyboard only ever gets plugged into this machine.
+  vial.enable = true;
   networking.networkmanager.wifi.backend = "iwd";
   networking.networkmanager.wifi.powersave = false;
   nvidia.enable = true;

@@ -23,6 +23,5 @@
 
   repo.networkmanager.enable = true;
   tailscale.enable = true;
-  vial.enable = false;
   virtual-machines.enable = false;
 }

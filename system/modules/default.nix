@@ -42,7 +42,7 @@
     bedtimeLockout.enable = lib.mkDefault true;
     nvim.enable = lib.mkDefault true;
     git.enable = lib.mkDefault true;
-    vial.enable = lib.mkDefault true;
+    vial.enable = lib.mkDefault false;
     supernote.enable = lib.mkDefault config.hyprland.enable;
     tailscale.enable = lib.mkDefault true;
     dataDrive.client.enable = lib.mkDefault true;

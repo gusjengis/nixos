@@ -17,7 +17,6 @@
   nvim.enable = true;
   repo.networkmanager.enable = true;
   tailscale.enable = true;
-  vial.enable = false;
 
   # Desktop
   hyprland.enable = true;

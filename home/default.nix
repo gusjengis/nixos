@@ -32,6 +32,8 @@
       default = true;
     };
 
+    mediaEditing.enable = lib.mkEnableOption "media creation/editing tools (Audacity, Kdenlive, GIMP)";
+
     laptop.enable = lib.mkEnableOption "is a laptop" // {
       default = true;
     };
