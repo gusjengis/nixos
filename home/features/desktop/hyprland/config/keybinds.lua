@@ -12,7 +12,8 @@ local function preserve_quickshell_focus(command)
 	return "qs ipc call focusGuard suspend; " .. command .. "; qs ipc call focusGuard resume"
 end
 
-bind("SUPER + SPACE", hl.dsp.exec_cmd("qs ipc call launcher toggle"), "App Launcher")
+-- bind("SUPER + SPACE", hl.dsp.exec_cmd("qs ipc call launcher toggle"), "App Launcher")
+bind("SUPER + SPACE", hl.dsp.exec_cmd("vicinae toggle"), "App Launcher")
 bind("SUPER + CTRL + SPACE", hl.dsp.exec_cmd("qs ipc call launcher remote"), "Remote Launcher")
 bind("SUPER + SHIFT + T", hl.dsp.exec_cmd("qs ipc call launcher tools"), "Tools Launcher")
 bind("SUPER + Q", hl.dsp.exec_cmd(vars.terminal), "Launch Terminal")

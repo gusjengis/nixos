@@ -1,0 +1,45 @@
+[meta]
+version = 1
+name = "Spotlight"
+description = "Translucent Spotlight glass with macOS blue selection"
+variant = "dark"
+inherits = "vicinae-dark"
+
+[colors.core]
+background = "#111318"
+secondary_background = "#1e2025"
+foreground = "#e2e2e9"
+border = "#44474e"
+accent = "#0a84ff"
+accent_foreground = "#ffffff"
+
+[colors.main_window]
+border = "#696d76"
+footer = { background = "colors.core.background" }
+
+[colors.text]
+muted = "#c4c6d0"
+placeholder = "#c4c6d0"
+selection = { background = "colors.core.accent", foreground = "#ffffff" }
+
+[colors.input]
+border = "#44474e"
+border_focus = "colors.core.accent"
+
+[colors.list.item.selection]
+background = "colors.core.accent"
+foreground = "#ffffff"
+secondary_background = "colors.core.accent"
+secondary_foreground = "#ffffff"
+
+[colors.list.item.hover]
+foreground = "#ffffff"
+secondary_foreground = "#c4c6d0"
+
+[colors.grid.item]
+background = "colors.core.secondary_background"
+hover = { outline = "colors.core.accent" }
+selection = { outline = "colors.core.accent" }
+
+[colors.scrollbars]
+background = "#44474e"

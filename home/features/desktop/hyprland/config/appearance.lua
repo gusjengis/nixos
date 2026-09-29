@@ -107,6 +107,12 @@ hl.layer_rule({
 	ignore_alpha = 0.2,
 })
 
+hl.layer_rule({
+	name = "vicinae-spotlight-no-animation",
+	match = { namespace = "^vicinae$" },
+	no_anim = true,
+})
+
 colorPickerNoAnimationRule = hl.layer_rule({
 	name = "tools-launcher-no-animation",
 	enabled = false,

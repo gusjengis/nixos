@@ -5,6 +5,7 @@
     ./quickshell
     ./screenshots
     ./theme
+    ./vicinae
     ./webapps
   ];
 }

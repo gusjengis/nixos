@@ -17,12 +17,7 @@ ShellRoot {
     id: root
 
     Bar {
-        openLauncher: () => {
-            if (localLauncher.visible)
-                localLauncher.visible = false;
-            else
-                localLauncher.open("local");
-        }
+        openLauncher: () => Quickshell.execDetached(["vicinae", "toggle"])
     }
 
     IpcHandler {
