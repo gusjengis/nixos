@@ -7,7 +7,7 @@ import Quickshell.Io
 QtObject {
     property var wallpaperColors: ({})
     // 0 is fully transparent; 1 is fully opaque.
-    readonly property real backgroundOpacity: 0.6
+    readonly property real backgroundOpacity: 0.8
     readonly property color backgroundBase: wallpaperColors.background || "#151922"
     readonly property color surfaceBase: wallpaperColors.surface || "#202633"
     readonly property color surfaceHoverBase: wallpaperColors.surfaceHover || "#2a3242"
@@ -64,7 +64,7 @@ QtObject {
     // (1.0 + 0.05) / (L + 0.05) >= 4.5  =>  L <= 0.1833.
     readonly property real barTargetLuminance: 0.1833
     readonly property real barScrimMax: backgroundOpacity
-    readonly property real barCrossover: barTargetLuminance / (1 - barScrimMax)
+    readonly property real barCrossover: 0.650//barTargetLuminance / (1 - barScrimMax)
     readonly property bool barContentIsDark: barLuminance >= barCrossover
     readonly property real barScrimAlpha: barContentIsDark ? 0 : Math.max(0, Math.min(barScrimMax, 1 - barTargetLuminance / Math.max(barLuminance, 0.0001)))
     readonly property color barText: barContentIsDark ? "#000000" : "#ffffff"

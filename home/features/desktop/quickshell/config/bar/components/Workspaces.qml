@@ -153,7 +153,7 @@ RowLayout {
                 anchors.centerIn: parent
                 // text: ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十"][parent.index]
                 text: parent.number
-                color: parent.active ? Theme.barTextInverse : parent.occupied ? Theme.barText : Theme.barMuted
+                color: parent.active ? Theme.barTextInverse : parent.occupied ? Theme.barText : Theme.barContentIsDark ? Qt.rgba(0, 0, 0, 0.35) : Theme.barMuted
                 font {
                     family: Theme.fontFamily
                     pixelSize: Theme.fontSize
