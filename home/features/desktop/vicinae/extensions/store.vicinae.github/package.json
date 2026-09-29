@@ -60,9 +60,9 @@
     },
     {
       "name": "pullRequests",
-      "title": "My Pull Requests",
-      "subtitle": "List your pull requests",
-      "description": "List pull requests created by you, assigned to you or mentioning you.",
+      "title": "Pull Requests",
+      "subtitle": "Browse pull requests",
+      "description": "Browse your PR inbox and pull requests across repositories.",
       "mode": "view",
       "keywords": [
         "github",
