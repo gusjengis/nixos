@@ -24,7 +24,7 @@ Rectangle {
         anchors.centerIn: parent
         width: 18
         height: 18
-        source: "icons/openai-blossom.svg"
+        source: "icons/chatgpt.svg"
         cache: false
         sourceSize: Qt.size(72, 72)
         fillMode: Image.PreserveAspectFit
