@@ -16,7 +16,7 @@ Item {
     readonly property rect bounds: metrics.tightBoundingRect
     // Apex-relative distances as a fraction of glyph height, measured from
     // the font: wedge ends ~0.29, middle arc spans 0.46-0.64, outer 0.82-1.
-    readonly property real litRadius: level >= 3 ? height * 2 : level === 2 ? height * 0.73 : level === 1 ? height * 0.375 : 0
+    readonly property real litRadius: level >= 3 ? height * 2 : level === 2 ? height * 0.68 : level === 1 ? height * 0.34 : 0
 
     implicitWidth: bounds.width
     implicitHeight: bounds.height
