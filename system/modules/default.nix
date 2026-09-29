@@ -38,7 +38,6 @@
   config = {
     grub.enable = lib.mkDefault true;
     bootSplash.enable = lib.mkDefault config.hyprland.enable;
-    nvidia.enable = lib.mkDefault false;
     hyprland.enable = lib.mkDefault true;
     # Keep lockout enabled on every managed machine, including headless hosts.
     bedtimeLockout.enable = lib.mkDefault true;
