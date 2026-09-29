@@ -8,6 +8,7 @@
 }:
 let
   configDir = "${repoRoot}/home/features/desktop/vicinae/config";
+  extensionsDir = "${repoRoot}/home/features/desktop/vicinae/extensions";
   themeFile = "${repoRoot}/home/features/desktop/vicinae/spotlight.toml";
   vicinaePackage = inputs.vicinae.packages.${pkgs.stdenv.hostPlatform.system}.default;
 in
@@ -20,8 +21,22 @@ in
       "${vicinaePackage}/etc/chromium/native-messaging-hosts/com.vicinae.vicinae.json";
 
     xdg.configFile."vicinae".source = config.lib.file.mkOutOfStoreSymlink configDir;
-    xdg.dataFile."vicinae/themes/spotlight.toml".source =
-      config.lib.file.mkOutOfStoreSymlink themeFile;
+    xdg.dataFile."vicinae/extensions".source = config.lib.file.mkOutOfStoreSymlink extensionsDir;
+    xdg.dataFile."vicinae/themes/spotlight.toml".source = config.lib.file.mkOutOfStoreSymlink themeFile;
+
+    home.activation.vicinaeMigrateExtensions = lib.hm.dag.entryBefore [ "checkLinkTargets" ] ''
+      target="''${XDG_DATA_HOME:-$HOME/.local/share}/vicinae/extensions"
+      if [[ -d "$target" && ! -L "$target" ]]; then
+        run cp -an "$target/." "${extensionsDir}/"
+        backup="$target.pre-repo"
+        n=1
+        while [[ -e "$backup" ]]; do
+          backup="$target.pre-repo-$n"
+          n=$((n + 1))
+        done
+        run mv "$target" "$backup"
+      fi
+    '';
 
     # Home Manager cannot replace an existing non-empty directory with a link.
     # Keep the original intact for users who configured Vicinae before activation.

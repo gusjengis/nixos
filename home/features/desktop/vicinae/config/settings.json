@@ -46,10 +46,22 @@
       "compact_mode": {
          "enabled": true
       },
-      "clock": {
-         "enabled": false
-      },
       "floating_status_bar": true,
-      "material": "blur"
+      "material": "blur",
+      "clock": {
+         "enabled": false,
+         "interval": 60
+      }
+   },
+   "providers": {
+      "snippets": {
+         "preferences": {
+            "enabled": true,
+            "undo": true,
+            "layout": "",
+            "prePasteDelay": "0",
+            "keyDelay": "2"
+         }
+      }
    }
 }
