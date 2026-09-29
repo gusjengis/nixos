@@ -54,6 +54,26 @@
       }
    },
    "providers": {
+      "@knoopx/store.vicinae.github": {
+         "preferences": {
+            "numberOfResults": "50",
+            "defaultIssueFilter": "my",
+            "defaultRepositoryFilter": "my"
+         },
+         "entrypoints": {
+            "createIssue": {
+               "enabled": false
+            },
+            "createPullRequest": {
+               "enabled": false
+            }
+         }
+      },
+      "@marcjulian/store.raycast.obsidian": {
+         "preferences": {
+            "configFileName": ".obsidian"
+         }
+      },
       "snippets": {
          "preferences": {
             "enabled": true,
