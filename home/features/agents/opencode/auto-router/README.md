@@ -77,7 +77,7 @@ Trivial and simple currently share models and effort. Their distinction is
 semantic, not a guaranteed difference in consumption.
 GPT-6 Astra is blocked from Auto routing; it remains available for manual selection.
 
-The local classifier is `qwen3:4b-instruct-2507-q8_0` on `omega:11434`. It sees
+The local classifier is `qwen3.8:27b` on `omega:11434`, with thinking disabled per request. It sees
 the current user's text and attachment count, not the full conversation, file
 contents, or tool results. Long text keeps its first 3,000 and last 1,500
 characters. Synthetic text and complete system-reminder blocks are excluded.
@@ -91,7 +91,7 @@ Tier boundaries are 1.5, 3.5, 5.5, and 8.0. The rubric lives in `RUBRIC.md`.
 A stack trace is treated as a symptom, not automatically as proof of an easy
 fix. An established cause and obvious correction can still be simple.
 
-The classifier has a 3-second timeout, a 256-entry in-memory result cache, and
+The classifier has a 6-second timeout, a 256-entry in-memory result cache, and
 a circuit breaker. Two transport failures open the breaker for 30 seconds;
 repeated failures increase that pause up to 10 minutes. While unavailable,
 weighted keywords choose the tier. No hosted classification call is made.
@@ -171,7 +171,7 @@ an identity check rather than assuming it succeeded.
 
 Normal turns use cached usage plus a local status command. An exceptional refresh
 can wait up to 45 seconds; selection up to 30 seconds; status up to 5 seconds.
-These are helper limits, separate from the classifier's 3-second budget.
+These are helper limits, separate from the classifier's 6-second budget.
 
 ### Live Switching Limits
 

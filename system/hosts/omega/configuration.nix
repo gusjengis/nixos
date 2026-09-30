@@ -24,11 +24,16 @@
   wallpaperFetch.enable = true;
 
   # Fleet inference host. The OpenCode auto-router on every other machine sends
-  # each prompt here to be graded before it picks a paid model, so this has to
-  # be the box with the idle 24 GB card on it.
+  # each prompt here to be graded before it picks a paid model, and the nightly
+  # wallpaper job asks it which part of the day each new image belongs to, so
+  # this has to be the box with the 24 GB card on it.
+  #
+  # One model for both callers: qwen3.8:27b reads images as well as text, and
+  # at 18 GB it is the largest Qwen that fits the card with room for its cache.
+  # A second resident model would not fit beside it.
   ollama.enable = true;
-  ollama.models = [ "qwen3:4b-instruct-2507-q8_0" ];
-  ollama.preload = "qwen3:4b-instruct-2507-q8_0";
+  ollama.models = [ "qwen3.8:27b" ];
+  ollama.preload = "qwen3.8:27b";
 
   repo.networkmanager.enable = true;
   tailscale.enable = true;

@@ -62,8 +62,8 @@
   "classifier": {
     "enabled": true,
     "endpoint": "http://omega:11434",
-    "model": "qwen3:4b-instruct-2507-q8_0",
-    "timeoutMs": 3000,
+    "model": "qwen3.8:27b",
+    "timeoutMs": 6000,
     "thresholds": {
       "simple": 1.5,
       "medium": 3.5,

@@ -43,7 +43,7 @@ in
     models = lib.mkOption {
       type = lib.types.listOf lib.types.str;
       default = [ ];
-      example = [ "qwen3:4b-instruct-2507-q8_0" ];
+      example = [ "qwen3.8:27b" ];
       description = ''
         Models pulled when the daemon starts. Pulls are idempotent, so listing a
         model that is already on disk costs nothing.
@@ -53,7 +53,7 @@ in
     preload = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = null;
-      example = "qwen3:4b-instruct-2507-q8_0";
+      example = "qwen3.8:27b";
       description = ''
         Model held in VRAM indefinitely. Loading a 4-20 GB model off disk takes
         seconds, which is longer than the request that triggered it is allowed

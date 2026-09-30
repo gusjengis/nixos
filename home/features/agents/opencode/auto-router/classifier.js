@@ -291,13 +291,16 @@ export function difficultyTier(value, thresholds) {
 const DEFAULTS = {
   enabled: true,
   endpoint: "http://omega:11434",
-  model: "qwen3:4b-instruct-2507-q8_0",
+  model: "qwen3.8:27b",
   // A miss costs the difference between two models on one turn. A stall costs
   // the user staring at an idle terminal, so the budget is tight and the
-  // heuristic takes over the moment it is exceeded. Measured p99 on the
-  // configured model is under 1.4s, so this is roughly double the worst
-  // observed case and well short of being noticed.
-  timeoutMs: 3000,
+  // heuristic takes over the moment it is exceeded. Measured on the eval set
+  // against the configured model: p50 2.3s, p90 3.0s, p99 4.2s. This clears
+  // the observed worst case with some margin without letting a wedged server
+  // hold a turn for long. The nightly wallpaper labelling job shares the GPU,
+  // so a request landing behind one of its images can still exceed it and
+  // fall back to the heuristic; that is the intended outcome.
+  timeoutMs: 6000,
   // Deliberately unset, and changing that is a trap.
   //
   // Ollama keys the loaded runner partly on the context length, so a request
@@ -397,6 +400,11 @@ export function createClassifier({ config: overrides, log = () => {}, fetch: fet
           // that arrives after a restart would otherwise reload it on the
           // default idle timer and pay the load again later.
           keep_alive: -1,
+          // Qwen 3.x reasons before answering unless told not to, and the
+          // reasoning would spend numPredict before the verdict is reached. The
+          // logprobs read below also assume the first tokens are the JSON.
+          // Ignored by models without a thinking mode.
+          think: false,
           logprobs: true,
           top_logprobs: config.topLogprobs,
           format: SCHEMA,
