@@ -59,6 +59,14 @@ ShellRoot {
         }
     }
 
+    // CTRL + dictation key: see Capture.qml and hyprland/config/keybinds.lua.
+    IpcHandler {
+        target: "capture"
+        function open(): void { capture.open(); }
+        function released(): void { capture.released(); }
+        function cancel(): void { capture.cancel(); }
+    }
+
     Component.onCompleted: Quickshell.execDetached(["wallpaperctl", "restore"])
 
     Timer {
@@ -98,5 +106,9 @@ ShellRoot {
     // title and the search field.
     WallpaperOverlay {
         id: wallpaperOverlay
+    }
+
+    Capture {
+        id: capture
     }
 }

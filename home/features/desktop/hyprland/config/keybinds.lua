@@ -38,8 +38,20 @@ bind("SUPER + W", hl.dsp.exec_cmd("qs ipc call wallpaper toggle"), "Wallpaper Pi
 bind("SUPER + R", hl.dsp.exec_cmd("qs ipc call bar toggle"), "Toggle Status Bar")
 bind("SUPER + J", hl.dsp.layout("togglesplit"), "Rotate Split")
 
+-- Every dictation release also tells the capture popup recording has stopped
+-- (a no-op when it is closed), so letting go of CTRL before the key still
+-- completes a capture.
+local stop_dictation = "handy --toggle-transcription; qs ipc call capture released"
+
 bind("code:202", hl.dsp.exec_cmd("handy --toggle-transcription"), "Dictate")
-hl.bind("code:202", hl.dsp.exec_cmd("handy --toggle-transcription"), { release = true })
+hl.bind("code:202", hl.dsp.exec_cmd(stop_dictation), { release = true })
+-- Hold to dictate straight into a new Obsidian note (vault Raw/ folder).
+bind(
+	"CTRL + code:202",
+	hl.dsp.exec_cmd("qs ipc call capture open & handy --toggle-transcription"),
+	"Dictate to Obsidian"
+)
+hl.bind("CTRL + code:202", hl.dsp.exec_cmd(stop_dictation), { release = true })
 bind("XF86AudioMicMute", hl.dsp.exec_cmd("handy --toggle-transcription"), "Dictate")
 hl.bind("XF86AudioMicMute", hl.dsp.exec_cmd("handy --toggle-transcription"), { release = true })
 
