@@ -16,6 +16,11 @@ let
   python = pkgs.python3.withPackages (ps: [ ps.pygobject3 ]);
   # Shared with the GTK theme module, which needs the same family for Thunar.
   sfPro = pkgs.callPackage ../../../packages/sf-pro.nix { };
+  # Where the sun is computed from until wallpaper-locate has asked geoclue
+  # once, or whenever geoclue has never answered. Around Tacoma: that is where
+  # an IP lookup puts home, and tens of kilometres of error shift sunrise by
+  # seconds.
+  sunFallbackLocation = "47.25,-122.44";
   # The hot path (catalog/current/set/preview/random/next/restore) is a
   # compiled binary: it runs on every scroll step in the wallpaper picker, and
   # a Python interpreter plus a double directory scan was most of its latency.
@@ -45,7 +50,8 @@ let
             # brightness; see sample_bar_luminance in src/main.rs.
             pkgs.imagemagick
           ]
-        }
+        } \
+        --set-default WALLPAPER_FALLBACK_LOCATION ${sunFallbackLocation}
     '';
   };
   # Publishes curation.json and collects whatever the scheduled fetcher pushed.
@@ -74,6 +80,31 @@ let
     ];
     text = ''
       exec bash "${wallpaperDir}/wallpaper-hide.sh" "$@"
+    '';
+  };
+  # Ctrl+T in the picker: correct a wallpaper's time-of-day phases, then push.
+  wallpaperPhases = pkgs.writeShellApplication {
+    name = "wallpaper-phases";
+    runtimeInputs = [
+      pkgs.util-linux
+      wallpaperSync
+      wallpaperctl
+    ];
+    text = ''
+      exec bash "${wallpaperDir}/wallpaper-phases.sh" "$@"
+    '';
+  };
+  # Records this machine's position from geoclue for the sun calculation.
+  wallpaperLocate = pkgs.writeShellApplication {
+    name = "wallpaper-locate";
+    runtimeInputs = [
+      pkgs.coreutils
+      pkgs.gnused
+    ];
+    # where-am-i is not in bin/, so makeBinPath cannot reach it.
+    text = ''
+      export PATH="${pkgs.geoclue2}/libexec/geoclue-2.0/demos:$PATH"
+      exec bash "${wallpaperDir}/wallpaper-locate.sh" "$@"
     '';
   };
   # Qt 6 ShaderEffect only loads precompiled .qsb, so the GLSL source kept in
@@ -173,6 +204,8 @@ in
       wallpaperctl
       wallpaperSync
       wallpaperHide
+      wallpaperPhases
+      wallpaperLocate
       aiUsage
       aiAccount
       universalSearch
@@ -212,6 +245,31 @@ in
         # Keeps several machines waking up from suspend together from hitting
         # the remote at the same instant.
         RandomizedDelaySec = "5m";
+        Persistent = true;
+      };
+      Install.WantedBy = [ "timers.target" ];
+    };
+
+    # Position for wallpaperctl's sun calculation. Rechecked every few hours
+    # so a laptop that travels catches up within an evening; a failed lookup
+    # keeps the previous fix.
+    systemd.user.services.wallpaper-locate = {
+      Unit = {
+        Description = "Record this machine's location for the wallpaper sun cycle";
+        After = [ "network-online.target" ];
+        Wants = [ "network-online.target" ];
+      };
+      Service = {
+        Type = "oneshot";
+        ExecStart = lib.getExe wallpaperLocate;
+      };
+    };
+
+    systemd.user.timers.wallpaper-locate = {
+      Unit.Description = "Refresh the wallpaper sun cycle's location";
+      Timer = {
+        OnStartupSec = "1m";
+        OnUnitActiveSec = "3h";
         Persistent = true;
       };
       Install.WantedBy = [ "timers.target" ];

@@ -26,6 +26,16 @@
 #   3. generate-palettes.py
 #        Warms the matugen palette cache so the picker does not pay ~0.3s per
 #        wallpaper the first time it is scrolled past.
+#   4. classify-sun.py --budget
+#        Asks the vision model on this host's Ollama which phases of the day
+#        (night, twilight, golden, day) each unlabelled image belongs to, so
+#        wallpaperctl can follow the sun. New images are still real files at
+#        this point; older ones are read straight out of the forge's LFS store
+#        by content hash, which is why the service user is in the forgejo
+#        group. The budget bounds a run: a full relabel (the first pass, or a
+#        prompt change bumping the script's VERSION) clears over a few nights
+#        instead of blowing the unit timeout. A labelling failure never blocks
+#        publishing new images.
 #
 # Then it commits and pushes. Three behaviours from the workflow are kept
 # deliberately and are not incidental:
@@ -101,6 +111,9 @@ let
       export WALLPAPER_DIR=${repoDir}
       export WALLPAPER_CACHE_DIR=${cacheDir}
       export MARGIN=${toString cfg.margin}
+      export LABEL_BUDGET=${toString cfg.labelBudgetMinutes}
+      export OLLAMA_URL=http://127.0.0.1:${toString config.ollama.port}
+      export WALLPAPER_LFS_STORE=${config.services.forgejo.lfs.contentDir}
 
       if [ ! -d ${repoDir}/.git ]; then
         echo "cloning ${cfg.repository} from the forge"
@@ -137,6 +150,8 @@ let
         python3 fetch-peapix.py --incremental --incremental-margin "$MARGIN" --rate 12
         python3 translate-metadata.py --rate 6
         python3 generate-palettes.py
+        python3 classify-sun.py --budget "$LABEL_BUDGET" \
+          || echo "sun labelling failed; publishing the rest anyway" >&2
       '
 
       if [ -z "$(git status --porcelain)" ]; then
@@ -166,7 +181,13 @@ let
         added=$((added + 1))
       done
 
-      git commit --quiet -m "Add $added wallpaper(s) from peapix"
+      # A run can change only metadata: a labelling instalment, a late
+      # translation. Say so instead of announcing zero new wallpapers.
+      if [ "$added" -gt 0 ]; then
+        git commit --quiet -m "Add $added wallpaper(s) from peapix"
+      else
+        git commit --quiet -m "Update wallpaper metadata"
+      fi
 
       # A workstation may have pushed a curation change since the fetch above.
       for attempt in 1 2 3; do
@@ -209,6 +230,16 @@ in
       '';
     };
 
+    labelBudgetMinutes = lib.mkOption {
+      type = lib.types.int;
+      default = 90;
+      description = ''
+        Minutes classify-sun.py may spend per run. At about 2.3s an image this
+        labels roughly 2300, so a full relabel of the library takes two nights.
+        Must leave room under the unit timeout for fetching and pushing.
+      '';
+    };
+
     schedule = lib.mkOption {
       type = lib.types.str;
       default = "*-*-* 05:40:00 UTC";
@@ -227,6 +258,10 @@ in
         assertion = config.forge.enable;
         message = "wallpaperFetch.enable pushes to the local forge, so forge.enable must be true.";
       }
+      {
+        assertion = config.ollama.enable;
+        message = "wallpaperFetch.enable labels images with the local Ollama, so ollama.enable must be true.";
+      }
     ];
 
     users.groups.wallpaper-fetch = { };
@@ -236,6 +271,11 @@ in
       home = stateDir;
       createHome = true;
       description = "Owns the wallpaper library checkout and its forge deploy key";
+      # Read access to the forge's LFS store, which is the only full copy of
+      # the images on this machine: the checkout here holds pointers. Forgejo
+      # writes objects 0640 and directories 0750 under its own group, so
+      # membership is all the labelling step needs to read them in place.
+      extraGroups = [ "forgejo" ];
     };
 
     systemd.tmpfiles.rules = [
@@ -287,6 +327,7 @@ in
         "network-online.target"
         "tailscaled.service"
         "forgejo-bootstrap.service"
+        "ollama.service"
       ];
       wants = [
         "network-online.target"
@@ -299,9 +340,9 @@ in
         WorkingDirectory = stateDir;
         ExecStart = lib.getExe fetchWallpapers;
 
-        # An hour is generous for a normal run; the first one downloads the
-        # repository's flake closure as well.
-        TimeoutStartSec = "2h";
+        # A normal run takes minutes. The ceiling covers the labelling budget
+        # plus a slow fetch, and the first run downloading the flake closure.
+        TimeoutStartSec = "3h";
 
         NoNewPrivileges = true;
         PrivateTmp = true;

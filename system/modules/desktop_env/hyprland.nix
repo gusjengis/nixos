@@ -37,7 +37,35 @@
     services = {
       graphical-desktop.enable = true;
       xserver.desktopManager.runXdgAutostartIfNone = lib.mkDefault true;
+
+      # Location for the wallpaper cycle, which follows the sun (see
+      # home/features/desktop/wallpaper/src/sun.rs). The user-level
+      # wallpaper-locate service asks through geoclue's where-am-i demo, which
+      # identifies itself as "geoclue-where-am-i"; whitelisting that id lets it
+      # through without an interactive agent. On wpa_supplicant machines
+      # geoclue scans Wi-Fi; on iwd ones it can only offer an IP-based fix,
+      # which is still plenty for sun angles.
+      geoclue2 = {
+        enable = true;
+        appConfig."geoclue-where-am-i" = {
+          isAllowed = true;
+          isSystem = false;
+        };
+      };
     };
+
+    # geoclue 2.8 moved IP geolocation into its own [ip] source, which is off
+    # unless a method is named, and the NixOS module does not write that
+    # section yet. Without it an iwd machine gets no fix at all, since the
+    # Wi-Fi source only scans through wpa_supplicant. `lines` concatenates, so
+    # this appends to the module's generated file. ichnaea reuses the Wi-Fi
+    # source's BeaconDB URL.
+    environment.etc."geoclue/geoclue.conf".text = lib.mkAfter ''
+
+      [ip]
+      enable=true
+      method=ichnaea
+    '';
 
     security = {
       polkit.enable = true;

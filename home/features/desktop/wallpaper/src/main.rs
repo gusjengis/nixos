@@ -13,8 +13,11 @@
 //   so every switch is a hard cut - that's intentional, not a bug.
 // - wallpapers() is scanned once per invocation and threaded through, unlike
 //   the old Python version which rescanned the ~900-file directory twice.
+// - Cycling follows the sun: see sun.rs and phase_pool below.
 
-use std::collections::{BTreeMap, HashSet};
+mod sun;
+
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::env;
 use std::fs;
 use std::io;
@@ -27,6 +30,8 @@ use rand::seq::SliceRandom;
 use rand::thread_rng;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
+
+use sun::{Phase, PHASES};
 
 const EXTENSIONS: &[&str] = &["avif", "gif", "jpeg", "jpg", "png", "webp"];
 // Assumed when the wallpaper can't be sampled (unreadable file, no `magick` on
@@ -107,6 +112,7 @@ struct Paths {
     current_file: PathBuf,
     order_file: PathBuf,
     colors_file: PathBuf,
+    location_file: PathBuf,
 }
 
 impl Paths {
@@ -123,6 +129,7 @@ impl Paths {
             current_file: state_dir.join("current"),
             order_file: state_dir.join("order.json"),
             colors_file: state_dir.join("colors.json"),
+            location_file: state_dir.join("location.json"),
             wallpaper_dir,
         }
     }
@@ -248,7 +255,8 @@ fn randomized_order(paths: &Paths, available: &[PathBuf]) -> Vec<PathBuf> {
     ordered
 }
 
-/// Wallpapers the user has hidden with Ctrl+D in the picker.
+/// Wallpapers the user has hidden with Ctrl+D in the picker, and phase labels
+/// they corrected with Ctrl+T.
 ///
 /// Deliberately a separate file from metadata.json, which is 8 MB and is
 /// rewritten by the scheduled fetcher. Keeping curation here means the only
@@ -260,6 +268,22 @@ struct Curation {
     version: u32,
     #[serde(default)]
     hidden: BTreeMap<String, HiddenEntry>,
+    /// Replaces the model's phases in metadata.json for that file. Lives here,
+    /// not in metadata.json, so the fetcher's relabelling can never undo it.
+    #[serde(default, rename = "sunOverrides", skip_serializing_if = "BTreeMap::is_empty")]
+    sun_overrides: BTreeMap<String, SunOverride>,
+    /// Anything a newer wallpaperctl wrote that this one does not know about,
+    /// carried through untouched. Every machine rewrites this file, so an
+    /// older build dropping unknown keys would silently erase another
+    /// machine's curation.
+    #[serde(flatten)]
+    extra: serde_json::Map<String, serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct SunOverride {
+    phases: Vec<String>,
+    at: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -277,7 +301,7 @@ fn load_curation(paths: &Paths) -> Curation {
         .and_then(|text| serde_json::from_str::<Curation>(&text).ok())
         .unwrap_or_else(|| Curation {
             version: curation_version(),
-            hidden: BTreeMap::new(),
+            ..Curation::default()
         })
 }
 
@@ -344,6 +368,161 @@ fn toggle_hidden(paths: &Paths, scanned: &[PathBuf], raw_path: &str) -> Result<(
     };
     save_curation(paths, &curation).map_err(|e| e.to_string())?;
     Ok((hidden, name))
+}
+
+/// Phases per file name as classify-sun.py labelled them in metadata.json.
+/// Deserialised into a narrow struct so the rest of the 10 MB file is skipped
+/// rather than built into a tree.
+fn model_phases(paths: &Paths) -> HashMap<String, Vec<Phase>> {
+    #[derive(Deserialize)]
+    struct Root {
+        #[serde(default)]
+        entries: HashMap<String, Entry>,
+    }
+    #[derive(Deserialize)]
+    struct Entry {
+        #[serde(default)]
+        sun: Option<Label>,
+    }
+    #[derive(Deserialize)]
+    struct Label {
+        #[serde(default)]
+        phases: Vec<String>,
+    }
+
+    let Some(root) = fs::read_to_string(&paths.metadata_file)
+        .ok()
+        .and_then(|text| serde_json::from_str::<Root>(&text).ok())
+    else {
+        return HashMap::new();
+    };
+    root.entries
+        .into_iter()
+        .filter_map(|(name, entry)| {
+            let phases = parse_phases(&entry.sun?.phases);
+            (!phases.is_empty()).then_some((name, phases))
+        })
+        .collect()
+}
+
+fn parse_phases(names: &[String]) -> Vec<Phase> {
+    let mut phases: Vec<Phase> = names.iter().filter_map(|name| Phase::parse(name)).collect();
+    phases.sort();
+    phases.dedup();
+    phases
+}
+
+/// The phases each wallpaper is shown in: the user's Ctrl+T correction if
+/// there is one, otherwise the model's label. Unlabelled files are absent.
+fn effective_phases(model: &HashMap<String, Vec<Phase>>, curation: &Curation) -> HashMap<String, Vec<Phase>> {
+    let mut phases = model.clone();
+    for (name, correction) in &curation.sun_overrides {
+        let parsed = parse_phases(&correction.phases);
+        if !parsed.is_empty() {
+            phases.insert(name.clone(), parsed);
+        }
+    }
+    phases
+}
+
+/// Where the sun calculation is done from.
+///
+/// wallpaper-locate writes location.json from geoclue. Without it (geoclue
+/// never answered, or the helper has not run yet on a fresh machine) the
+/// coordinate baked into the wrapper by Nix stands in. Tens of kilometres of
+/// error move sunrise by seconds, so a stale or coarse fix is harmless.
+fn location(paths: &Paths) -> Option<(f64, f64, &'static str)> {
+    #[derive(Deserialize)]
+    struct Stored {
+        latitude: f64,
+        longitude: f64,
+    }
+    if let Some(stored) = fs::read_to_string(&paths.location_file)
+        .ok()
+        .and_then(|text| serde_json::from_str::<Stored>(&text).ok())
+    {
+        return Some((stored.latitude, stored.longitude, "geoclue"));
+    }
+    let fallback = env::var("WALLPAPER_FALLBACK_LOCATION").ok()?;
+    let (lat, lon) = fallback.split_once(',')?;
+    Some((lat.trim().parse().ok()?, lon.trim().parse().ok()?, "fallback"))
+}
+
+/// The current phase of the day, or None when no location is known at all,
+/// which turns phase filtering off rather than guessing.
+fn current_phase(paths: &Paths) -> Option<(Phase, f64, &'static str)> {
+    let (latitude, longitude, source) = location(paths)?;
+    // Overridable so the filter can be exercised at any hour.
+    let now = env::var("WALLPAPER_NOW")
+        .ok()
+        .and_then(|value| value.parse::<i64>().ok())
+        .unwrap_or_else(|| {
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs() as i64)
+                .unwrap_or(0)
+        });
+    let elevation = sun::elevation(latitude, longitude, now);
+    Some((Phase::from_elevation(elevation), elevation, source))
+}
+
+/// Below this many candidates a phase's pool is widened, so a thin phase
+/// repeats a little less instead of looping a handful of images.
+const MIN_POOL: usize = 20;
+
+/// Narrow the visible cycle to wallpapers labelled for the current phase.
+///
+/// Order is preserved, so this is the same persisted shuffle with gaps rather
+/// than a separate playlist per phase. If too few match, neighbouring phases
+/// are admitted one step at a time; unlabelled wallpapers are only used when
+/// even that fails, which in practice means the library has not been labelled
+/// yet and filtering should simply stay out of the way.
+fn phase_pool(visible: &[PathBuf], phases: &HashMap<String, Vec<Phase>>, now: Phase) -> Vec<PathBuf> {
+    for width in 0..PHASES.len() as i32 {
+        let pool: Vec<PathBuf> = visible
+            .iter()
+            .filter(|path| {
+                phases
+                    .get(&file_name_of(path))
+                    .is_some_and(|labels| labels.iter().any(|label| (label.rank() - now.rank()).abs() <= width))
+            })
+            .cloned()
+            .collect();
+        if pool.len() >= MIN_POOL {
+            return pool;
+        }
+    }
+    visible.to_vec()
+}
+
+/// Ctrl+T in the picker: replace a wallpaper's phases, or drop the correction
+/// and fall back to the model's label with "reset".
+fn set_phases(paths: &Paths, scanned: &[PathBuf], raw_path: &str, spec: &str) -> Result<String, String> {
+    let requested = fs::canonicalize(raw_path).map_err(|e| format!("{raw_path}: {e}"))?;
+    if !scanned.contains(&requested) {
+        return Err(format!("not a wallpaper under {}: {}", paths.wallpaper_dir.display(), requested.display()));
+    }
+    let name = file_name_of(&requested);
+    let mut curation = load_curation(paths);
+
+    let result = if spec.trim() == "reset" {
+        curation.sun_overrides.remove(&name);
+        "reset".to_string()
+    } else {
+        let names: Vec<String> = spec.split(',').map(|part| part.trim().to_string()).filter(|p| !p.is_empty()).collect();
+        if let Some(bad) = names.iter().find(|name| Phase::parse(name).is_none()) {
+            return Err(format!("unknown phase {bad:?}; expected night, twilight, golden or day"));
+        }
+        let phases: Vec<String> = parse_phases(&names).into_iter().map(|p| p.name().to_string()).collect();
+        if phases.is_empty() {
+            return Err("at least one phase is required; use \"reset\" to return to the model's label".to_string());
+        }
+        let joined = phases.join(",");
+        curation.sun_overrides.insert(name.clone(), SunOverride { phases, at: timestamp_now() });
+        joined
+    };
+    save_curation(paths, &curation).map_err(|e| e.to_string())?;
+    Ok(format!("{result} {name}"))
 }
 
 fn current(paths: &Paths, available: &[PathBuf]) -> Option<PathBuf> {
@@ -594,6 +773,8 @@ fn print_catalog(
     available: &[PathBuf],
     active: Option<&PathBuf>,
     curation: &Curation,
+    model: &HashMap<String, Vec<Phase>>,
+    now: Option<Phase>,
 ) {
     #[derive(Serialize)]
     struct Entry {
@@ -602,6 +783,12 @@ fn print_catalog(
         path: String,
         extension: String,
         hidden: bool,
+        /// What cycling uses: the correction if any, else the model's.
+        phases: Vec<&'static str>,
+        #[serde(rename = "modelPhases")]
+        model_phases: Vec<&'static str>,
+        #[serde(rename = "phaseOverride")]
+        phase_override: bool,
     }
     #[derive(Serialize)]
     struct Catalog {
@@ -610,8 +797,16 @@ fn print_catalog(
         metadata_file: String,
         #[serde(rename = "curationFile")]
         curation_file: String,
+        /// Phase of the day right now, empty when no location is known.
+        #[serde(rename = "sunPhase")]
+        sun_phase: &'static str,
         wallpapers: Vec<Entry>,
     }
+
+    let names = |phases: Option<&Vec<Phase>>| -> Vec<&'static str> {
+        phases.map(|list| list.iter().map(|p| p.name()).collect()).unwrap_or_default()
+    };
+    let effective = effective_phases(model, curation);
 
     // Hidden wallpapers stay in the catalog, flagged, so the picker can offer
     // an "is:hidden" view to un-hide them. Only the cycling commands drop them.
@@ -626,6 +821,9 @@ fn print_catalog(
                     .unwrap_or_default()
                     .to_string(),
                 hidden: curation.hidden.contains_key(&file),
+                phases: names(effective.get(&file)),
+                model_phases: names(model.get(&file)),
+                phase_override: curation.sun_overrides.contains_key(&file),
                 file,
                 path: p.to_string_lossy().to_string(),
                 extension: p
@@ -647,6 +845,7 @@ fn print_catalog(
         // Always reported, even before the file exists: the picker watches it
         // so the first Ctrl+D is picked up without reopening the picker.
         curation_file: paths.curation_file.to_string_lossy().to_string(),
+        sun_phase: now.map(Phase::name).unwrap_or(""),
         wallpapers: entries,
     };
 
@@ -699,7 +898,7 @@ fn resolve_cycle_target(
 
 fn usage_and_exit() -> ! {
     eprintln!(
-        "usage: wallpaperctl {{catalog|current|set PATH|preview PATH|commit PATH|random|next|previous|restore|toggle-hidden PATH}}"
+        "usage: wallpaperctl {{catalog|current|set PATH|preview PATH|commit PATH|random|next|previous|restore|toggle-hidden PATH|set-phases PATH PHASE[,PHASE]|reset|phase}}"
     );
     std::process::exit(2);
 }
@@ -715,20 +914,44 @@ fn main() {
     let scanned = wallpapers(&paths);
     let available = randomized_order(&paths, &scanned);
     let curation = load_curation(&paths);
+    let command = args.get(1).map(String::as_str).unwrap_or("");
+
     // Two lists on purpose: `available` is every wallpaper in cycle order and
     // backs the catalog plus set/preview, while `cycling` drops what the user
-    // hid so next/previous/random/restore can never land on it again.
-    let cycling: Vec<PathBuf> = available
+    // hid, and what does not suit the time of day, so next/previous/random/
+    // restore never land on either. Picking by hand ignores the sun.
+    let visible: Vec<PathBuf> = available
         .iter()
         .filter(|path| !curation.hidden.contains_key(&file_name_of(path)))
         .cloned()
         .collect();
+    let now = current_phase(&paths);
+    // metadata.json is 10 MB; only parse it for commands that use the labels.
+    let needs_labels = matches!(command, "catalog" | "random" | "next" | "previous" | "restore" | "phase");
+    let model = if needs_labels { model_phases(&paths) } else { HashMap::new() };
+    let cycling: Vec<PathBuf> = match now {
+        Some((phase, _, _)) if needs_labels => phase_pool(&visible, &effective_phases(&model, &curation), phase),
+        _ => visible.clone(),
+    };
     let active = current(&paths, &available);
 
-    let command = args.get(1).map(String::as_str).unwrap_or("");
-
     match command {
-        "catalog" => print_catalog(&paths, &available, active.as_ref(), &curation),
+        "catalog" => print_catalog(&paths, &available, active.as_ref(), &curation, &model, now.map(|(p, _, _)| p)),
+        "phase" => match now {
+            Some((phase, elevation, source)) => println!(
+                "{} {:.1} {} {} of {} in cycle",
+                phase.name(),
+                elevation,
+                source,
+                cycling.len(),
+                visible.len()
+            ),
+            None => println!("unknown (no location)"),
+        },
+        "set-phases" if args.len() == 4 => match set_phases(&paths, &scanned, &args[2], &args[3]) {
+            Ok(result) => println!("{result}"),
+            Err(e) => fail(&e),
+        },
         "current" => println!("{}", active.map(|p| p.to_string_lossy().to_string()).unwrap_or_default()),
         "toggle-hidden" if args.len() == 3 => match toggle_hidden(&paths, &scanned, &args[2]) {
             Ok((hidden, name)) => println!("{} {}", if hidden { "hidden" } else { "visible" }, name),
@@ -880,5 +1103,69 @@ mod tests {
         assert_eq!(&stamp[10..11], "T");
         let year: i32 = stamp[0..4].parse().unwrap();
         assert!(year >= 2024 && year < 2100, "{stamp}");
+    }
+
+    fn labelled(counts: &[(Phase, usize)]) -> (Vec<PathBuf>, HashMap<String, Vec<Phase>>) {
+        let mut visible = Vec::new();
+        let mut phases = HashMap::new();
+        for (phase, count) in counts {
+            for i in 0..*count {
+                let name = format!("{}-{i}.jpg", phase.name());
+                visible.push(PathBuf::from(format!("/w/{name}")));
+                phases.insert(name, vec![*phase]);
+            }
+        }
+        (visible, phases)
+    }
+
+    #[test]
+    fn pool_keeps_only_the_current_phase_when_it_is_big_enough() {
+        let (visible, phases) = labelled(&[(Phase::Night, 25), (Phase::Day, 40)]);
+        let pool = phase_pool(&visible, &phases, Phase::Night);
+        assert_eq!(pool.len(), 25);
+        assert!(pool.iter().all(|p| p.to_string_lossy().contains("night")));
+    }
+
+    #[test]
+    fn pool_widens_to_neighbours_when_a_phase_is_thin() {
+        let (visible, phases) = labelled(&[(Phase::Night, 5), (Phase::Twilight, 18), (Phase::Day, 40)]);
+        let pool = phase_pool(&visible, &phases, Phase::Night);
+        // night + twilight = 23 is enough; day is two phases away and stays out.
+        assert_eq!(pool.len(), 23);
+    }
+
+    #[test]
+    fn pool_falls_back_to_everything_before_labelling() {
+        let visible = paths(&["/w/a.jpg", "/w/b.jpg"]);
+        assert_eq!(phase_pool(&visible, &HashMap::new(), Phase::Golden), visible);
+    }
+
+    #[test]
+    fn pool_preserves_cycle_order() {
+        let (mut visible, phases) = labelled(&[(Phase::Golden, 30)]);
+        visible.reverse();
+        assert_eq!(phase_pool(&visible, &phases, Phase::Golden), visible);
+    }
+
+    #[test]
+    fn overrides_replace_model_phases() {
+        let model = HashMap::from([("a.jpg".to_string(), vec![Phase::Day])]);
+        let mut curation = Curation::default();
+        curation.sun_overrides.insert(
+            "a.jpg".to_string(),
+            SunOverride { phases: vec!["night".into(), "twilight".into()], at: String::new() },
+        );
+        let effective = effective_phases(&model, &curation);
+        assert_eq!(effective["a.jpg"], vec![Phase::Night, Phase::Twilight]);
+    }
+
+    #[test]
+    fn curation_round_trips_fields_it_does_not_know() {
+        let text = r#"{"version":1,"hidden":{},"futureThing":{"x":1}}"#;
+        let curation: Curation = serde_json::from_str(text).unwrap();
+        let written = serde_json::to_value(&curation).unwrap();
+        assert_eq!(written["futureThing"]["x"], 1);
+        // Empty overrides are omitted, so older files stay byte-for-byte stable.
+        assert!(written.get("sunOverrides").is_none());
     }
 }

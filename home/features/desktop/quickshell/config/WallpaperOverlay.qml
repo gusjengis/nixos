@@ -44,7 +44,17 @@ PanelWindow {
     property string metadataPath: ""
     // Filenames the user hid with Ctrl+D, mirrored from ~/Wallpapers/curation.json.
     property var hiddenFiles: ({})
+    // Ctrl+T corrections to the model's time-of-day phases, also from
+    // curation.json: filename -> { phases: [...] }.
+    property var phaseOverrides: ({})
     property string curationPath: ""
+    // Phase of the day right now according to wallpaperctl, "" if unknown.
+    property string sunPhase: ""
+    // Ctrl+T panel. The draft is what the toggles show until it is saved.
+    readonly property var phaseNames: ["night", "twilight", "golden", "day"]
+    property bool phasePanelOpen: false
+    property var phaseDraft: []
+    property int phaseCursor: 0
     property string notice: ""
     property int poolSize: 0
     property int index: 0
@@ -191,6 +201,72 @@ PanelWindow {
         Quickshell.execDetached(["wallpaper-hide", entry.path]);
     }
 
+    function phaseLabel(phases) {
+        return phases && phases.length > 0 ? phases.map(name => name.charAt(0).toUpperCase() + name.slice(1)).join(" + ") : "Unlabelled";
+    }
+
+    function samePhases(left, right) {
+        return (left || []).slice().sort().join(",") === (right || []).slice().sort().join(",");
+    }
+
+    // Ctrl+T. Opens a small panel over the caption to correct which parts of the
+    // day the selected wallpaper is cycled in. Nothing is written until Enter.
+    function openPhasePanel() {
+        const entry = selected;
+        if (!entry)
+            return;
+        phaseDraft = entry.phases.slice();
+        const first = phaseNames.indexOf(phaseDraft[0]);
+        phaseCursor = first >= 0 ? first : 0;
+        phasePanelOpen = true;
+    }
+
+    function closePhasePanel() {
+        phasePanelOpen = false;
+    }
+
+    function togglePhase(name) {
+        const draft = phaseDraft.slice();
+        const at = draft.indexOf(name);
+        if (at >= 0)
+            draft.splice(at, 1);
+        else
+            draft.push(name);
+        // Kept in night..day order so the label reads naturally.
+        phaseDraft = phaseNames.filter(phase => draft.indexOf(phase) >= 0);
+    }
+
+    // Saving the model's own answer, or pressing R, drops the correction rather
+    // than storing a copy that would outlive a future relabel.
+    function savePhases(reset) {
+        const entry = selected;
+        if (!entry)
+            return;
+        if (!reset && phaseDraft.length === 0) {
+            notice = "Pick at least one phase, or R to use the model's label";
+            noticeTimer.restart();
+            return;
+        }
+        const useModel = reset || samePhases(phaseDraft, entry.modelPhases);
+        const updated = Object.assign({}, phaseOverrides);
+        if (useModel)
+            delete updated[entry.file];
+        else
+            updated[entry.file] = {
+                "phases": phaseDraft.slice()
+            };
+        phaseOverrides = updated;
+        entry.phases = useModel ? entry.modelPhases.slice() : phaseDraft.slice();
+        entry.phaseOverride = !useModel;
+        // Reassigned so bindings on `selected` see the change.
+        wallpapers = wallpapers.slice();
+        phasePanelOpen = false;
+        notice = (useModel ? "Using the model's label: " : "Shown at: ") + phaseLabel(entry.phases);
+        noticeTimer.restart();
+        // Writes curation.json and pushes it, like Ctrl+D.
+        Quickshell.execDetached(["wallpaper-phases", entry.path, useModel ? "reset" : phaseDraft.join(",")]);
+    }
+
     function normalizeText(value) {
         return (value || "").toLowerCase().replace(/[^0-9a-z\u00c0-\u024f]+/g, " ").trim();
     }
@@ -211,8 +287,10 @@ PanelWindow {
         try {
             const parsed = JSON.parse(curationView.text());
             hiddenFiles = parsed.hidden || {};
+            phaseOverrides = parsed.sunOverrides || {};
         } catch (error) {
             hiddenFiles = ({});
+            phaseOverrides = ({});
         }
         rebuild();
     }
@@ -237,7 +315,14 @@ PanelWindow {
             const headline = record && (record.englishHeadline || record.headline) ? record.englishHeadline || record.headline : "";
             const description = record && (record.englishDescription || record.description) ? record.englishDescription || record.description : "";
             const date = record && record.date ? record.date : "";
+            // metadata.json is watched, so a label that lands while the picker
+            // is open wins over the catalog's snapshot.
+            const modelPhases = record && record.sun && record.sun.phases ? record.sun.phases : item.modelPhases || [];
+            const override = phaseOverrides[item.file];
             entries.push({
+                "modelPhases": modelPhases,
+                "phases": override && override.phases && override.phases.length > 0 ? override.phases : modelPhases,
+                "phaseOverride": !!override,
                 "path": item.path,
                 "file": item.file,
                 "name": item.name,
@@ -312,7 +397,10 @@ PanelWindow {
         previewTimer.restart();
     }
 
-    onSelectedPathChanged: previewSelected()
+    onSelectedPathChanged: {
+        phasePanelOpen = false;
+        previewSelected();
+    }
 
     onVisibleChanged: {
         if (visible)
@@ -321,6 +409,7 @@ PanelWindow {
             acceptTimer.stop();
             previewTimer.stop();
             search.text = "";
+            phasePanelOpen = false;
         }
     }
 
@@ -369,6 +458,7 @@ PanelWindow {
                 overlay.displayedPath = overlay.originalWallpaper;
                 overlay.metadataPath = result.metadataFile || "";
                 overlay.curationPath = result.curationFile || "";
+                overlay.sunPhase = result.sunPhase || "";
                 // Seeded from the catalog so the first frame already excludes
                 // hidden wallpapers, before curation.json has been read.
                 const seeded = {};
@@ -577,7 +667,34 @@ PanelWindow {
                 // Handled here rather than with Shortcut so typing a query never
                 // triggers navigation.
                 Keys.onPressed: event => {
-                    if (event.key === Qt.Key_Left || event.key === Qt.Key_Up) {
+                    // The Ctrl+T panel owns the keyboard while it is open, so
+                    // nothing typed there reaches the search or navigation.
+                    if (overlay.phasePanelOpen) {
+                        const ctrl = event.modifiers & Qt.ControlModifier;
+                        const numbered = event.key - Qt.Key_1;
+                        if (event.key === Qt.Key_Escape || (event.key === Qt.Key_T && ctrl))
+                            overlay.closePhasePanel();
+                        else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
+                            overlay.savePhases(false);
+                        else if (event.key === Qt.Key_R)
+                            overlay.savePhases(true);
+                        else if (event.key === Qt.Key_Left || event.key === Qt.Key_Up)
+                            overlay.phaseCursor = (overlay.phaseCursor + 3) % 4;
+                        else if (event.key === Qt.Key_Right || event.key === Qt.Key_Down)
+                            overlay.phaseCursor = (overlay.phaseCursor + 1) % 4;
+                        else if (event.key === Qt.Key_Space)
+                            overlay.togglePhase(overlay.phaseNames[overlay.phaseCursor]);
+                        else if (numbered >= 0 && numbered < 4) {
+                            overlay.phaseCursor = numbered;
+                            overlay.togglePhase(overlay.phaseNames[numbered]);
+                        }
+                        event.accepted = true;
+                        return;
+                    }
+                    if (event.key === Qt.Key_T && (event.modifiers & Qt.ControlModifier)) {
+                        overlay.openPhasePanel();
+                        event.accepted = true;
+                    } else if (event.key === Qt.Key_Left || event.key === Qt.Key_Up) {
                         overlay.select(-1);
                         event.accepted = true;
                     } else if (event.key === Qt.Key_Right || event.key === Qt.Key_Down) {
@@ -601,6 +718,8 @@ PanelWindow {
                     }
                 }
                 onAccepted: {
+                    if (overlay.phasePanelOpen)
+                        return;
                     if (search.text === "")
                         overlay.applySelected();
                     else {
@@ -676,6 +795,111 @@ PanelWindow {
                 font.family: Theme.fontFamily
                 font.pixelSize: 16
                 font.weight: Font.Medium
+            }
+        }
+
+        // Ctrl+T: which parts of the day the selected wallpaper is cycled in.
+        // Sits above the caption so the title stays readable while editing.
+        Rectangle {
+            id: phasePanel
+            anchors.left: caption.left
+            anchors.bottom: caption.top
+            anchors.bottomMargin: 20
+            width: phaseColumn.implicitWidth + 44
+            height: phaseColumn.implicitHeight + 36
+            radius: 18
+            visible: opacity > 0
+            opacity: overlay.phasePanelOpen ? 1 : 0
+            color: Qt.rgba(Theme.backgroundBase.r, Theme.backgroundBase.g, Theme.backgroundBase.b, 0.86)
+            border.width: 1
+            border.color: Qt.rgba(1, 1, 1, 0.12)
+
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: 140
+                    easing.type: Easing.OutCubic
+                }
+            }
+
+            // Swallows clicks on the slab so they do not reach the stage.
+            MouseArea {
+                anchors.fill: parent
+            }
+
+            Column {
+                id: phaseColumn
+                anchors.left: parent.left
+                anchors.top: parent.top
+                anchors.leftMargin: 22
+                anchors.topMargin: 18
+                spacing: 12
+
+                Text {
+                    text: "Time of day"
+                    color: Theme.text
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 20
+                    font.weight: Font.DemiBold
+                }
+
+                Row {
+                    spacing: 10
+
+                    Repeater {
+                        model: overlay.phaseNames
+
+                        Rectangle {
+                            required property string modelData
+                            required property int index
+                            readonly property bool checked: overlay.phaseDraft.indexOf(modelData) >= 0
+                            readonly property bool current: overlay.sunPhase === modelData
+                            width: chipText.implicitWidth + 36
+                            height: 40
+                            radius: 12
+                            color: checked ? Theme.accentStrong : Qt.rgba(1, 1, 1, 0.06)
+                            border.width: overlay.phaseCursor === index ? 2 : 1
+                            border.color: overlay.phaseCursor === index ? Theme.accent : Qt.rgba(1, 1, 1, 0.14)
+
+                            Text {
+                                id: chipText
+                                anchors.centerIn: parent
+                                text: (index + 1) + "  " + overlay.phaseLabel([modelData]) + (current ? "  \u2022" : "")
+                                color: checked ? Theme.backgroundBase : Theme.text
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 16
+                                font.weight: Font.Medium
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: {
+                                    overlay.phaseCursor = index;
+                                    overlay.togglePhase(modelData);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Text {
+                    text: {
+                        const entry = overlay.selected;
+                        if (!entry)
+                            return "";
+                        const model = "Model: " + overlay.phaseLabel(entry.modelPhases);
+                        return entry.phaseOverride ? model + "   \u00b7   corrected by you" : model;
+                    }
+                    color: Theme.muted
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 14
+                }
+
+                Text {
+                    text: "1-4 or Space toggle  \u00b7  Enter save  \u00b7  R use model  \u00b7  Esc cancel" + (overlay.sunPhase !== "" ? "  \u00b7  \u2022 now" : "")
+                    color: Theme.muted
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 13
+                }
             }
         }
     }

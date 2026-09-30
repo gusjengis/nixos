@@ -2,9 +2,10 @@
 # Reconcile ~/Wallpapers with origin: publish local curation, collect whatever
 # the scheduled fetcher pushed.
 #
-# Two callers share this script. Ctrl+D in the picker runs it so a hide reaches
-# the other machines promptly, and an hourly timer runs it to pick up new
-# wallpapers from omega's nightly wallpaper-fetch job. flock serialises the two,
+# Three callers share this script. Ctrl+D (hide) and Ctrl+T (time-of-day
+# phases) in the picker run it so a curation change reaches the other machines
+# promptly, and an hourly timer runs it to pick up new
+# wallpapers from omega's nightly wallpaper-fetch job. flock serialises them,
 # so a hide landing mid-pull cannot leave a half-rebased tree.
 #
 # Only curation.json is ever authored here. Images and metadata.json belong to
@@ -38,11 +39,11 @@ if [ "$branch" = "HEAD" ]; then
 fi
 
 # Coalescing falls out of committing whatever is pending rather than a specific
-# change: several rapid Ctrl+D presses leave one commit for the first sync and
+# change: several rapid Ctrl+D or Ctrl+T presses leave one commit for the first sync and
 # nothing for the ones behind it.
 if [ -n "$(git status --porcelain -- curation.json)" ]; then
   git add -- curation.json
-  git commit -q -m "Update hidden wallpapers" -- curation.json
+  git commit -q -m "Update wallpaper curation" -- curation.json
 fi
 
 if ! git fetch -q origin "$branch" 2>/dev/null; then
