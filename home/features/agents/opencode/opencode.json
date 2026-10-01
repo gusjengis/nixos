@@ -146,8 +146,8 @@
         "baseURL": "http://omega.tail29bd65.ts.net:11434/v1"
       },
       "models": {
-        "qwen3:8b": {
-          "name": "Qwen3 8B (omega)",
+        "qwen3.8:27b": {
+          "name": "Qwen3.8 27B (omega)",
           "limit": {
             "context": 32768,
             "output": 8192
