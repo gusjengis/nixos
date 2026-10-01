@@ -127,11 +127,18 @@ in
         "nixos-test"
       ])
     ]
-    ++ map (
-      system:
-      # User-mode emulation cannot provide hardware virtualisation.
-      buildMachine system cfg.client.emulatedSpeedFactor [ "big-parallel" ]
-    ) (lib.filter (system: system != cfg.nativeSystem) cfg.emulatedSystems);
+    ++
+      map
+        (
+          system:
+          # User-mode emulation cannot provide hardware virtualisation.
+          buildMachine system cfg.client.emulatedSpeedFactor [ "big-parallel" ]
+        )
+        (
+          lib.filter (
+            system: system != cfg.nativeSystem && system != config.nixpkgs.hostPlatform.system
+          ) cfg.emulatedSystems
+        );
 
     nix.settings = {
       builders-use-substitutes = true;
