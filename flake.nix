@@ -12,6 +12,7 @@
     apple-silicon.url = "github:nix-community/nixos-apple-silicon";
     home-manager.url = "github:nix-community/home-manager";
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
+    supernote-tool.url = "github:jya-dev/supernote-tool/c1019f1c290ed5b586a9518978dbb78240b882d3";
     alga.url = "github:Tenzer/alga";
     nix-flatpak.url = "github:gmodena/nix-flatpak";
     rmatrix.url = "github:RoastBeefer00/rmatrix";

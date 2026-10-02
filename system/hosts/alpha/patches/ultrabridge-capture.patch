@@ -1,0 +1,182 @@
+diff -ruN a/internal/spcserver/server.go b/internal/spcserver/server.go
+--- a/internal/spcserver/server.go	2026-09-30 21:32:05.760161384 -0700
++++ b/internal/spcserver/server.go	2026-10-01 09:13:14.851985840 -0700
+@@ -10,6 +10,7 @@
+ 	"database/sql"
+ 	"log/slog"
+ 	"net/http"
++	"os"
+ 	"time"
+ 
+ 	"github.com/sysop/ultrabridge/internal/spcserver/auth"
+@@ -260,7 +261,7 @@
+ 	// download GET). The staging store is kept on s for Run's orphan sweeper.
+ 	// FileNotifier nudges the device to re-pull files after a finish (best-effort).
+ 	if s.cfg.FileRoot != "" {
+-		s.staging = &staging.Store{Root: s.cfg.FileRoot, DB: s.cfg.DB}
++		s.staging = &staging.Store{Root: s.cfg.FileRoot, DB: s.cfg.DB, CaptureArchiveDir: os.Getenv("UB_CAPTURE_ARCHIVE_DIR")}
+ 	}
+ 	fileNotifier := notify.NewSocketNotifier(
+ 		s.reg,
+diff -ruN a/internal/spcserver/staging/capture.go b/internal/spcserver/staging/capture.go
+--- a/internal/spcserver/staging/capture.go	1969-12-31 16:00:00.000000000 -0800
++++ b/internal/spcserver/staging/capture.go	2026-10-01 09:13:23.365003866 -0700
+@@ -0,0 +1,79 @@
++package staging
++
++import (
++	"bytes"
++	"crypto/sha256"
++	"encoding/hex"
++	"fmt"
++	"io"
++	"log/slog"
++	"os"
++	"path/filepath"
++)
++
++// archiveCapture copies a verified upload of NOTE/Note/Capture.note into
++// CaptureArchiveDir as Capture-<sha256>.note before it is promoted. The live
++// notebook is never modified; an external worker OCRs the archive. It is a
++// no-op for any other target or when no archive directory is configured. A
++// failure aborts the upload, so the device retries rather than losing a copy.
++func (s *Store) archiveCapture(src, dst string) error {
++	if s.CaptureArchiveDir == "" || dst != filepath.Join(s.Root, "NOTE", "Note", "Capture.note") {
++		return nil
++	}
++	if err := os.MkdirAll(s.CaptureArchiveDir, 0o700); err != nil {
++		return err
++	}
++	original, err := os.Open(src)
++	if err != nil {
++		return err
++	}
++	defer original.Close()
++	tmp, err := os.CreateTemp(s.CaptureArchiveDir, ".capture-")
++	if err != nil {
++		return err
++	}
++	defer os.Remove(tmp.Name())
++	sum := sha256.New()
++	if _, err := io.Copy(io.MultiWriter(tmp, sum), original); err != nil {
++		tmp.Close()
++		return err
++	}
++	if err := tmp.Sync(); err != nil {
++		tmp.Close()
++		return err
++	}
++	if err := tmp.Close(); err != nil {
++		return err
++	}
++	archive := filepath.Join(s.CaptureArchiveDir, "Capture-"+hex.EncodeToString(sum.Sum(nil))+".note")
++	if err := os.Link(tmp.Name(), archive); err != nil {
++		if !os.IsExist(err) {
++			return err
++		}
++		if err := verifySHA256(archive, sum.Sum(nil)); err != nil {
++			return err
++		}
++	}
++	if dir, err := os.Open(s.CaptureArchiveDir); err == nil {
++		_ = dir.Sync()
++		_ = dir.Close()
++	}
++	slog.Info("capture upload archived", "archive", archive)
++	return nil
++}
++
++func verifySHA256(path string, want []byte) error {
++	f, err := os.Open(path)
++	if err != nil {
++		return err
++	}
++	defer f.Close()
++	h := sha256.New()
++	if _, err := io.Copy(h, f); err != nil {
++		return err
++	}
++	if !bytes.Equal(h.Sum(nil), want) {
++		return fmt.Errorf("existing capture archive failed verification: %s", path)
++	}
++	return nil
++}
+diff -ruN a/internal/spcserver/staging/capture_test.go b/internal/spcserver/staging/capture_test.go
+--- a/internal/spcserver/staging/capture_test.go	1969-12-31 16:00:00.000000000 -0800
++++ b/internal/spcserver/staging/capture_test.go	2026-10-01 09:13:29.675017227 -0700
+@@ -0,0 +1,52 @@
++package staging
++
++import (
++	"crypto/sha256"
++	"encoding/hex"
++	"os"
++	"path/filepath"
++	"testing"
++)
++
++func TestArchiveCaptureCopiesUploadAndLeavesItForPromotion(t *testing.T) {
++	root := t.TempDir()
++	archive := filepath.Join(root, ".capture-backups", "uploads")
++	src := filepath.Join(root, ".staging", "upload")
++	dst := filepath.Join(root, "NOTE", "Note", "Capture.note")
++	if err := os.MkdirAll(filepath.Dir(src), 0o700); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(src, []byte("handwriting"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	s := &Store{Root: root, CaptureArchiveDir: archive}
++	for i := 0; i < 2; i++ { // repeat upload of identical bytes is idempotent
++		if err := s.archiveCapture(src, dst); err != nil {
++			t.Fatal(err)
++		}
++	}
++	sum := sha256.Sum256([]byte("handwriting"))
++	got, err := os.ReadFile(filepath.Join(archive, "Capture-"+hex.EncodeToString(sum[:])+".note"))
++	if err != nil || string(got) != "handwriting" {
++		t.Fatalf("archive = %q, %v", got, err)
++	}
++	if staged, err := os.ReadFile(src); err != nil || string(staged) != "handwriting" {
++		t.Fatalf("staged upload must remain for promotion: %q, %v", staged, err)
++	}
++	entries, _ := os.ReadDir(archive)
++	if len(entries) != 1 {
++		t.Fatalf("archive entries = %d, want 1", len(entries))
++	}
++}
++
++func TestArchiveCaptureIgnoresOtherNotebooks(t *testing.T) {
++	root := t.TempDir()
++	archive := filepath.Join(root, "archive")
++	s := &Store{Root: root, CaptureArchiveDir: archive}
++	if err := s.archiveCapture("/nonexistent", filepath.Join(root, "NOTE", "Note", "Daily.note")); err != nil {
++		t.Fatal(err)
++	}
++	if _, err := os.Stat(archive); !os.IsNotExist(err) {
++		t.Fatalf("archive dir should not be created: %v", err)
++	}
++}
+diff -ruN a/internal/spcserver/staging/store.go b/internal/spcserver/staging/store.go
+--- a/internal/spcserver/staging/store.go	2026-09-30 21:32:05.760161384 -0700
++++ b/internal/spcserver/staging/store.go	2026-10-01 09:13:14.851985840 -0700
+@@ -31,6 +31,9 @@
+ 	Root string
+ 	DB   *sql.DB
+ 	Now  func() time.Time
++	// CaptureArchiveDir, when set, receives a verified copy of every upload of
++	// NOTE/Note/Capture.note before it is promoted (see capture.go).
++	CaptureArchiveDir string
+ 	mu   sync.Mutex
+ }
+ 
+@@ -236,6 +239,9 @@
+ 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+ 		return "", fmt.Errorf("staging Finalize mkdir %q: %w", dst, err)
+ 	}
++	if err := s.archiveCapture(src, dst); err != nil {
++		return "", fmt.Errorf("staging Finalize capture archive: %w", err)
++	}
+ 	if err := os.Rename(src, dst); err != nil {
+ 		return "", fmt.Errorf("staging Finalize rename %q→%q: %w", src, dst, err)
+ 	}

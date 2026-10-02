@@ -2,6 +2,7 @@
   config,
   lib,
   pkgs,
+  inputs,
   ...
 }:
 
@@ -10,6 +11,24 @@ let
   stateDir = "/data/.services/ultrabridge";
   fileRoot = "/data/Supernote";
   adminPasswordFile = "${stateDir}/admin-password";
+  captureArchiveDir = "${fileRoot}/.capture-backups/uploads";
+  captureOutboxDir = "${fileRoot}/.capture-backups/outbox";
+  supernoteTool = inputs.supernote-tool.packages.${pkgs.stdenv.hostPlatform.system}.default;
+  captureProcessor = pkgs.writeShellApplication {
+    name = "supernote-capture-process";
+    runtimeInputs = [
+      pkgs.python3
+      supernoteTool
+    ];
+    text = ''
+      exec python3 ${./capture-process.py} \
+        --archive-dir ${lib.escapeShellArg captureArchiveDir} \
+        --outbox-dir ${lib.escapeShellArg captureOutboxDir} \
+        --renderer ${supernoteTool}/bin/supernote-tool \
+        --ocr-url http://omega:11434/api/chat \
+        --model qwen3.6:35b-a3b-q4_K_M
+    '';
+  };
 
   # jdkruzr/go-sn, patched to accept the "noteSN_FILE_VER_20260016" file
   # signature introduced by Chauvet firmware 3.28.42 (Manta/N5), and to
@@ -57,7 +76,15 @@ let
     # patches/ultrabridge-rel-path-fix.patch for the full diff and new
     # regression tests (TestScan_ReconcilesStaleRelPath,
     # TestRenameFile_RecomputesRelPath).
-    patches = [ ./patches/ultrabridge-rel-path-fix.patch ];
+    patches = [
+      ./patches/ultrabridge-rel-path-fix.patch
+      # Supernote Capture notebook: archive a verified copy of every upload of
+      # NOTE/Note/Capture.note (UB_CAPTURE_ARCHIVE_DIR) for OCR into Obsidian.
+      # The live notebook is never modified; it is cleared by hand on the
+      # tablet. Server-side resets were tried and lose to device-side edits,
+      # producing conflict copies.
+      ./patches/ultrabridge-capture.patch
+    ];
 
     # Route the go-sn dependency to our patched copy before vendoring runs
     # (buildGoModule shares postPatch between the vendor-fetching derivation
@@ -70,6 +97,9 @@ let
 
     vendorHash = "sha256-WcChE96oJGW5bu21cF/Hi0vlXJIS3OSPejdmo6WwOEk=";
     subPackages = [ "cmd/ultrabridge" ];
+    preCheck = ''
+      go test ./internal/spcserver/staging
+    '';
 
     nativeBuildInputs = [ pkgs.makeWrapper ];
     postInstall = ''
@@ -117,10 +147,15 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    system.build.ultrabridgePackage = package;
+
     systemd.tmpfiles.rules = [
       "d /data/.services 0751 root root -"
       "d ${stateDir} 0750 gusjengis users -"
       "d ${fileRoot} 2775 gusjengis users -"
+      "d ${fileRoot}/.capture-backups 0700 gusjengis users -"
+      "d ${fileRoot}/.capture-backups/uploads 0700 gusjengis users -"
+      "d ${captureOutboxDir} 0700 gusjengis users -"
     ];
 
     systemd.services.ultrabridge = {
@@ -142,6 +177,7 @@ in
         UB_SPC_MODE = "server";
         UB_SPC_LISTEN_ADDR = "127.0.0.1:8089";
         UB_SPC_FILE_ROOT = fileRoot;
+        UB_CAPTURE_ARCHIVE_DIR = captureArchiveDir;
         UB_OCR_ENABLED = "true";
         UB_OCR_API_URL = "http://omega:11434";
         UB_OCR_MODEL = "qwen3.6:35b-a3b-q4_K_M";
@@ -167,6 +203,30 @@ in
           stateDir
           fileRoot
         ];
+      };
+    };
+
+    systemd.services.supernote-capture-process = {
+      description = "Render and OCR archived Supernote captures";
+      unitConfig.RequiresMountsFor = [ "/data" ];
+      serviceConfig = {
+        Type = "oneshot";
+        User = "gusjengis";
+        Group = "users";
+        ExecStart = lib.getExe captureProcessor;
+        NoNewPrivileges = true;
+        ProtectHome = true;
+        ProtectSystem = "strict";
+        ReadWritePaths = [ fileRoot ];
+      };
+    };
+
+    systemd.timers.supernote-capture-process = {
+      wantedBy = [ "timers.target" ];
+      timerConfig = {
+        OnBootSec = "2min";
+        OnUnitActiveSec = "2min";
+        Persistent = true;
       };
     };
 
