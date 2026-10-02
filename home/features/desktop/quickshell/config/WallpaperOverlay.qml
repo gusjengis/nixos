@@ -37,7 +37,7 @@ PanelWindow {
 
     // Every wallpaper in the persisted random order, decorated with metadata.
     property var allWallpapers: []
-    // The subset the query selects; equals allWallpapers when the query is empty.
+    // The subset the query selects from the current sun phase by default.
     property var wallpapers: []
     property var catalogEntries: []
     property var metadata: ({})
@@ -50,6 +50,8 @@ PanelWindow {
     property string curationPath: ""
     // Phase of the day right now according to wallpaperctl, "" if unknown.
     property string sunPhase: ""
+    // Ctrl+P opts into browsing every visible wallpaper until the picker closes.
+    property bool showAll: false
     // Ctrl+T panel. The draft is what the toggles show until it is saved.
     readonly property var phaseNames: ["night", "twilight", "golden", "day"]
     property bool phasePanelOpen: false
@@ -93,6 +95,7 @@ PanelWindow {
     function show() {
         armed = false;
         accepting = false;
+        showAll = false;
         search.text = "";
         notice = "";
         // Cleared rather than kept: the 5-minute cycle may have changed the
@@ -166,6 +169,13 @@ PanelWindow {
         if (wallpapers.length === 0)
             return;
         index = Math.floor(Math.random() * wallpapers.length);
+    }
+
+    function toggleShowAll() {
+        showAll = !showAll;
+        applyFilter(selectedPath);
+        notice = showAll ? "Showing all wallpapers - Ctrl+P for current phase" : "Showing current phase - Ctrl+P for all";
+        noticeTimer.restart();
     }
 
     // Ctrl+D. Hiding removes a wallpaper from the picker and from the cycle
@@ -366,9 +376,26 @@ PanelWindow {
         const keep = preferredPath !== undefined && preferredPath !== "" ? preferredPath : selectedPath;
         const terms = normalizeText(query).split(" ").filter(term => term !== "");
 
-        // Hidden wallpapers stay in allWallpapers so toggling "is:hidden" is a
-        // refilter rather than a rebuild, but only one side is ever reachable.
-        const pool = allWallpapers.filter(entry => entry.hidden === showingHidden);
+        // Match wallpaperctl's phase pool, including its <20 fallback. Hidden
+        // browsing is an explicit request for every hidden image, irrespective
+        // of time of day; Ctrl+P similarly exposes the full visible library.
+        const available = allWallpapers.filter(entry => entry.hidden === showingHidden);
+        let pool = available;
+        if (!showingHidden && !showAll && sunPhase !== "") {
+            const current = phaseNames.indexOf(sunPhase);
+            if (current >= 0) {
+                for (let width = 0; width < phaseNames.length; width++) {
+                    const candidates = available.filter(entry => entry.phases.some(phase => {
+                        const rank = phaseNames.indexOf(phase);
+                        return rank >= 0 && Math.abs(rank - current) <= width;
+                    }));
+                    if (candidates.length >= 20) {
+                        pool = candidates;
+                        break;
+                    }
+                }
+            }
+        }
         poolSize = pool.length;
 
         let results;
@@ -471,7 +498,13 @@ PanelWindow {
                 overlay.rebuild();
                 if (overlay.metadataPath !== "" && Object.keys(overlay.metadata).length === 0)
                     metadataView.reload();
-                Qt.callLater(() => overlay.armed = true);
+                Qt.callLater(() => {
+                    overlay.armed = true;
+                    // If a manually chosen wallpaper is outside today's pool,
+                    // show the first eligible one before its caption appears.
+                    if (overlay.selectedPath !== overlay.displayedPath)
+                        overlay.previewSelected();
+                });
             } catch (error) {
                 console.warn("Cannot load wallpaper catalog:", error);
             }
@@ -693,6 +726,9 @@ PanelWindow {
                     }
                     if (event.key === Qt.Key_T && (event.modifiers & Qt.ControlModifier)) {
                         overlay.openPhasePanel();
+                        event.accepted = true;
+                    } else if (event.key === Qt.Key_P && (event.modifiers & Qt.ControlModifier)) {
+                        overlay.toggleShowAll();
                         event.accepted = true;
                     } else if (event.key === Qt.Key_Left || event.key === Qt.Key_Up) {
                         overlay.select(-1);
