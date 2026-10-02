@@ -8,7 +8,7 @@
     ./windows-vm.nix
   ];
 
-  bedtimeLockout.enable = false;
+  bedtimeLockout.enable = true;
   # Vial keyboard only ever gets plugged into this machine.
   vial.enable = true;
   networking.networkmanager.wifi.backend = "iwd";
@@ -28,6 +28,10 @@
     "nvidia_modeset"
     "nvidia_drm"
   ];
+  # NixOS loads nvidia_uvm through a modprobe softdep on nvidia, which never
+  # fires when nvidia is loaded in the initrd above. Without it CUDA (and so
+  # NVENC in OBS) fails with CUDA_ERROR_UNKNOWN.
+  boot.kernelModules = [ "nvidia_uvm" ];
   virtual-machines.enable = true;
   programs.steam.enable = true;
   boot.loader.efi.efiSysMountPoint = "/boot/efi";
