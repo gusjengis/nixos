@@ -34,6 +34,11 @@
   ollama.enable = true;
   ollama.models = [ "qwen3.8:27b" ];
   ollama.preload = "qwen3.8:27b";
+  # Interactive OpenCode sessions spend ~13k tokens on the system prompt alone,
+  # so 16k left almost no room for conversation. Only 16 of qwen3.8's 65 layers
+  # carry a KV cache (~64 KiB/token at f16), making 64k about 4 GiB, which fits
+  # beside the ~16 GB of weights on the 24 GB card.
+  ollama.contextLength = 65536;
 
   repo.networkmanager.enable = true;
   tailscale.enable = true;

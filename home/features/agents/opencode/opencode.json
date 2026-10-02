@@ -149,7 +149,7 @@
         "qwen3.8:27b": {
           "name": "Qwen3.8 27B (omega)",
           "limit": {
-            "context": 32768,
+            "context": 65536,
             "output": 8192
           }
         },
