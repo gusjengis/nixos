@@ -148,6 +148,11 @@
       "models": {
         "qwen3.8:27b": {
           "name": "Qwen3.8 27B (omega)",
+          "attachment": true,
+          "modalities": {
+            "input": ["text", "image"],
+            "output": ["text"]
+          },
           "limit": {
             "context": 49152,
             "output": 8192
