@@ -51,6 +51,11 @@ Same mechanics (text in, vector out, nearest neighbours); only the training
 objective differs. Each step always uses the same model, so the two indexes never
 mix. Vectors are incompatible across models.
 
+Limits: 4k tokens per input (~3,000 words). Batch size (512) is only how many
+tokens are processed per step; output is unchanged. Inputs over ~2k tokens are
+chunked at headings / blank-line groups with slight overlap; a note's search
+score is its best chunk. Atomic thoughts never come close.
+
 Storage: SQLite cache on omega, one table per model, keyed by model + dims;
 disposable, rebuilt from the vault when a model changes (matching backfill on CPU
 ~20 min for the whole vault, retrieval ~1 min on GPU). Brute-force cosine over a
@@ -187,6 +192,18 @@ several types = same target under several relation keys.
   rebuild: stable thought IDs, rebuilt thoughts matched to old ones, user fields
   carried over. A thought that disappears is marked `orphaned`, not deleted.
 - Raw edit -> re-normalize -> re-extract only that note's thoughts.
+- Nothing is deleted automatically (a half-synced vault looks like deletions).
+  `note-delete` removes a raw note and everything generated from it on request;
+  extraction must register `Thoughts/` it created per raw note so `note-delete`
+  can remove or orphan-mark them (merged thoughts lose a source, not the file).
+
+## Current state (2026-10-04)
+
+- Models live on omega: `qwen3.8:27b` (48k ctx, GPU), `jina-v5-retrieval`
+  (GPU), `jina-v5-matching` (CPU), all resident. ~0.9 GB VRAM headroom.
+- `Normalized/` is complete and kept current; this stage reads it.
+- Matching scores on known duplicates: 0.51-0.57; unrelated: 0.19-0.33. Merge
+  threshold needs tuning with an LLM confirm step, not a raw cutoff.
 
 ## Build order
 
