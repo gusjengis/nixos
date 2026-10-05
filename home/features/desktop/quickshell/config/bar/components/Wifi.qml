@@ -13,8 +13,8 @@ Rectangle {
     readonly property bool popupVisible: popup.visible
 
     implicitWidth: 30
-    implicitHeight: 24
-    radius: 6
+    implicitHeight: Theme.barItemHeight
+    radius: height / 2
     color: popup.visible ? Theme.barHoverFill : "transparent"
 
     WifiGlyph {
@@ -38,28 +38,19 @@ Rectangle {
                 visible = false;
                 return;
             }
-            anchor.item = anchorItem;
+            popup.anchorItem = anchorItem;
             content.reset();
             visible = true;
             root.controls.refreshWifi();
         }
 
-        anchor.rect.x: root.width - width
-        anchor.rect.y: Theme.barPopupY(anchor.item)
-        implicitWidth: 380
-        implicitHeight: Math.min(480, content.implicitHeight + 32)
-        color: "transparent"
-
-        Rectangle {
-            anchors.fill: parent
-            radius: Theme.windowRadius
-            color: Theme.background
-            border { width: Theme.windowBorderWidth; color: Theme.windowBorder }
-        }
+        popupX: root.width - popupWidth
+        popupWidth: 310
+        popupHeight: content.implicitHeight + 2 * Theme.menuPadding
 
         WifiPanel {
             id: content
-            anchors { fill: parent; margins: 16 }
+            anchors { left: parent.left; right: parent.right; top: parent.top; margins: Theme.menuPadding }
             controls: root.controls
         }
 

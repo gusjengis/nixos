@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import "../../theme"
+import "../../widgets"
 
 GuardedPopupWindow {
     id: popup
@@ -13,7 +14,7 @@ GuardedPopupWindow {
         currentMenu = trayItem.menu;
         history = [];
         menuTitle = trayItem.title || trayItem.tooltipTitle || "System tray";
-        anchor.item = anchorItem;
+        popup.anchorItem = anchorItem;
         visible = true;
     }
 
@@ -29,57 +30,62 @@ GuardedPopupWindow {
         history = history.slice(0, -1);
     }
 
-    anchor.rect.x: (anchor.item ? anchor.item.width : 0) - width
-    anchor.rect.y: Theme.barPopupY(anchor.item)
-    implicitWidth: 230
-    implicitHeight: Math.min(360, header.height + menuList.contentHeight + 10)
-    color: "transparent"
+    readonly property bool reserveLeading: {
+        const entries = opener.children ? opener.children.values : [];
+        return entries.some(entry => entry && !entry.isSeparator && (entry.buttonType !== QsMenuButtonType.None || entry.icon !== ""));
+    }
+
+    popupX: (anchorItem ? anchorItem.width : 0) - popupWidth
+    popupWidth: 240
+    popupHeight: Math.min(560, header.height + menuList.contentHeight + 2 * Theme.menuPadding)
 
     QsMenuOpener {
         id: opener
         menu: popup.currentMenu
     }
 
-    Rectangle {
-        anchors.fill: parent
-        radius: Theme.windowRadius
-        color: Theme.background
-        border { width: Theme.windowBorderWidth; color: Theme.windowBorder }
-    }
-
+    // Submenus open in place (no cascading surface); this row returns.
     Item {
         id: header
-        anchors { left: parent.left; right: parent.right; top: parent.top }
-        height: popup.history.length > 0 ? 29 : 0
+        anchors { left: parent.left; right: parent.right; top: parent.top; margins: Theme.menuPadding }
+        height: popup.history.length > 0 ? Theme.menuRowHeight + Theme.menuSeparatorHeight : 0
         visible: height > 0
 
         Rectangle {
-            anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
+            anchors { left: parent.left; right: parent.right; top: parent.top }
+            height: Theme.menuRowHeight
+            radius: Theme.menuHighlightRadius
+            color: backMouse.containsMouse ? Theme.menuHighlight : "transparent"
+
+            SFSymbol {
+                id: backChevron
+                anchors { left: parent.left; leftMargin: Theme.menuTextInset - Theme.menuPadding; verticalCenter: parent.verticalCenter }
+                symbol: "chevron.left"
+                size: 11
+                color: backMouse.containsMouse ? "#ffffff" : Theme.menuText
+            }
+
+            Text {
+                anchors { left: backChevron.right; leftMargin: 8; verticalCenter: parent.verticalCenter }
+                text: "Back"
+                color: backMouse.containsMouse ? "#ffffff" : Theme.menuText
+                font { family: Theme.fontFamily; pixelSize: Theme.menuFontSize }
+            }
+
+            MouseArea {
+                id: backMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                enabled: popup.history.length > 0
+                onClicked: popup.back()
+            }
+        }
+
+        Rectangle {
+            anchors { left: parent.left; right: parent.right; bottom: parent.bottom; bottomMargin: (Theme.menuSeparatorHeight - 1) / 2
+                leftMargin: Theme.menuTextInset - Theme.menuPadding; rightMargin: Theme.menuTextInset - Theme.menuPadding }
             height: 1
-            color: Theme.border
-        }
-
-        Text {
-            anchors { left: parent.left; leftMargin: 10; verticalCenter: parent.verticalCenter }
-            text: "‹"
-            color: Theme.accent
-            font { family: Theme.fontFamily; pixelSize: 22; bold: true }
-        }
-
-        Text {
-            anchors.centerIn: parent
-            width: parent.width - 50
-            text: "Back"
-            color: Theme.text
-            elide: Text.ElideRight
-            horizontalAlignment: Text.AlignHCenter
-            font { family: Theme.fontFamily; pixelSize: Theme.fontSize; bold: true }
-        }
-
-        MouseArea {
-            anchors.fill: parent
-            enabled: popup.history.length > 0
-            onClicked: popup.back()
+            color: Theme.menuSeparator
         }
     }
 
@@ -88,9 +94,10 @@ GuardedPopupWindow {
         anchors {
             left: parent.left
             right: parent.right
-            top: header.bottom
+            top: header.visible ? header.bottom : parent.top
             bottom: parent.bottom
-            margins: 5
+            margins: Theme.menuPadding
+            topMargin: header.visible ? 0 : Theme.menuPadding
         }
         clip: true
         boundsBehavior: Flickable.StopAtBounds
@@ -100,6 +107,7 @@ GuardedPopupWindow {
             required property var modelData
             width: menuList.width
             entry: modelData
+            reserveLeading: popup.reserveLeading
             onActivated: {
                 if (entry.hasChildren)
                     popup.enter(entry);

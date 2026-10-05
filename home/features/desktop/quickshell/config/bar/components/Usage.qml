@@ -15,8 +15,8 @@ Rectangle {
     signal accountRequested(string profile, bool saved)
 
     implicitWidth: 30
-    implicitHeight: 24
-    radius: 6
+    implicitHeight: Theme.barItemHeight
+    radius: height / 2
     color: popup.visible ? Theme.barHoverFill : "transparent"
 
     Image {

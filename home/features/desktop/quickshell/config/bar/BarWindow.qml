@@ -38,16 +38,8 @@ PanelWindow {
     readonly property bool popupVisible: media.popupVisible || usage.popupVisible || tray.popupVisible || wifi.popupVisible || battery.popupVisible || controlCenter.popupVisible || clock.popupVisible
 
     visible: shown || notchFullscreen
-    // Taller than the bar itself so the tint can keep fading past the content.
-    // The extra height is deliberately not reserved, and the input mask below
-    // keeps it from taking clicks, so it costs no space and steals no input.
-    //
-    // It has to live on this surface rather than a separate one underneath:
-    // Hyprland's workspace blur is a full-monitor blur rect emitted after the
-    // background and bottom layers but before windows, and a second one before
-    // special-workspace windows. Anything below those gets smeared and no longer
-    // lines up with the bar, which renders on the top layer after all of them.
-    implicitHeight: Theme.barHeight + Theme.barScrimFade
+    // Wallpaper-dependent scrim is on the bottom layer, below app windows.
+    implicitHeight: Theme.barHeight
     // The notch is dead screen, so it is reserved unconditionally on that panel
     // rather than only once a fullscreen window is detected. Reserving on
     // detection is circular: the fullscreen geometry is computed from the
@@ -66,37 +58,11 @@ PanelWindow {
         item: barArea
     }
 
-    // macOS menu bar treatment: one continuous ramp instead of a flat fill cut
-    // off by a hard border line. Strong behind the content, gone by the bottom.
+    // Fallback before the wallpaper is known; never tint windows below the bar.
     Rectangle {
         anchors.fill: parent
-        visible: !bar.notchFullscreen
-        gradient: Gradient {
-            GradientStop {
-                position: 0.0
-                color: Theme.scrimColor(Theme.barScrimPeak)
-            }
-            GradientStop {
-                position: Theme.barScrimContentStop * 0.5
-                color: Theme.scrimColor(1.12)
-            }
-            GradientStop {
-                position: Theme.barScrimContentStop
-                color: Theme.scrimColor(0.74)
-            }
-            GradientStop {
-                position: Theme.barScrimContentStop + (1 - Theme.barScrimContentStop) * 0.32
-                color: Theme.scrimColor(0.38)
-            }
-            GradientStop {
-                position: Theme.barScrimContentStop + (1 - Theme.barScrimContentStop) * 0.64
-                color: Theme.scrimColor(0.14)
-            }
-            GradientStop {
-                position: 1.0
-                color: Theme.scrimColor(0)
-            }
-        }
+        visible: !bar.notchFullscreen && Theme.wallpaperPath === ""
+        color: Theme.barContentIsDark ? "#55ffffff" : "#55000000"
     }
 
     Rectangle {

@@ -25,9 +25,9 @@ RowLayout {
             id: trayItem
             required property var modelData
             implicitWidth: 28
-            implicitHeight: 24
-            radius: 6
-            color: contextMenu.visible && contextMenu.anchor.item === trayItem ? Theme.barHoverFill : "transparent"
+            implicitHeight: Theme.barItemHeight
+            radius: height / 2
+            color: contextMenu.visible && contextMenu.anchorItem === trayItem ? Theme.barHoverFill : "transparent"
 
             // App-supplied icons can be any color, so they are recolored to
             // follow the bar's black/white content; see shaders/tray-mono.frag.

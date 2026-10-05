@@ -6,8 +6,9 @@ import Quickshell.Io
 
 QtObject {
     property var wallpaperColors: ({})
-    // 0 is fully transparent; 1 is fully opaque.
-    readonly property real backgroundOpacity: 0.8
+    // Liquid Glass tint changes popup density, not menu-bar contrast.
+    property real glassTint: 1
+    readonly property real backgroundOpacity: 0.56 + 0.24 * glassTint
     readonly property color backgroundBase: wallpaperColors.background || "#151922"
     readonly property color surfaceBase: wallpaperColors.surface || "#202633"
     readonly property color surfaceHoverBase: wallpaperColors.surfaceHover || "#2a3242"
@@ -23,59 +24,71 @@ QtObject {
     readonly property color border: wallpaperColors.border || "#344052"
 
     // Mac notch mode adds 74 physical rows at 2x scale.
-    readonly property int barHeight: 37
-    // The bar's tint does not stop at its exclusive zone: BarScrim.qml continues
-    // the same ramp below it on the bottom layer, where windows paint over it, so
-    // the long fade is only ever visible against the wallpaper. Both surfaces
-    // read these, so the seam between them stays invisible.
-    // Distance the bar's tint keeps fading past its content. Drawn on the bar's
-    // own surface, unreserved and click-through, so it costs no space.
-    readonly property int barScrimFade: 56
-    readonly property real barScrimPeak: 1.3
-    // Where the content ends as a fraction of the whole gradient, so the stops
-    // stay put if either height changes.
-    readonly property real barScrimContentStop: barHeight / (barHeight + barScrimFade)
-
-    // --- Bar content contrast, reacting to the wallpaper behind it ---
-    //
-    // The bar's own row of icons and text (Workspaces, Wifi, Clock, ...) has
-    // no backing of its own - only the scrim gradient above - so unlike
-    // popups (which sit on the always-dark Theme.surface/background below)
-    // it needs to react to whatever the wallpaper actually looks like, the
-    // way macOS's menu bar switches between light and dark content depending
-    // on what's behind it. wallpaperctl samples the strip of the wallpaper
-    // that sits behind the bar and writes its WCAG relative luminance (0
-    // black, 1 white) into colors.json as barLuminance; everything else here
-    // is derived from that one number.
-    //
-    // Three zones fall out of the same formula:
-    //  - Below barTargetLuminance, white content already clears WCAG AA
-    //    (4.5:1) on its own, so no scrim is needed at all.
-    //  - Up to barCrossover, a black scrim (capped at barScrimMax, the same
-    //    ceiling the rest of the UI's translucency uses) is strengthened
-    //    just enough to keep pulling the strip's *effective* luminance back
-    //    down to barTargetLuminance, so white content keeps its contrast as
-    //    the wallpaper gets brighter.
-    //  - Past barCrossover even a max-strength scrim cannot save white
-    //    content, so the bar switches to dark content instead - which, at
-    //    that luminance, already clears AA against the bare wallpaper, so no
-    //    scrim is drawn there at all.
-    readonly property real barLuminance: wallpaperColors.barLuminance !== undefined ? wallpaperColors.barLuminance : 0.08
-    // (1.0 + 0.05) / (L + 0.05) >= 4.5  =>  L <= 0.1833.
-    readonly property real barTargetLuminance: 0.1833
-    readonly property real barScrimMax: backgroundOpacity
-    readonly property real barCrossover: 0.650//barTargetLuminance / (1 - barScrimMax)
-    readonly property bool barContentIsDark: barLuminance >= barCrossover
-    readonly property real barScrimAlpha: barContentIsDark ? 0 : Math.max(0, Math.min(barScrimMax, 1 - barTargetLuminance / Math.max(barLuminance, 0.0001)))
+    readonly property int barHeight: 30
+    readonly property int barScrimHeight: 183
+    // Historical JSON key now stores mean per-pixel CIE L* of the top 30 rows.
+    readonly property real barLightness: wallpaperColors.barLuminance !== undefined ? wallpaperColors.barLuminance : 0.08
+    readonly property bool barContentIsDark: barLightness >= 0.786
     readonly property color barText: barContentIsDark ? "#000000" : "#ffffff"
     // For content drawn on a barText-filled shape (e.g. the active workspace).
     readonly property color barTextInverse: barContentIsDark ? "#ffffff" : "#000000"
     readonly property color barMuted: Qt.rgba(barText.r, barText.g, barText.b, 0.62)
     // A faint wash of barText itself, so a hovered pill's highlight always
     // reads correctly against the barText/barMuted drawn on top of it.
-    readonly property color barHoverFill: Qt.rgba(barText.r, barText.g, barText.b, 0.14)
+    readonly property color barHoverFill: Qt.rgba(barText.r, barText.g, barText.b, 0.09)
+    // Open menu-extra highlight: a capsule, 22px tall on the 30px bar.
+    readonly property int barItemHeight: 22
 
-    readonly property int popupGap: 4
+    // Menus hang 1px below the bar; the glass outline occupies that row.
+    readonly property int popupGap: 1
+    readonly property int popupScreenMargin: 6
+
+    // Liquid Glass dropdowns. Radii and padding must match the hyprglass
+    // layers configured in hyprland/config/glass.lua.
+    property bool glassActive: false
+    property bool groupedGlassActive: false
+    readonly property int glassShadowPadding: 80
+    readonly property int menuRadius: 13
+    readonly property int panelRadius: 22
+    // macOS 27 menu metrics at 1x, measured from reference captures.
+    readonly property int menuRowHeight: 24
+    readonly property int menuPadding: 5
+    readonly property int menuSeparatorHeight: 11
+    readonly property int menuTextInset: 12
+    readonly property int menuFontSize: 14
+    readonly property color menuText: Qt.rgba(1, 1, 1, 0.9)
+    readonly property color menuSecondaryText: Qt.rgba(1, 1, 1, 0.42)
+    readonly property color menuSeparator: Qt.rgba(1, 1, 1, 0.12)
+    readonly property color menuHighlight: "#007aff"
+    readonly property int menuHighlightRadius: 8
+
+    property var glassProbe: Process {
+        command: ["hyprctl", "-j", "hyprglass", "status"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const status = JSON.parse(text);
+                    glassActive = status.features && status.features.layers && status.features.layers.active === true;
+                    groupedGlassActive = glassActive && status.macRects === true;
+                } catch (error) {
+                    glassActive = false;
+                    groupedGlassActive = false;
+                }
+            }
+        }
+    }
+    // The plugin is loaded by the launcher's startup helper, possibly after
+    // QuickShell starts; keep probing until it is present.
+    property var glassProbeTimer: Timer {
+        interval: 3000
+        repeat: true
+        running: !glassActive || !groupedGlassActive
+        triggeredOnStart: true
+        onTriggered: {
+            if (!glassProbe.running)
+                glassProbe.running = true;
+        }
+    }
     readonly property int radius: 8
     readonly property int spacing: 8
     readonly property int fontSize: 15
@@ -90,11 +103,29 @@ QtObject {
         return Qt.rgba(color.r, color.g, color.b, backgroundOpacity);
     }
 
-    // Black source-over compositing only scales destination RGB, preserving hue.
-    // Strength is tied to barScrimAlpha, so this goes to zero outside the
-    // zone where white bar content actually needs the help (see above).
-    function scrimColor(factor) {
-        return Qt.rgba(0, 0, 0, Math.min(1, barScrimAlpha * factor));
+    function setGlassTint(value) {
+        if (!Number.isFinite(value))
+            return;
+        glassTint = Math.max(0, Math.min(1, value));
+        glassTintFile.setText(glassTint.toFixed(3) + "\n");
+    }
+
+    onGlassTintChanged: {
+        if (glassTintSyncTimer)
+            glassTintSyncTimer.restart();
+    }
+
+    property var glassTintSync: Process {}
+    property var glassTintSyncTimer: Timer {
+        interval: 25
+        onTriggered: {
+            if (glassTintSync.running) {
+                restart();
+                return;
+            }
+            glassTintSync.command = ["hyprctl", "eval", "if hl.plugin.hyprglass then hl.plugin.hyprglass.config({mac={tint=" + glassTint.toString() + "}}) end"];
+            glassTintSync.running = true;
+        }
     }
 
     function barPopupY(anchorItem) {
@@ -119,6 +150,43 @@ QtObject {
         printErrors: false
         onFileChanged: reload()
         onLoaded: loadWallpaperColors()
+    }
+
+    property string wallpaperPath: displayedPath || currentPath
+    property string displayedPath: ""
+    property string currentPath: ""
+
+    property var displayedFile: FileView {
+        path: (Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state") + "/wallpaper/displayed"
+        preload: true
+        watchChanges: true
+        printErrors: false
+        onFileChanged: reload()
+        onLoaded: displayedPath = text().trim()
+    }
+
+    property var currentFile: FileView {
+        path: (Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state") + "/wallpaper/current"
+        preload: true
+        watchChanges: true
+        printErrors: false
+        onFileChanged: reload()
+        onLoaded: currentPath = text().trim()
+    }
+
+    property var glassTintFile: FileView {
+        path: (Quickshell.env("XDG_CONFIG_HOME") || Quickshell.env("HOME") + "/.config") + "/quickshell/theme/glass-tint"
+        preload: true
+        watchChanges: true
+        printErrors: false
+        onFileChanged: reload()
+        onLoaded: {
+            const value = Number(text().trim());
+            if (Number.isFinite(value)) {
+                glassTint = Math.max(0, Math.min(1, value));
+                glassTintSyncTimer.restart();
+            }
+        }
     }
 
     function refreshHyprland() {

@@ -21,22 +21,13 @@ GuardedPopupWindow {
             visible = false;
             return;
         }
-        anchor.item = anchorItem;
+        popup.anchorItem = anchorItem;
         visible = true;
     }
 
-    anchor.rect.x: (anchor.item ? anchor.item.width : 0) - width
-    anchor.rect.y: Theme.barPopupY(anchor.item)
-    implicitWidth: 390
-    implicitHeight: 481
-    color: "transparent"
-
-    Rectangle {
-        anchors.fill: parent
-        radius: Theme.windowRadius
-        color: Theme.background
-        border { width: Theme.windowBorderWidth; color: Theme.windowBorder }
-    }
+    popupX: (anchorItem ? anchorItem.width : 0) - popupWidth
+    popupWidth: 390
+    popupHeight: 481
 
     Column {
         anchors { fill: parent; margins: 14 }

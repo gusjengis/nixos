@@ -14,6 +14,9 @@ Item {
     id: root
 
     required property var entry
+    property bool compositorGlass: false
+    property bool showTimestamp: true
+    readonly property bool hovered: hover.hovered
     signal dismissRequested()
 
     readonly property var current: entry.notification
@@ -67,7 +70,7 @@ Item {
         onTriggered: root.now = Date.now()
     }
 
-    HoverHandler { id: hover }
+    HoverHandler { id: hover; margin: 8 }
 
     Rectangle {
         id: card
@@ -75,8 +78,8 @@ Item {
         width: parent.width
         implicitHeight: Math.max(content.implicitHeight, 40) + 24
         radius: 22
-        color: Theme.background
-        border { width: 1; color: Qt.rgba(1, 1, 1, 0.12) }
+        color: root.compositorGlass ? "transparent" : Theme.background
+        border { width: root.compositorGlass ? 0 : 1; color: Qt.rgba(1, 1, 1, 0.12) }
 
         MouseArea {
             anchors.fill: parent
@@ -92,8 +95,8 @@ Item {
 
             Item {
                 Layout.alignment: Qt.AlignVCenter
-                implicitWidth: 38
-                implicitHeight: 38
+                implicitWidth: 36
+                implicitHeight: 36
 
                 Rectangle {
                     anchors.fill: parent
@@ -114,7 +117,7 @@ Item {
                     anchors.fill: parent
                     source: root.iconSource
                     fillMode: Image.PreserveAspectFit
-                    sourceSize { width: 76; height: 76 }
+                    sourceSize { width: 72; height: 72 }
                     visible: status === Image.Ready
                 }
             }
@@ -133,7 +136,18 @@ Item {
 
                 Text {
                     Layout.fillWidth: true
+                    text: root.current.appName || "Notification"
+                    textFormat: Text.PlainText
+                    color: Theme.text
+                    elide: Text.ElideRight
+                    font { family: Theme.fontFamily; pixelSize: 13; weight: Font.DemiBold }
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    visible: (root.current.summary || "").length > 0
                     text: root.current.summary || root.current.appName || "Notification"
+                    textFormat: Text.PlainText
                     color: Theme.text
                     elide: Text.ElideRight
                     font { family: Theme.fontFamily; pixelSize: 14; weight: Font.DemiBold }
@@ -194,6 +208,7 @@ Item {
 
                 Text {
                     Layout.alignment: Qt.AlignRight
+                    visible: root.showTimestamp
                     text: root.stamp(root.entry.receivedAt)
                     color: Theme.muted
                     font { family: Theme.fontFamily; pixelSize: 12 }

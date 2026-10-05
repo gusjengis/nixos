@@ -6,26 +6,39 @@ import "../../notifications"
 import "../../theme"
 import "../../widgets"
 
-// macOS Notification Center: no panel of its own, just a floating title,
-// a clear-all button and the notification cards over the desktop. The popup
-// surface is transparent; only the cards carry glass (blurred through the
-// bar layer's blur_popups rule, which skips fully transparent pixels).
+// Transparent scrolling host; cards own independent glass layer surfaces.
 Item {
     id: root
 
     required property var notificationService
     required property Item popupAnchor
+    property bool compositorGlass: Theme.glassActive
+    property var cardWindows: []
     readonly property var history: notificationService ? notificationService.history : []
     readonly property bool popupVisible: popup.visible
     // Room left of and above each card for its hover close button.
     readonly property int overhang: 8
+
+    function registerCard(window) {
+        cardWindows = cardWindows.concat([window]);
+    }
+
+    function unregisterCard(window) {
+        cardWindows = cardWindows.filter(item => item !== window);
+    }
+
+    function scrollCards(delta) {
+        const minY = list.originY - list.topMargin;
+        const maxY = Math.max(minY, list.originY + list.contentHeight + list.bottomMargin - list.height);
+        list.contentY = Math.max(minY, Math.min(maxY, list.contentY - delta));
+    }
 
     function toggle(anchorItem) {
         if (popup.visible) {
             popup.visible = false;
             return;
         }
-        popup.anchor.item = anchorItem;
+        popup.anchorItem = anchorItem;
         popup.visible = true;
     }
 
@@ -35,13 +48,16 @@ Item {
 
         readonly property real maxListHeight: (screen ? screen.height : 1000) - Theme.barHeight - header.height - 60
 
-        anchor.rect.x: root.popupAnchor.width
-            - (anchor.item ? anchor.item.mapToItem(root.popupAnchor, 0, 0).x : 0)
-            - width - 10
-        anchor.rect.y: Theme.barPopupY(anchor.item)
-        implicitWidth: 380
-        implicitHeight: header.height + 10 + (root.history.length > 0 ? list.height : empty.implicitHeight + 8)
-        color: "transparent"
+        // Transparent surface: only the cards carry material.
+        glassNamespace: "quickshell-inbox"
+        backgroundVisible: false
+        shadowPadding: 0
+        focusWindows: [popup].concat(root.cardWindows)
+        popupX: root.popupAnchor.width
+            - (anchorItem ? anchorItem.mapToItem(root.popupAnchor, 0, 0).x : 0)
+            - popupWidth - 10
+        popupWidth: 380
+        popupHeight: header.height + 10 + (root.history.length > 0 ? list.height : empty.implicitHeight + 8)
         onVisibleChanged: root.notificationService.centerOpen = visible
 
         RowLayout {
@@ -109,11 +125,30 @@ Item {
             boundsBehavior: Flickable.StopAtBounds
             model: root.history
 
-            delegate: NotificationCard {
+            // Layer windows cannot inherit Item clipping. Hide any card whose
+            // body/close overhang is not wholly in the viewport; partial rows
+            // leave an edge gap instead of floating over the header or desktop.
+            delegate: GlassNotificationCard {
+                id: card
                 required property var modelData
                 width: list.width - root.overhang
+                height: implicitHeight
                 entry: modelData
+                hostWindow: popup
+                bodyX: popup._origin.x + list.x + x - list.contentX
+                bodyY: popup._origin.y + list.y + y - list.contentY
+                compositorGlass: root.compositorGlass
+                keyboardEnabled: true
+                surfaceVisible: list.visible && y - list.contentY - root.overhang >= 0
+                    && y - list.contentY + height <= list.height
+                    && popup.screen && bodyY + height <= popup.screen.height
+                    && bodyY - root.overhang >= 0
+                    && bodyX - root.overhang >= 0 && bodyX + width <= popup.screen.width
+                Component.onCompleted: root.registerCard(window)
+                Component.onDestruction: root.unregisterCard(window)
                 onDismissRequested: root.notificationService.dismiss(entry.key)
+                onCloseRequested: popup.visible = false
+                onScrollRequested: delta => root.scrollCards(delta)
             }
         }
 

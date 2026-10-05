@@ -13,7 +13,7 @@ GuardedPopupWindow {
             visible = false;
             return;
         }
-        anchor.item = anchorItem;
+        popup.anchorItem = anchorItem;
         visible = true;
         chart.requestPaint();
     }
@@ -41,57 +41,78 @@ GuardedPopupWindow {
         return duration(batteryService.estimateSeconds) + " remaining";
     }
 
-    anchor.rect.x: (anchor.item ? anchor.item.width : 0) - width
-    anchor.rect.y: Theme.barPopupY(anchor.item)
-    implicitWidth: 370
-    implicitHeight: 230
-    color: "transparent"
+    popupX: (anchorItem ? anchorItem.width : 0) - popupWidth
+    popupWidth: 310
+    popupHeight: content.implicitHeight + 2 * Theme.menuPadding
 
-    Rectangle {
-        anchors.fill: parent
-        radius: Theme.windowRadius
-        color: Theme.background
-        border { width: Theme.windowBorderWidth; color: Theme.windowBorder }
-    }
-
+    // macOS battery menu: bold title with the level on the right, secondary
+    // status lines, then the recent-charge chart in place of Energy Mode.
     Column {
-        anchors { fill: parent; margins: 14 }
-        spacing: 10
+        id: content
+        anchors { left: parent.left; right: parent.right; top: parent.top
+            margins: Theme.menuPadding; leftMargin: Theme.menuTextInset; rightMargin: Theme.menuTextInset }
+        spacing: 0
 
-        Row {
+        Item {
             width: parent.width
-            spacing: 8
+            height: 34
 
             Text {
-                text: popup.batteryService && popup.batteryService.charging ? "Charging" : "Battery"
-                color: Theme.text
-                font { family: Theme.fontFamily; pixelSize: 16; bold: true }
+                anchors { left: parent.left; verticalCenter: parent.verticalCenter }
+                text: "Battery"
+                color: Theme.menuText
+                font { family: Theme.fontFamily; pixelSize: Theme.menuFontSize; weight: Font.Bold }
             }
 
             Text {
+                anchors { right: parent.right; verticalCenter: parent.verticalCenter }
                 text: (popup.batteryService ? popup.batteryService.percentage : 0) + "%"
                 color: popup.batteryService && popup.batteryService.percentage <= 15
-                    ? Theme.danger : Theme.accent
-                font { family: Theme.fontFamily; pixelSize: 16; bold: true }
+                    ? Theme.danger : Theme.menuSecondaryText
+                font { family: Theme.fontFamily; pixelSize: Theme.menuFontSize; weight: Font.Medium }
             }
         }
 
         Text {
-            text: popup.statusText()
-            color: Theme.muted
-            font { family: Theme.fontFamily; pixelSize: Theme.fontSize }
+            width: parent.width
+            height: 20
+            verticalAlignment: Text.AlignVCenter
+            text: "Power Source: " + (popup.batteryService && popup.batteryService.charging ? "Power Adapter" : "Battery")
+            color: Theme.menuSecondaryText
+            font { family: Theme.fontFamily; pixelSize: Theme.menuFontSize }
         }
 
-        Rectangle {
+        Text {
             width: parent.width
-            height: 140
-            radius: Theme.radius
-            color: Theme.surface
-            border { width: 1; color: Theme.border }
+            height: 20
+            verticalAlignment: Text.AlignVCenter
+            text: popup.statusText()
+            color: Theme.menuSecondaryText
+            font { family: Theme.fontFamily; pixelSize: Theme.menuFontSize }
+        }
+
+        Item {
+            width: parent.width
+            height: Theme.menuSeparatorHeight
+            Rectangle { anchors.verticalCenter: parent.verticalCenter; width: parent.width; height: 1; color: Theme.menuSeparator }
+        }
+
+        Text {
+            width: parent.width
+            height: 22
+            verticalAlignment: Text.AlignVCenter
+            text: "Last 3 Hours"
+            color: Theme.menuSecondaryText
+            font { family: Theme.fontFamily; pixelSize: Theme.menuFontSize - 1; weight: Font.DemiBold }
+        }
+
+        Item {
+            width: parent.width
+            height: 118
 
             Canvas {
                 id: chart
-                anchors { fill: parent; leftMargin: 10; rightMargin: 10; topMargin: 10; bottomMargin: 22 }
+                anchors { fill: parent; topMargin: 4; bottomMargin: 22 }
 
                 onWidthChanged: requestPaint()
                 onHeightChanged: requestPaint()
@@ -99,7 +120,7 @@ GuardedPopupWindow {
                     const ctx = getContext("2d");
                     ctx.clearRect(0, 0, width, height);
 
-                    ctx.strokeStyle = Theme.border;
+                    ctx.strokeStyle = Theme.menuSeparator;
                     ctx.lineWidth = 1;
                     for (let i = 0; i <= 4; i++) {
                         const y = i * height / 4;
@@ -128,7 +149,7 @@ GuardedPopupWindow {
                         ctx.lineTo(pointX(samples[j]), pointY(samples[j]));
                     ctx.lineTo(width, height);
                     ctx.closePath();
-                    ctx.fillStyle = Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.18);
+                    ctx.fillStyle = Qt.rgba(0.204, 0.78, 0.349, 0.22);
                     ctx.fill();
 
                     ctx.beginPath();
@@ -140,14 +161,14 @@ GuardedPopupWindow {
                         else
                             ctx.lineTo(x, y);
                     }
-                    ctx.strokeStyle = Theme.accent;
+                    ctx.strokeStyle = "#34c759";
                     ctx.lineWidth = 2;
                     ctx.stroke();
 
                     const last = samples[samples.length - 1];
                     ctx.beginPath();
                     ctx.arc(width - 2, pointY(last), 3, 0, Math.PI * 2);
-                    ctx.fillStyle = Theme.accent;
+                    ctx.fillStyle = "#34c759";
                     ctx.fill();
                 }
 
@@ -158,16 +179,16 @@ GuardedPopupWindow {
             }
 
             Text {
-                anchors { left: parent.left; leftMargin: 10; bottom: parent.bottom; bottomMargin: 5 }
+                anchors { left: parent.left; bottom: parent.bottom; bottomMargin: 5 }
                 text: "3 hours ago"
-                color: Theme.muted
+                color: Theme.menuSecondaryText
                 font { family: Theme.fontFamily; pixelSize: 10 }
             }
 
             Text {
-                anchors { right: parent.right; rightMargin: 10; bottom: parent.bottom; bottomMargin: 5 }
+                anchors { right: parent.right; bottom: parent.bottom; bottomMargin: 5 }
                 text: "Now"
-                color: Theme.muted
+                color: Theme.menuSecondaryText
                 font { family: Theme.fontFamily; pixelSize: 10; bold: true }
             }
         }

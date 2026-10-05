@@ -28,14 +28,13 @@ GuardedPopupWindow {
     readonly property bool playing: connected && sendspinPlayer.playbackState === MprisPlaybackState.Playing
     readonly property bool hasProgress: connected && sendspinPlayer.positionSupported && sendspinPlayer.lengthSupported && sendspinPlayer.length > 0
     readonly property real progress: hasProgress ? Math.max(0, Math.min(1, sendspinPlayer.position / sendspinPlayer.length)) : 0
-    readonly property int popupWidth: 320
 
     function toggle(anchorItem) {
         if (visible) {
             visible = false;
             return;
         }
-        anchor.item = anchorItem;
+        popup.anchorItem = anchorItem;
         visible = true;
     }
 
@@ -48,25 +47,14 @@ GuardedPopupWindow {
         return m + ":" + (s < 10 ? "0" : "") + s;
     }
 
-    anchor.rect.x: popup.screen.width / 2 - popupWidth / 2
-    anchor.rect.y: Theme.barPopupY(anchor.item)
-    width: popupWidth
-    height: content.implicitHeight + 32
-    color: "transparent"
+    glassNamespace: "quickshell-panel"
+    popupX: (screen ? screen.width / 2 : 0) - popupWidth / 2 - (anchorItem ? anchorItem.mapToItem(null, 0, 0).x : 0)
+    popupWidth: 320
+    popupHeight: content.implicitHeight + 32
 
     FrameAnimation {
         running: popup.visible && popup.playing && popup.hasProgress
         onTriggered: popup.sendspinPlayer.positionChanged()
-    }
-
-    Rectangle {
-        anchors.fill: parent
-        radius: Theme.windowRadius
-        color: Theme.background
-        border {
-            width: Theme.windowBorderWidth
-            color: Theme.windowBorder
-        }
     }
 
     ColumnLayout {

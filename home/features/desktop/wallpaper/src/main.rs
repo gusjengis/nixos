@@ -110,6 +110,7 @@ struct Paths {
     metadata_file: PathBuf,
     curation_file: PathBuf,
     current_file: PathBuf,
+    displayed_file: PathBuf,
     order_file: PathBuf,
     colors_file: PathBuf,
     location_file: PathBuf,
@@ -127,6 +128,7 @@ impl Paths {
             metadata_file: wallpaper_dir.join("metadata.json"),
             curation_file: wallpaper_dir.join("curation.json"),
             current_file: state_dir.join("current"),
+            displayed_file: state_dir.join("displayed"),
             order_file: state_dir.join("order.json"),
             colors_file: state_dir.join("colors.json"),
             location_file: state_dir.join("location.json"),
@@ -600,45 +602,9 @@ fn cached_palette(paths: &Paths, filename: &str) -> Option<Palette> {
     serde_json::from_value(palette_value).ok()
 }
 
-/// Relative luminance (WCAG, sRGB gamma-corrected) of a single RGB triple in
-/// the 0..1 range, where 0 is black and 1 is white.
-fn relative_luminance(r: f64, g: f64, b: f64) -> f64 {
-    fn linearize(channel: f64) -> f64 {
-        if channel <= 0.04045 {
-            channel / 12.92
-        } else {
-            ((channel + 0.055) / 1.055).powf(2.4)
-        }
-    }
-    0.2126 * linearize(r) + 0.7152 * linearize(g) + 0.0722 * linearize(b)
-}
-
-/// Parses ImageMagick's `%[pixel:...]` output, e.g. "srgb(7.1%,8%,13.6%)" or
-/// "srgb(114,133,158)" (percent vs. 0-255 depending on image depth/format).
-fn parse_pixel_luminance(text: &str) -> Option<f64> {
-    let start = text.find('(')?;
-    let end = text.find(')')?;
-    let mut channels = text[start + 1..end].split(',').map(str::trim);
-    let mut channel = || -> Option<f64> {
-        let raw = channels.next()?;
-        if let Some(percent) = raw.strip_suffix('%') {
-            percent.trim().parse::<f64>().ok().map(|v| v / 100.0)
-        } else {
-            raw.parse::<f64>().ok().map(|v| v / 255.0)
-        }
-    };
-    let r = channel()?;
-    let g = channel()?;
-    let b = channel()?;
-    Some(relative_luminance(r, g, b))
-}
-
-/// Samples the strip of the wallpaper that actually sits behind the bar - the
-/// top of the image, "cover"-fit wallpapers keep that anchored to the top of
-/// the screen - and averages it down to one pixel with ImageMagick. A
-/// generous 10% strip (the bar itself is a couple of percent of a typical
-/// screen's height) keeps this forgiving of monitors with a taller bar or a
-/// slightly different aspect ratio than the wallpaper.
+/// Mean CIE L* of the first 30 rendered rows behind the menu bar. Convert
+/// each pixel before averaging; converting the average RGB gives the wrong
+/// item color on patterned wallpapers. `-scale` computes an area mean.
 ///
 /// This is a live pixel sample, not a cache: unlike the matugen palette it
 /// costs no backfill step and never misses, only fails if the file cannot be
@@ -649,17 +615,27 @@ fn sample_bar_luminance(path: &Path) -> Option<f64> {
         .args([
             path.to_string_lossy().as_ref(),
             "-auto-orient",
+            "-resize",
+            "3840x2160^",
+            "-gravity",
+            "center",
+            "-extent",
+            "3840x2160",
             "-gravity",
             "North",
             "-crop",
-            "100%x10%+0+0",
+            "0x30+0+0",
             "+repage",
             "-colorspace",
-            "sRGB",
-            "-resize",
+            "Lab",
+            "-channel",
+            "R",
+            "-separate",
+            "+channel",
+            "-scale",
             "1x1!",
             "-format",
-            "%[pixel:p{0,0}]",
+            "%[fx:mean]",
             "info:",
         ])
         .output()
@@ -667,7 +643,10 @@ fn sample_bar_luminance(path: &Path) -> Option<f64> {
     if !output.status.success() {
         return None;
     }
-    parse_pixel_luminance(&String::from_utf8_lossy(&output.stdout))
+    String::from_utf8_lossy(&output.stdout)
+        .trim()
+        .parse::<f64>()
+        .ok()
 }
 
 fn write_colors(paths: &Paths, colors: &Palette, bar_luminance: f64) -> io::Result<()> {
@@ -715,6 +694,7 @@ fn commit_wallpaper(paths: &Paths, available: &[PathBuf], raw_path: &str) -> Res
     let colors = palette_for(paths, &requested);
     let bar_luminance = sample_bar_luminance(&requested).unwrap_or(DEFAULT_BAR_LUMINANCE);
     write_state(paths, &requested, colors.as_ref(), bar_luminance).map_err(|e| e.to_string())?;
+    write_atomic(&paths.displayed_file, &format!("{}\n", requested.display())).map_err(|e| e.to_string())?;
     Ok(requested)
 }
 
@@ -733,6 +713,7 @@ fn set_wallpaper(paths: &Paths, available: &[PathBuf], raw_path: &str, persist: 
     if !status.success() {
         return Err(format!("hyprctl hyprpaper wallpaper failed for {}", requested.display()));
     }
+    write_atomic(&paths.displayed_file, &format!("{}\n", requested.display())).map_err(|e| e.to_string())?;
 
     let colors = palette_for(paths, &requested);
     let bar_luminance = sample_bar_luminance(&requested).unwrap_or(DEFAULT_BAR_LUMINANCE);
@@ -1074,24 +1055,6 @@ mod tests {
             resolve_cycle_target(&available, &[], Some(&active), true),
             None
         );
-    }
-
-    #[test]
-    fn parses_percent_pixel_output() {
-        let luminance = parse_pixel_luminance("srgb(7.06668%,7.95562%,13.633%)").unwrap();
-        assert!(luminance > 0.0 && luminance < 0.1, "{luminance}");
-    }
-
-    #[test]
-    fn parses_integer_pixel_output() {
-        let luminance = parse_pixel_luminance("srgb(255,255,255)").unwrap();
-        assert!((luminance - 1.0).abs() < 1e-9, "{luminance}");
-    }
-
-    #[test]
-    fn black_and_white_are_the_luminance_extremes() {
-        assert!((relative_luminance(0.0, 0.0, 0.0)).abs() < 1e-9);
-        assert!((relative_luminance(1.0, 1.0, 1.0) - 1.0).abs() < 1e-9);
     }
 
     #[test]

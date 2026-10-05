@@ -4,14 +4,13 @@ import Quickshell.Hyprland
 import Quickshell.Wayland
 import "../theme"
 
-// macOS notification banners: glass cards at the top-right that slide in
-// from the screen edge. The surface itself stays transparent; Hyprland blurs
-// behind the cards via the quickshell-notifications layer rule.
+// Legacy transparent layout host; each banner owns its glass layer surface.
 PanelWindow {
     id: root
 
     required property var notificationService
     required property bool barShown
+    property bool compositorGlass: Theme.glassActive
 
     readonly property var popups: notificationService ? notificationService.popups : []
     readonly property var monitor: Hyprland.monitorFor(screen)
@@ -29,18 +28,11 @@ PanelWindow {
     implicitHeight: cards.implicitHeight + overhang
     color: "transparent"
     WlrLayershell.namespace: "quickshell-notifications"
+    WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
     exclusionMode: ExclusionMode.Ignore
     anchors { top: true; right: true }
-    margins { top: (barShown ? Theme.barHeight : 0) + 6 - overhang; right: 10 }
-    mask: Region { item: inputArea }
-
-    Item {
-        id: inputArea
-        x: cards.x
-        y: cards.y
-        width: root.showing ? cards.width : 0
-        height: root.showing ? cards.height : 0
-    }
+    margins { top: Math.max(overhang, (barShown ? Theme.barHeight : 0) + 6) - overhang; right: 10 }
+    mask: Region { width: 0; height: 0 }
 
     Column {
         id: cards
@@ -53,28 +45,29 @@ PanelWindow {
         Repeater {
             model: root.popups
 
-            delegate: NotificationCard {
+            delegate: GlassNotificationCard {
                 id: card
                 required property var modelData
                 width: cards.width
+                height: implicitHeight
                 entry: modelData
+                hostWindow: root
+                bodyX: root.screen ? root.screen.width - root.margins.right - root.width + cards.x + x : 0
+                bodyY: root.margins.top + cards.y + y
+                compositorGlass: root.compositorGlass
+                showTimestamp: false
+                surfaceVisible: root.showing && root.focusedScreen
+                    && bodyY - root.overhang >= 0
+                    && root.screen && bodyY + height <= root.screen.height
+                    && bodyX - root.overhang >= 0 && bodyX + width <= root.screen.width
                 onDismissRequested: root.notificationService.dismiss(entry.key)
-
-                NumberAnimation on x {
-                    from: root.width
-                    to: 0
-                    duration: 380
-                    easing.type: Easing.OutCubic
-                }
 
                 Timer {
                     readonly property int baseInterval: root.notificationService.toastTimeout(card.entry)
                     interval: baseInterval + card.entry.revision % 2
-                    running: baseInterval > 0 && root.focusedScreen && !cardHover.hovered
+                    running: baseInterval > 0 && root.focusedScreen && !card.hovered
                     onTriggered: root.notificationService.hidePopup(card.entry.key)
                 }
-
-                HoverHandler { id: cardHover }
             }
         }
     }

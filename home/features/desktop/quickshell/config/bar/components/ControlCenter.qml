@@ -37,8 +37,8 @@ Rectangle {
     readonly property bool playing: player !== null && player.playbackState === MprisPlaybackState.Playing
 
     implicitWidth: 30
-    implicitHeight: 24
-    radius: 6
+    implicitHeight: Theme.barItemHeight
+    radius: height / 2
     color: popup.visible ? Theme.barHoverFill : "transparent"
 
     PwObjectTracker { objects: [root.sink] }
@@ -56,14 +56,26 @@ Rectangle {
         onClicked: popup.toggle(root)
     }
 
-    component Module: Rectangle {
-        radius: 14
-        color: Theme.surface
-        border { width: 1; color: Qt.rgba(Theme.border.r, Theme.border.g, Theme.border.b, 0.45) }
+    // Foreground islands share one surface; the compositor supplies their glass.
+    component Module: Item {
+        id: module
+        default property alias content: platterContent.data
+
+        Rectangle {
+            anchors.fill: parent
+            radius: 32
+            color: Theme.background
+            visible: !Theme.groupedGlassActive
+        }
+
+        Item {
+            id: platterContent
+            anchors.fill: parent
+        }
     }
 
     component ModuleTitle: Text {
-        color: Theme.text
+        color: "#ffffff"
         font { family: Theme.fontFamily; pixelSize: 13; weight: Font.DemiBold }
     }
 
@@ -84,25 +96,25 @@ Rectangle {
         spacing: 9
 
         Rectangle {
-            implicitWidth: 28
-            implicitHeight: 28
-            radius: 14
-            color: row.on ? Theme.accentStrong : Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, toggleMouse.containsMouse ? 0.24 : 0.16)
+            implicitWidth: 36
+            implicitHeight: 36
+            radius: 18
+            color: row.on ? "#ffffff" : Qt.rgba(1, 1, 1, toggleMouse.containsMouse ? 0.24 : 0.16)
 
             SFSymbol {
                 anchors.centerIn: parent
                 visible: row.symbol !== ""
                 symbol: row.symbol
-                size: 13
-                color: row.on ? "#ffffff" : Theme.text
+                size: 18
+                color: row.on ? "#007aff" : "#ffffff"
             }
 
             Text {
                 anchors.centerIn: parent
                 visible: row.glyph !== ""
                 text: row.glyph
-                color: row.on ? "#ffffff" : Theme.text
-                font { family: Theme.iconFontFamily; pixelSize: 15 }
+                color: row.on ? "#007aff" : "#ffffff"
+                font { family: Theme.iconFontFamily; pixelSize: 20 }
             }
 
             MouseArea {
@@ -131,8 +143,10 @@ Rectangle {
                 Text {
                     Layout.fillWidth: true
                     text: row.subtitle
-                    color: Theme.muted
+                    color: Qt.rgba(1, 1, 1, 0.85)
                     elide: Text.ElideRight
+                    wrapMode: Text.Wrap
+                    maximumLineCount: 2
                     font { family: Theme.fontFamily; pixelSize: 11 }
                 }
             }
@@ -205,9 +219,9 @@ Rectangle {
 
     GuardedPopupWindow {
         id: popup
+        anchorItem: root
 
         property string page: "main"
-        readonly property Item currentPage: page === "wifi" ? wifiPage : page === "bluetooth" ? bluetoothPage : page === "sound" ? soundPage : mainPage
 
         function toggle(anchorItem) {
             if (visible) {
@@ -215,7 +229,7 @@ Rectangle {
                 return;
             }
             page = "main";
-            anchor.item = anchorItem;
+            popup.anchorItem = anchorItem;
             visible = true;
             root.controls.refresh();
         }
@@ -223,46 +237,69 @@ Rectangle {
         function open(name) {
             if (name === "wifi")
                 wifiPanel.reset();
+            if (name === "sound")
+                soundPanel.advanced = false;
             page = name;
         }
 
-        anchor.rect.x: root.popupAnchor.width
-            - (anchor.item ? anchor.item.mapToItem(root.popupAnchor, 0, 0).x : 0)
-            - width - 10
-        anchor.rect.y: Theme.barPopupY(anchor.item)
-        implicitWidth: 340
-        implicitHeight: Math.min(720, currentPage.implicitHeight + 24)
-        color: "transparent"
-
-        Rectangle {
-            anchors.fill: parent
-            radius: Theme.windowRadius
-            color: Theme.background
-            border { width: Theme.windowBorderWidth; color: Theme.windowBorder }
+        function back() {
+            if (page === "sound" && soundPanel.advanced)
+                soundPanel.advanced = false;
+            else if (page !== "main")
+                page = "main";
+            else
+                visible = false;
         }
+
+        // This mapped controller never acquires material or an input region.
+        glassNamespace: "quickshell-cc-host"
+        backgroundVisible: false
+        acceptsInput: false
+        shadowPadding: 0
+        focusWindows: [popup, mainSurface, details]
+        popupX: root.popupAnchor.width
+            - (anchorItem ? anchorItem.mapToItem(root.popupAnchor, 0, 0).x : 0)
+            - popupWidth - 14
+        popupY: Theme.barPopupY(anchorItem) + 11
+        popupWidth: 292
+        popupHeight: root.controls.brightness.available ? 292 : 216
+    }
+
+    GuardedPopupWindow {
+        id: mainSurface
+        anchorItem: popup.anchorItem
+        glassNamespace: "quickshell-cc-group"
+        backgroundVisible: false
+        focusGrabEnabled: false
+        visible: popup.visible && popup.page === "main"
+        popupX: popup.popupX
+        popupY: popup.popupY
+        popupWidth: 292
+        popupHeight: popup.popupHeight
+        shadowPadding: 80
 
         ColumnLayout {
             id: mainPage
             visible: popup.page === "main"
-            anchors { left: parent.left; right: parent.right; top: parent.top; margins: 12 }
-            spacing: 10
+            anchors { left: parent.left; right: parent.right; top: parent.top }
+            spacing: 12
 
             RowLayout {
                 Layout.fillWidth: true
-                spacing: 10
+                spacing: 12
 
-                Module {
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    Layout.preferredWidth: 1
-                    implicitHeight: connectivity.implicitHeight + 24
+                ColumnLayout {
+                    Layout.preferredWidth: 140
+                    Layout.preferredHeight: 140
+                    spacing: 12
 
-                    ColumnLayout {
-                        id: connectivity
-                        anchors { left: parent.left; right: parent.right; verticalCenter: parent.verticalCenter; margins: 12 }
-                        spacing: 12
+                    Module {
+                        id: wifiModule
+                        Layout.fillWidth: true
+                        implicitHeight: 64
 
                         ToggleRow {
+                            anchors { left: parent.left; right: parent.right; verticalCenter: parent.verticalCenter; margins: 14 }
                             title: "Wi-Fi"
                             symbol: "wifi"
                             on: root.wifi.enabled
@@ -270,8 +307,15 @@ Rectangle {
                             onToggled: root.controls.wifiPower(!root.wifi.enabled)
                             onOpened: popup.open("wifi")
                         }
+                    }
+
+                    Module {
+                        id: bluetoothModule
+                        Layout.fillWidth: true
+                        implicitHeight: 64
 
                         ToggleRow {
+                            anchors { left: parent.left; right: parent.right; verticalCenter: parent.verticalCenter; margins: 14 }
                             title: "Bluetooth"
                             glyph: "󰂯"
                             on: root.bluetooth.powered
@@ -287,25 +331,24 @@ Rectangle {
 
                 // Now Playing
                 Module {
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    Layout.preferredWidth: 1
-                    implicitHeight: nowPlaying.implicitHeight + 24
+                    id: mediaModule
+                    Layout.preferredWidth: 140
+                    implicitHeight: 140
 
                     ColumnLayout {
                         id: nowPlaying
                         anchors { left: parent.left; right: parent.right; verticalCenter: parent.verticalCenter; margins: 12 }
                         spacing: 8
 
-                        RowLayout {
+                        ColumnLayout {
                             Layout.fillWidth: true
                             spacing: 8
 
                             ClippingRectangle {
                                 id: artwork
                                 readonly property bool hasArt: root.player !== null && root.player.trackArtUrl !== ""
-                                implicitWidth: 34
-                                implicitHeight: 34
+                                implicitWidth: 40
+                                implicitHeight: 40
                                 radius: 6
                                 color: Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.16)
 
@@ -349,7 +392,7 @@ Rectangle {
 
                         RowLayout {
                             Layout.alignment: Qt.AlignHCenter
-                            spacing: 14
+                            spacing: 10
 
                             MediaButton {
                                 symbol: "backward.fill"
@@ -375,21 +418,24 @@ Rectangle {
             }
 
             Module {
+                id: displayModule
                 Layout.fillWidth: true
                 visible: root.controls.brightness.available
-                implicitHeight: displayColumn.implicitHeight + 24
+                implicitHeight: 64
 
                 ColumnLayout {
                     id: displayColumn
                     anchors { left: parent.left; right: parent.right; verticalCenter: parent.verticalCenter; margins: 12 }
-                    spacing: 8
+                    spacing: 4
 
                     ModuleTitle { text: "Display" }
 
                     MacSlider {
                         id: brightnessSlider
                         Layout.fillWidth: true
-                        symbol: "sun.max.fill"
+                        thin: true
+                        symbol: "sun.min.fill"
+                        trailingSymbol: "sun.max.fill"
                         from: 0
                         to: 100
                         stepSize: 1
@@ -410,13 +456,14 @@ Rectangle {
             }
 
             Module {
+                id: soundModule
                 Layout.fillWidth: true
-                implicitHeight: soundColumn.implicitHeight + 24
+                implicitHeight: 64
 
                 ColumnLayout {
                     id: soundColumn
                     anchors { left: parent.left; right: parent.right; verticalCenter: parent.verticalCenter; margins: 12 }
-                    spacing: 8
+                    spacing: 4
 
                     Item {
                         Layout.fillWidth: true
@@ -448,10 +495,11 @@ Rectangle {
                         id: volumeSlider
                         Layout.fillWidth: true
                         enabled: !!root.sink && !!root.sink.audio
+                        thin: true
+                        trailingSymbol: "speaker.wave.3.fill"
                         symbol: root.muted || root.volume <= 0 ? "speaker.slash.fill" : root.volume < 0.34 ? "speaker.wave.1.fill" : root.volume < 0.67 ? "speaker.wave.2.fill" : "speaker.wave.3.fill"
-                        value: root.volume
-                        onMoved: root.sink.audio.volume = value
-                        onSymbolClicked: root.sink.audio.muted = !root.sink.audio.muted
+                        onMoved: if (root.sink && root.sink.audio) root.sink.audio.volume = value
+                        onSymbolClicked: if (root.sink && root.sink.audio) root.sink.audio.muted = !root.sink.audio.muted
                     }
 
                     Binding {
@@ -459,10 +507,34 @@ Rectangle {
                         property: "value"
                         value: root.volume
                         when: !volumeSlider.pressed
+                        restoreMode: Binding.RestoreNone
                     }
                 }
             }
         }
+
+        Shortcut {
+            sequence: "Escape"
+            enabled: popup.visible && popup.page === "main"
+            onActivated: popup.back()
+        }
+    }
+
+    GuardedPopupWindow {
+        id: details
+
+        readonly property Item currentPage: popup.page === "wifi" ? wifiPage : popup.page === "bluetooth" ? bluetoothPage : soundPage
+        glassNamespace: "quickshell-cc-detail"
+        popupRadius: popup.page === "sound" ? 14 : 13
+        focusGrabEnabled: false
+        anchorItem: popup.anchorItem
+        visible: popup.visible && popup.page !== "main"
+        popupX: root.popupAnchor.width
+            - (anchorItem ? anchorItem.mapToItem(root.popupAnchor, 0, 0).x : 0)
+            - popupWidth - 10
+        popupY: Theme.barPopupY(anchorItem) + (popup.page === "sound" ? 5 : 0)
+        popupWidth: popup.page === "sound" ? 310 : 340
+        popupHeight: Math.min(720, currentPage.implicitHeight + (popup.page === "sound" ? 12 : 24))
 
         ColumnLayout {
             id: wifiPage
@@ -470,7 +542,7 @@ Rectangle {
             anchors { left: parent.left; right: parent.right; top: parent.top; margins: 12 }
             spacing: 8
 
-            DetailHeader { onBack: popup.page = "main" }
+            DetailHeader { onBack: popup.back() }
             WifiPanel {
                 id: wifiPanel
                 Layout.fillWidth: true
@@ -484,7 +556,7 @@ Rectangle {
             anchors { left: parent.left; right: parent.right; top: parent.top; margins: 12 }
             spacing: 8
 
-            DetailHeader { onBack: popup.page = "main" }
+            DetailHeader { onBack: popup.back() }
             BluetoothPanel {
                 Layout.fillWidth: true
                 controls: root.controls
@@ -497,21 +569,16 @@ Rectangle {
             anchors { left: parent.left; right: parent.right; top: parent.top; margins: 12 }
             spacing: 8
 
-            DetailHeader { onBack: popup.page = "main" }
             SoundPanel {
+                id: soundPanel
                 Layout.fillWidth: true
             }
         }
 
         Shortcut {
             sequence: "Escape"
-            enabled: popup.visible
-            onActivated: {
-                if (popup.page !== "main")
-                    popup.page = "main";
-                else
-                    popup.visible = false;
-            }
+            enabled: details.visible
+            onActivated: popup.back()
         }
     }
 }

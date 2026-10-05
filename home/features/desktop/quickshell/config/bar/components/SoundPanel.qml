@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Services.Pipewire
@@ -6,12 +7,11 @@ import Quickshell.Widgets
 import "../../theme"
 import "../../widgets"
 
-// Control Center's expanded Sound module, doubling as a small pavucontrol:
-// default output/input levels, every hardware device (click to make it the
-// default), and a level per playing application.
+// Output-first Sound module; input and application mixing live in Settings.
 ColumnLayout {
     id: panel
 
+    property bool advanced: false
     readonly property var sink: Pipewire.defaultAudioSink
     readonly property var source: Pipewire.defaultAudioSource
     readonly property var nodes: Pipewire.nodes.values.filter(node => node.audio)
@@ -62,26 +62,26 @@ ColumnLayout {
         Layout.fillWidth: true
         enabled: !!audio
         symbol: input ? (audio && audio.muted ? "mic.slash.fill" : "mic.fill") : panel.volumeSymbol(audio)
-        onMoved: audio.volume = value
-        onSymbolClicked: audio.muted = !audio.muted
+        onMoved: if (audio) audio.volume = value
+        onSymbolClicked: if (audio) audio.muted = !audio.muted
 
         Binding {
             target: slider
             property: "value"
             value: slider.audio ? slider.audio.volume : 0
             when: !slider.pressed
+            restoreMode: Binding.RestoreNone
         }
     }
 
     component SectionLabel: Text {
         Layout.fillWidth: true
         Layout.topMargin: 8
-        color: Theme.muted
+        color: Theme.menuSecondaryText
         font { family: Theme.fontFamily; pixelSize: 12; weight: Font.DemiBold }
     }
 
-    // macOS device row: round glyph badge, filled with the accent when the
-    // device is the current default.
+    // Selected output uses a white badge and blue glyph, as in macOS.
     component DeviceRow: Rectangle {
         id: row
 
@@ -90,7 +90,7 @@ ColumnLayout {
         signal picked()
 
         Layout.fillWidth: true
-        implicitHeight: 34
+        implicitHeight: 32
         radius: 8
         color: rowMouse.containsMouse ? Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.08) : "transparent"
 
@@ -102,20 +102,20 @@ ColumnLayout {
                 implicitWidth: 26
                 implicitHeight: 26
                 radius: 13
-                color: row.selected ? Theme.accentStrong : Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.16)
+                color: row.selected ? "#ffffff" : Qt.rgba(1, 1, 1, 0.22)
 
                 SFSymbol {
                     anchors.centerIn: parent
                     symbol: panel.deviceSymbol(row.modelData)
                     size: 12
-                    color: row.selected ? "#ffffff" : Theme.text
+                    color: row.selected ? Theme.menuHighlight : "#ffffff"
                 }
             }
 
             Text {
                 Layout.fillWidth: true
                 text: panel.label(row.modelData)
-                color: Theme.text
+                color: Theme.menuText
                 elide: Text.ElideRight
                 font { family: Theme.fontFamily; pixelSize: 13 }
             }
@@ -130,78 +130,193 @@ ColumnLayout {
     }
 
     Text {
-        text: "Sound"
-        color: Theme.text
+        text: panel.advanced ? "Sound Settings" : "Sound"
+        color: Theme.menuText
         font { family: Theme.fontFamily; pixelSize: 13; weight: Font.DemiBold }
     }
 
-    NodeSlider { node: panel.sink }
-
-    SectionLabel { text: "Output" }
-
-    Repeater {
-        model: panel.sinks
-
-        DeviceRow {
-            selected: panel.sink === modelData
-            onPicked: Pipewire.preferredDefaultAudioSink = modelData
-        }
-    }
-
-    SectionLabel { text: "Input" }
-
     NodeSlider {
-        node: panel.source
-        input: true
+        id: outputSlider
+        visible: !panel.advanced
+        node: panel.sink
+        thin: true
+        symbol: audio && audio.muted ? "speaker.slash.fill" : "speaker.fill"
+        trailingSymbol: "speaker.wave.3.fill"
+        handle: Rectangle {
+            x: outputSlider.leftPadding + outputSlider.visualPosition * (outputSlider.availableWidth - width)
+            y: outputSlider.topPadding + outputSlider.availableHeight / 2 - height / 2
+            implicitWidth: 20
+            implicitHeight: 16
+            radius: 8
+            color: "#ffffff"
+        }
     }
 
-    Repeater {
-        model: panel.sources
-
-        DeviceRow {
-            selected: panel.source === modelData
-            onPicked: Pipewire.preferredDefaultAudioSource = modelData
-        }
+    Rectangle {
+        Layout.fillWidth: true
+        implicitHeight: 1
+        color: Theme.menuSeparator
     }
 
     SectionLabel {
-        visible: panel.streams.length > 0
-        text: "Applications"
+        visible: !panel.advanced
+        text: "Output"
+        Layout.topMargin: 2
     }
 
-    Repeater {
-        model: panel.streams
+    Flickable {
+        id: outputList
+        visible: !panel.advanced
+        Layout.fillWidth: true
+        Layout.preferredHeight: Math.min(320, contentHeight)
+        contentHeight: outputs.implicitHeight
+        contentWidth: width
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
+        flickableDirection: Flickable.VerticalFlick
+        ScrollBar.vertical: ScrollBar {}
+
+        WheelHandler {
+            target: null
+            onWheel: event => {
+                const limit = Math.max(0, outputList.contentHeight - outputList.height);
+                outputList.contentY = Math.max(0, Math.min(limit, outputList.contentY - event.angleDelta.y / 120 * 32));
+            }
+        }
 
         ColumnLayout {
-            id: app
+            id: outputs
+            width: outputList.width
+            spacing: 0
 
-            required property var modelData
-            readonly property string iconName: (modelData.properties || {})["application.icon-name"] || ""
+            Repeater {
+                model: panel.sinks
 
-            Layout.fillWidth: true
-            spacing: 4
-
-            RowLayout {
-                Layout.fillWidth: true
-                Layout.leftMargin: 4
-                spacing: 6
-
-                IconImage {
-                    visible: app.iconName !== ""
-                    implicitSize: 14
-                    source: app.iconName !== "" ? Quickshell.iconPath(app.iconName, true) : ""
-                }
-
-                Text {
-                    Layout.fillWidth: true
-                    text: panel.appLabel(app.modelData)
-                    color: Theme.text
-                    elide: Text.ElideRight
-                    font { family: Theme.fontFamily; pixelSize: 12 }
+                DeviceRow {
+                    selected: panel.sink === modelData
+                    onPicked: Pipewire.preferredDefaultAudioSink = modelData
                 }
             }
 
-            NodeSlider { node: app.modelData }
+            Text {
+                visible: panel.sinks.length === 0
+                Layout.fillWidth: true
+                text: "No Output Devices"
+                color: Theme.menuSecondaryText
+                font { family: Theme.fontFamily; pixelSize: 12 }
+            }
+        }
+    }
+
+    Flickable {
+        id: advancedList
+        visible: panel.advanced
+        Layout.fillWidth: true
+        Layout.preferredHeight: Math.min(400, contentHeight)
+        contentHeight: advancedContent.implicitHeight
+        contentWidth: width
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
+        flickableDirection: Flickable.VerticalFlick
+        ScrollBar.vertical: ScrollBar {}
+
+        WheelHandler {
+            target: null
+            onWheel: event => {
+                const limit = Math.max(0, advancedList.contentHeight - advancedList.height);
+                advancedList.contentY = Math.max(0, Math.min(limit, advancedList.contentY - event.angleDelta.y / 120 * 32));
+            }
+        }
+
+        ColumnLayout {
+            id: advancedContent
+            width: advancedList.width
+            spacing: 6
+
+            SectionLabel { text: "Input" }
+
+            NodeSlider {
+                node: panel.source
+                input: true
+            }
+
+            Repeater {
+                model: panel.sources
+
+                DeviceRow {
+                    selected: panel.source === modelData
+                    onPicked: Pipewire.preferredDefaultAudioSource = modelData
+                }
+            }
+
+            SectionLabel {
+                visible: panel.streams.length > 0
+                text: "Applications"
+            }
+
+            Repeater {
+                model: panel.streams
+
+                ColumnLayout {
+                    id: app
+
+                    required property var modelData
+                    readonly property string iconName: (modelData.properties || {})["application.icon-name"] || ""
+
+                    Layout.fillWidth: true
+                    spacing: 4
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Layout.leftMargin: 4
+                        spacing: 6
+
+                        IconImage {
+                            visible: app.iconName !== ""
+                            implicitSize: 14
+                            source: app.iconName !== "" ? Quickshell.iconPath(app.iconName, true) : ""
+                        }
+
+                        Text {
+                            Layout.fillWidth: true
+                            text: panel.appLabel(app.modelData)
+                            color: Theme.text
+                            elide: Text.ElideRight
+                            font { family: Theme.fontFamily; pixelSize: 12 }
+                        }
+                    }
+
+                    NodeSlider { node: app.modelData }
+                }
+            }
+        }
+    }
+
+    Rectangle {
+        Layout.fillWidth: true
+        implicitHeight: 1
+        color: Theme.menuSeparator
+    }
+
+    Rectangle {
+        Layout.fillWidth: true
+        implicitHeight: 26
+        radius: 6
+        color: footerMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.08) : "transparent"
+
+        Text {
+            anchors { left: parent.left; verticalCenter: parent.verticalCenter }
+            text: panel.advanced ? "Back to Output" : "Sound Settings..."
+            color: Theme.menuText
+            font { family: Theme.fontFamily; pixelSize: 13 }
+        }
+
+        MouseArea {
+            id: footerMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: panel.advanced = !panel.advanced
         }
     }
 }

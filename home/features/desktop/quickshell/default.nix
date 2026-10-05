@@ -115,6 +115,12 @@ let
     mkdir -p $out
     qsb --qt6 -o $out/tray-mono.frag.qsb ${./config/bar/components/shaders/tray-mono.frag}
   '';
+  barScrimShader = pkgs.runCommand "quickshell-bar-scrim-shader" {
+    nativeBuildInputs = [ pkgs.qt6.qtshadertools ];
+  } ''
+    mkdir -p $out
+    qsb --qt6 -o $out/bar-scrim.frag.qsb ${./config/bar/components/shaders/bar-scrim.frag}
+  '';
   aiUsage = pkgs.writeShellApplication {
     name = "quickshell-ai-usage";
     runtimeInputs = [ pkgs.python3 ];
@@ -195,6 +201,7 @@ in
     xdg.dataFile."quickshell/laptop".text = if config.laptop.enable then "1" else "0";
     # Build artifact, so store-backed on purpose: edit the .frag and rebuild.
     xdg.dataFile."quickshell/shaders/tray-mono.frag.qsb".source = "${trayMonoShader}/tray-mono.frag.qsb";
+    xdg.dataFile."quickshell/shaders/bar-scrim.frag.qsb".source = "${barScrimShader}/bar-scrim.frag.qsb";
 
     # Waypipe starts its remote server before the metadata helper's wrapper runs.
     home.packages = [

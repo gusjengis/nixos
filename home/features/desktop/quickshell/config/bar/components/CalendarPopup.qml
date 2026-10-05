@@ -21,7 +21,7 @@ GuardedPopupWindow {
         }
         viewYear = today.getFullYear();
         viewMonth = today.getMonth();
-        anchor.item = anchorItem;
+        popup.anchorItem = anchorItem;
         visible = true;
     }
 
@@ -42,18 +42,9 @@ GuardedPopupWindow {
     }
 
     // Keep the popup inside the screen beneath the right-edge clock.
-    anchor.rect.x: (anchor.item ? anchor.item.width : 0) - width
-    anchor.rect.y: Theme.barPopupY(anchor.item)
-    implicitWidth: content.implicitWidth + 28
-    implicitHeight: content.implicitHeight + 28
-    color: "transparent"
-
-    Rectangle {
-        anchors.fill: parent
-        radius: Theme.windowRadius
-        color: Theme.background
-        border { width: Theme.windowBorderWidth; color: Theme.windowBorder }
-    }
+    popupX: (anchorItem ? anchorItem.width : 0) - popupWidth
+    popupWidth: content.implicitWidth + 28
+    popupHeight: content.implicitHeight + 28
 
     Column {
         id: content

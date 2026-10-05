@@ -9,8 +9,8 @@ Rectangle {
     signal activated()
 
     implicitWidth: 30
-    implicitHeight: 24
-    radius: 6
+    implicitHeight: Theme.barItemHeight
+    radius: height / 2
     color: mouse.pressed ? Theme.barHoverFill : "transparent"
 
     SFSymbol {

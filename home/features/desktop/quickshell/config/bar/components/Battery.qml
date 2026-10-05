@@ -15,8 +15,8 @@ Rectangle {
 
     visible: !!batteryService && batteryService.available
     implicitWidth: 36
-    implicitHeight: 24
-    radius: 6
+    implicitHeight: Theme.barItemHeight
+    radius: height / 2
     color: popup.visible ? Theme.barHoverFill : "transparent"
 
     Item {

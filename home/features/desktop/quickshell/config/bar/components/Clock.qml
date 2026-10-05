@@ -12,13 +12,15 @@ Rectangle {
     function displayTime(date) {
         const hours = date.getHours() % 12 || 12;
         const minutes = ("0" + date.getMinutes()).slice(-2);
-        const period = date.getHours() < 12 ? " AM" : " PM";
-        return Qt.formatDate(date, "ddd MMM d") + "  " + hours + ":" + minutes + period;
+        // macOS separates the meridiem with a narrow no-break space and
+        // leaves ~11px between date and time.
+        const period = date.getHours() < 12 ? "\u202FAM" : "\u202FPM";
+        return Qt.formatDate(date, "ddd MMM d") + "  \u200A" + hours + ":" + minutes + period;
     }
 
     width: label.implicitWidth + 18
-    height: 24
-    radius: 6
+    height: Theme.barItemHeight
+    radius: height / 2
     color: popup.popupVisible ? Theme.barHoverFill : "transparent"
 
     SystemClock {

@@ -36,6 +36,7 @@ Text {
         "bolt.fill": 0x1002E6,
         "camera.fill": 0x10031F,
         "eyedropper": 0x100397,
+        "lock.fill": 0x1003A1,
         "display": 0x1003B2,
         "headphones": 0x100448,
         "wifi": 0x100647,

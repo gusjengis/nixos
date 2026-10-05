@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Io
+import "../theme"
 import "../notifications"
 
 Scope {
@@ -94,6 +95,18 @@ Scope {
                 systemControls: systemControlsService
                 notificationService: notifications
                 openLauncher: root.openLauncher
+            }
+        }
+    }
+
+    Variants {
+        model: monitorModes.initialized ? Quickshell.screens : []
+
+        delegate: Component {
+            BarScrim {
+                required property var modelData
+                screen: modelData
+                shown: root.shown
             }
         }
     }
