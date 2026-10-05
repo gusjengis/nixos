@@ -8,7 +8,7 @@ Every channel ends up as a raw note in `Raw/` of the Obsidian vault, in one shar
 | Channel | Path | Source value |
 | --- | --- | --- |
 | Desktop dictation | `CTRL + code:202` -> Handy (local Parakeet) -> `Capture.qml` -> `capture-note` | `desktop-dictation` |
-| Supernote notebook | UltraBridge on alpha -> `capture-process.py` (Ollama OCR on omega) -> outbox -> `capture-import.py` on pc | `supernote` |
+| Supernote notebook | UltraBridge on alpha -> `capture-process.py` (Ollama `qwen3.8:27b` OCR on omega) -> outbox -> `capture-import.py` on pc | `supernote` |
 | Typing (phone/desktop) | Obsidian + Templater `Templates/Raw Note.md` | `phone-typed` / `desktop-typed` |
 
 Relevant files:
@@ -66,6 +66,17 @@ Known sources: `desktop-typed`, `desktop-dictation`, `phone-typed`, `phone-dicta
 - Atomic, no-clobber write (dotfile in vault root + `link()`); if another capture took the name, the template is rendered again.
 - Difference from Obsidian: Templater re-serializes frontmatter through Obsidian's YAML stringifier after rendering; the runner writes the rendered text verbatim.
 - Templater quirk: on file creation it executes `<% %>` tags found in any new non-empty note, so dictating literal `<%` would be interpreted when Obsidian opens the vault.
+
+## Normalization (omega)
+
+Raw notes are the durable record; everything downstream must be rebuildable from them. The first processing stage turns each `Raw/<stamp>.md` into `Normalized/<stamp>.md`.
+
+- Files: `system/hosts/omega/notes.nix` (headless `ob sync` + `note-normalize` system units, run as the user since omega has no login session), `system/hosts/omega/note-normalize.py`.
+- Model: the resident `qwen3.8:27b` on omega's Ollama, `think: false`, temperature 0. Supernote notes are sent with their page images, which are authoritative for indentation and strike-through.
+- Output: Markdown lists (thoughts as bullets, details nested, tabs for indentation), spelling/grammar/punctuation fixed, misheard or misread words corrected, `~~strike~~` kept, no embeds. Frontmatter: `created`, `day`, `source`, `raw` (link), `normalized_at`, `normalizer` (model / prompt version), `raw_hash`, and `review: true` when under 80% of the raw words survive in order.
+- Raw gets exactly one added property, `normalized: "[[Normalized/<stamp>]]"`. Links are full paths because both folders hold the same file names.
+- Triggered by a systemd path unit watching `Raw/` and `Raw/Images/`; runs rescan until a pass finds nothing (changes during a run are dropped by systemd). A 5-minute timer catches edits whose quiet period expired. New notes are normalized at once (typed notes still being written wait). A raw note whose hash (excluding `normalized`) differs from `raw_hash` was edited and is redone after 10 quiet minutes. Normalized notes are generated output and are overwritten.
+- Manual: `note-normalize [--dry-run] [--force] [stem ...]` on omega. Bump `VERSION` in the script when the prompt changes; `--force` regenerates.
 
 ## Chunks
 

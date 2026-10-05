@@ -6,6 +6,7 @@
     ./forgejo.nix
     ./nix_build_farm_server.nix
     ./wallpaper_fetch.nix
+    ./notes.nix
   ];
 
   system.stateVersion = "25.11";
@@ -23,10 +24,15 @@
   forge.enable = true;
   wallpaperFetch.enable = true;
 
+  # Synced copy of the Obsidian vault; normalizes raw captures into
+  # Normalized/ with the resident model below.
+  notesPipeline.enable = true;
+
   # Fleet inference host. The OpenCode auto-router on every other machine sends
   # each prompt here to be graded before it picks a paid model, and the nightly
-  # wallpaper job asks it which part of the day each new image belongs to, so
-  # this has to be the box with the 24 GB card on it.
+  # wallpaper job asks it which part of the day each new image belongs to, and
+  # the Supernote OCR on alpha and the note normalizer (notes.nix) use it too,
+  # so this has to be the box with the 24 GB card on it.
   #
   # One model for both callers: qwen3.8:27b reads images as well as text, and
   # at 18 GB it is the largest Qwen that fits the card with room for its cache.
