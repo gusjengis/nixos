@@ -30,5 +30,11 @@ Host trevornomad
   IdentitiesOnly yes
   IdentityFile ~/.config/secrets/ssh/fleet_ed25519
 
+Host macos
+  HostName macos.tail29bd65.ts.net
+  User anthonygreen
+  IdentitiesOnly yes
+  IdentityFile ~/.config/secrets/ssh/fleet_ed25519
+
 Host *
   IdentityFile ~/.config/secrets/ssh/fleet_ed25519
