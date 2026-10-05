@@ -270,6 +270,8 @@ struct Curation {
     version: u32,
     #[serde(default)]
     hidden: BTreeMap<String, HiddenEntry>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    favorites: BTreeMap<String, HiddenEntry>,
     /// Replaces the model's phases in metadata.json for that file. Lives here,
     /// not in metadata.json, so the fetcher's relabelling can never undo it.
     #[serde(default, rename = "sunOverrides", skip_serializing_if = "BTreeMap::is_empty")]
@@ -370,6 +372,20 @@ fn toggle_hidden(paths: &Paths, scanned: &[PathBuf], raw_path: &str) -> Result<(
     };
     save_curation(paths, &curation).map_err(|e| e.to_string())?;
     Ok((hidden, name))
+}
+
+fn toggle_favorite(paths: &Paths, scanned: &[PathBuf], raw_path: &str) -> Result<(bool, String), String> {
+    let requested = resolve_wallpaper(paths, scanned, raw_path)?;
+    let name = file_name_of(&requested);
+    let mut curation = load_curation(paths);
+    let favorite = if curation.favorites.remove(&name).is_some() {
+        false
+    } else {
+        curation.favorites.insert(name.clone(), HiddenEntry { at: timestamp_now() });
+        true
+    };
+    save_curation(paths, &curation).map_err(|e| e.to_string())?;
+    Ok((favorite, name))
 }
 
 /// Phases per file name as classify-sun.py labelled them in metadata.json.
@@ -764,6 +780,7 @@ fn print_catalog(
         path: String,
         extension: String,
         hidden: bool,
+        favorite: bool,
         /// What cycling uses: the correction if any, else the model's.
         phases: Vec<&'static str>,
         #[serde(rename = "modelPhases")]
@@ -802,6 +819,7 @@ fn print_catalog(
                     .unwrap_or_default()
                     .to_string(),
                 hidden: curation.hidden.contains_key(&file),
+                favorite: curation.favorites.contains_key(&file),
                 phases: names(effective.get(&file)),
                 model_phases: names(model.get(&file)),
                 phase_override: curation.sun_overrides.contains_key(&file),
@@ -879,7 +897,7 @@ fn resolve_cycle_target(
 
 fn usage_and_exit() -> ! {
     eprintln!(
-        "usage: wallpaperctl {{catalog|current|set PATH|preview PATH|commit PATH|random|next|previous|restore|toggle-hidden PATH|set-phases PATH PHASE[,PHASE]|reset|phase}}"
+        "usage: wallpaperctl {{catalog|current|set PATH|preview PATH|commit PATH|random|next|previous|restore|toggle-hidden PATH|toggle-favorite PATH|set-phases PATH PHASE[,PHASE]|reset|phase}}"
     );
     std::process::exit(2);
 }
@@ -938,6 +956,10 @@ fn main() {
             Ok((hidden, name)) => println!("{} {}", if hidden { "hidden" } else { "visible" }, name),
             Err(e) => fail(&e),
         },
+        "toggle-favorite" if args.len() == 3 => match toggle_favorite(&paths, &scanned, &args[2]) {
+            Ok((favorite, name)) => println!("{} {}", if favorite { "favorite" } else { "unfavorited" }, name),
+            Err(e) => fail(&e),
+        },
         "set" if args.len() == 3 => match set_wallpaper(&paths, &available, &args[2], true) {
             Ok(path) => println!("{}", path.display()),
             Err(e) => fail(&e),
@@ -988,6 +1010,112 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    struct FavoriteFixture {
+        root: PathBuf,
+        paths: Paths,
+    }
+
+    impl FavoriteFixture {
+        fn new() -> Self {
+            static NEXT_ID: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+            let root = env::temp_dir().join(format!(
+                "wallpaperctl-favorite-{}-{}-{}",
+                std::process::id(),
+                std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos(),
+                NEXT_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+            ));
+            fs::create_dir(&root).unwrap();
+            let wallpaper_dir = root.join("Wallpapers");
+            let paths = Paths {
+                metadata_file: wallpaper_dir.join("metadata.json"),
+                curation_file: wallpaper_dir.join("curation.json"),
+                current_file: root.join("current"),
+                displayed_file: root.join("displayed"),
+                order_file: root.join("order.json"),
+                colors_file: root.join("colors.json"),
+                location_file: root.join("location.json"),
+                wallpaper_dir,
+            };
+            let fixture = Self { root, paths };
+            fs::create_dir(&fixture.paths.wallpaper_dir).unwrap();
+            for name in ["a.jpg", "b.jpg"] {
+                fs::write(fixture.paths.wallpaper_dir.join(name), b"jpg stub").unwrap();
+            }
+            fixture
+        }
+    }
+
+    impl Drop for FavoriteFixture {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.root);
+        }
+    }
+
+    #[test]
+    fn toggle_favorite_persists_on_and_off() {
+        let fixture = FavoriteFixture::new();
+        let paths = &fixture.paths;
+        let scanned = wallpapers(paths);
+        assert_eq!(scanned.len(), 2);
+        let target = paths.wallpaper_dir.join("a.jpg");
+        assert!(!paths.curation_file.exists());
+
+        assert_eq!(toggle_favorite(paths, &scanned, target.to_str().unwrap()).unwrap(), (true, "a.jpg".into()));
+        let persisted: Curation = serde_json::from_slice(&fs::read(&paths.curation_file).unwrap()).unwrap();
+        assert_eq!(persisted.version, 1);
+        assert_eq!(persisted.favorites.len(), 1);
+        assert!(!persisted.favorites["a.jpg"].at.is_empty());
+
+        assert_eq!(toggle_favorite(paths, &scanned, target.to_str().unwrap()).unwrap(), (false, "a.jpg".into()));
+        let persisted: Curation = serde_json::from_slice(&fs::read(&paths.curation_file).unwrap()).unwrap();
+        assert!(persisted.favorites.is_empty());
+    }
+
+    #[test]
+    fn toggle_favorite_preserves_other_curation_and_favorites() {
+        let fixture = FavoriteFixture::new();
+        let paths = &fixture.paths;
+        let scanned = wallpapers(paths);
+        let target = paths.wallpaper_dir.join("a.jpg");
+        let original = serde_json::json!({
+            "version": 1,
+            "hidden": {"a.jpg": {"at": "2026-01-01T00:00:00Z"}},
+            "favorites": {"b.jpg": {"at": "2026-02-01T00:00:00Z"}},
+            "sunOverrides": {"a.jpg": {"phases": ["night", "twilight"], "at": "2026-03-01T00:00:00Z"}},
+            "futureThing": {"nested": [1, true, "keep", null]},
+            "futureFlag": false,
+        });
+        fs::write(&paths.curation_file, serde_json::to_vec(&original).unwrap()).unwrap();
+
+        for favorite in [true, false] {
+            assert_eq!(toggle_favorite(paths, &scanned, target.to_str().unwrap()).unwrap(), (favorite, "a.jpg".into()));
+            let written: serde_json::Value = serde_json::from_slice(&fs::read(&paths.curation_file).unwrap()).unwrap();
+            let mut expected = original.clone();
+            if favorite {
+                assert!(!written["favorites"]["a.jpg"]["at"].as_str().unwrap().is_empty());
+                expected["favorites"]["a.jpg"] = written["favorites"]["a.jpg"].clone();
+            }
+            assert_eq!(written, expected);
+        }
+    }
+
+    #[test]
+    fn toggle_favorite_rejects_outside_path_without_mutation() {
+        let fixture = FavoriteFixture::new();
+        let paths = &fixture.paths;
+        let outside = fixture.root.join("b.jpg");
+        fs::rename(paths.wallpaper_dir.join("b.jpg"), &outside).unwrap();
+        let scanned = wallpapers(paths);
+        assert_eq!(scanned.len(), 1);
+        let original = b"{\"version\":1,\"hidden\":{},\"favorites\":{\"b.jpg\":{\"at\":\"keep\"}},\"futureThing\":true}\n";
+        fs::write(&paths.curation_file, original).unwrap();
+
+        let error = toggle_favorite(paths, &scanned, outside.to_str().unwrap()).unwrap_err();
+        assert!(error.contains("not a supported image under"), "{error}");
+        assert_eq!(fs::read(&paths.curation_file).unwrap(), original);
+        assert!(!paths.curation_file.with_extension("tmp").exists());
+    }
 
     fn paths(names: &[&str]) -> Vec<PathBuf> {
         names.iter().map(PathBuf::from).collect()

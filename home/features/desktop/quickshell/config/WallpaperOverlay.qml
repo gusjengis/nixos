@@ -44,6 +44,8 @@ PanelWindow {
     property string metadataPath: ""
     // Filenames the user hid with Ctrl+D, mirrored from ~/Wallpapers/curation.json.
     property var hiddenFiles: ({})
+    property var favoriteFiles: ({})
+    property bool favoritesOnly: false
     // Ctrl+T corrections to the model's time-of-day phases, also from
     // curation.json: filename -> { phases: [...] }.
     property var phaseOverrides: ({})
@@ -96,6 +98,7 @@ PanelWindow {
         armed = false;
         accepting = false;
         showAll = false;
+        favoritesOnly = false;
         search.text = "";
         notice = "";
         // Cleared rather than kept: the 5-minute cycle may have changed the
@@ -176,6 +179,35 @@ PanelWindow {
         applyFilter(selectedPath);
         notice = showAll ? "Showing all wallpapers - Ctrl+P for current phase" : "Showing current phase - Ctrl+P for all";
         noticeTimer.restart();
+    }
+
+    function toggleFavoritesOnly() {
+        favoritesOnly = !favoritesOnly;
+        applyFilter(selectedPath);
+        notice = favoritesOnly ? "Favorites only - Ctrl+Shift+F for normal browsing" : "Normal browsing";
+        noticeTimer.restart();
+    }
+
+    function toggleFavoriteSelected() {
+        const entry = selected;
+        if (!entry || favoriteEdit.running)
+            return;
+        const nowFavorite = !favoriteFiles[entry.file];
+        favoriteEdit.file = entry.file;
+        favoriteEdit.wasFavorite = !nowFavorite;
+        const neighbour = wallpapers.length > 1 ? wallpapers[(selectedIndex + 1) % wallpapers.length] : null;
+        const updated = Object.assign({}, favoriteFiles);
+        if (nowFavorite)
+            updated[entry.file] = true;
+        else
+            delete updated[entry.file];
+        favoriteFiles = updated;
+        entry.favorite = nowFavorite;
+        applyFilter(favoritesOnly && !nowFavorite && neighbour ? neighbour.path : entry.path);
+        notice = nowFavorite ? "Favorited - Ctrl+Shift+F to browse favorites" : "Removed from favorites";
+        noticeTimer.restart();
+        favoriteEdit.command = ["wallpaper-favorite", entry.path];
+        favoriteEdit.running = true;
     }
 
     // Ctrl+D. Hiding removes a wallpaper from the picker and from the cycle
@@ -297,9 +329,11 @@ PanelWindow {
         try {
             const parsed = JSON.parse(curationView.text());
             hiddenFiles = parsed.hidden || {};
+            favoriteFiles = parsed.favorites || {};
             phaseOverrides = parsed.sunOverrides || {};
         } catch (error) {
             hiddenFiles = ({});
+            favoriteFiles = ({});
             phaseOverrides = ({});
         }
         rebuild();
@@ -339,6 +373,7 @@ PanelWindow {
                 "extension": item.extension,
                 "order": i,
                 "hidden": !!hiddenFiles[item.file],
+                "favorite": !!favoriteFiles[item.file],
                 "title": title,
                 "headline": headline,
                 "date": date,
@@ -379,9 +414,9 @@ PanelWindow {
         // Match wallpaperctl's phase pool, including its <20 fallback. Hidden
         // browsing is an explicit request for every hidden image, irrespective
         // of time of day; Ctrl+P similarly exposes the full visible library.
-        const available = allWallpapers.filter(entry => entry.hidden === showingHidden);
+        const available = allWallpapers.filter(entry => entry.hidden === showingHidden && (!favoritesOnly || entry.favorite));
         let pool = available;
-        if (!showingHidden && !showAll && sunPhase !== "") {
+        if (!showingHidden && !showAll && !favoritesOnly && sunPhase !== "") {
             const current = phaseNames.indexOf(sunPhase);
             if (current >= 0) {
                 for (let width = 0; width < phaseNames.length; width++) {
@@ -489,12 +524,16 @@ PanelWindow {
                 // Seeded from the catalog so the first frame already excludes
                 // hidden wallpapers, before curation.json has been read.
                 const seeded = {};
+                const favorites = {};
                 for (let i = 0; i < overlay.catalogEntries.length; i++) {
                     const item = overlay.catalogEntries[i];
                     if (item.hidden)
                         seeded[item.file] = true;
+                    if (item.favorite)
+                        favorites[item.file] = true;
                 }
                 overlay.hiddenFiles = seeded;
+                overlay.favoriteFiles = favorites;
                 overlay.rebuild();
                 if (overlay.metadataPath !== "" && Object.keys(overlay.metadata).length === 0)
                     metadataView.reload();
@@ -519,6 +558,25 @@ PanelWindow {
         printErrors: false
         onFileChanged: reload()
         onLoaded: overlay.loadMetadata()
+    }
+
+    Process {
+        id: favoriteEdit
+        property string file: ""
+        property bool wasFavorite: false
+        onExited: (code, status) => {
+            if (code !== 0 || status !== 0) {
+                const restored = Object.assign({}, overlay.favoriteFiles);
+                if (wasFavorite)
+                    restored[file] = true;
+                else
+                    delete restored[file];
+                overlay.favoriteFiles = restored;
+                overlay.rebuild();
+                overlay.notice = "Could not save favorite";
+                noticeTimer.restart();
+            }
+        }
     }
 
     // printErrors stays off because curation.json legitimately does not exist
@@ -658,7 +716,7 @@ PanelWindow {
                 anchors.fill: parent
                 anchors.leftMargin: searchIcon.x + searchIcon.width + 16
                 focus: true
-                placeholderText: "Search wallpapers"
+                placeholderText: overlay.favoritesOnly ? "Search favorites" : "Search wallpapers"
                 color: Theme.text
                 placeholderTextColor: Theme.muted
                 selectionColor: Theme.accentStrong
@@ -724,7 +782,15 @@ PanelWindow {
                         event.accepted = true;
                         return;
                     }
-                    if (event.key === Qt.Key_T && (event.modifiers & Qt.ControlModifier)) {
+                    if (event.key === Qt.Key_F && (event.modifiers & Qt.ControlModifier)) {
+                        if (!event.isAutoRepeat) {
+                            if (event.modifiers & Qt.ShiftModifier)
+                                overlay.toggleFavoritesOnly();
+                            else
+                                overlay.toggleFavoriteSelected();
+                        }
+                        event.accepted = true;
+                    } else if (event.key === Qt.Key_T && (event.modifiers & Qt.ControlModifier)) {
                         overlay.openPhasePanel();
                         event.accepted = true;
                     } else if (event.key === Qt.Key_P && (event.modifiers & Qt.ControlModifier)) {
@@ -771,7 +837,7 @@ PanelWindow {
                 anchors.rightMargin: 22
                 anchors.verticalCenter: parent.verticalCenter
                 visible: overlay.filtering
-                text: overlay.wallpapers.length + "/" + overlay.poolSize + (overlay.showingHidden ? " hidden" : "")
+                text: overlay.wallpapers.length + "/" + overlay.poolSize + (overlay.favoritesOnly ? " favorites" : "") + (overlay.showingHidden ? " hidden" : "")
                 color: overlay.wallpapers.length === 0 ? Theme.danger : Theme.muted
                 font.family: Theme.fontFamily
                 font.pixelSize: 14
@@ -803,7 +869,7 @@ PanelWindow {
                 id: captionTitle
                 width: parent.width
                 elide: Text.ElideRight
-                text: overlay.wallpapers.length === 0 ? (overlay.showingHidden && overlay.query === "" ? "Nothing is hidden" : overlay.filtering ? "No matches" : catalog.running ? "Loading wallpapers" : "No wallpapers in ~/Wallpapers") : overlay.armed && overlay.selected ? overlay.selected.title : ""
+                text: overlay.wallpapers.length === 0 ? (overlay.showingHidden && overlay.query === "" ? "Nothing is hidden" : overlay.filtering ? "No matches" : overlay.favoritesOnly ? "No favorites yet - Ctrl+Shift+F to browse wallpapers" : catalog.running ? "Loading wallpapers" : "No wallpapers in ~/Wallpapers") : overlay.armed && overlay.selected ? overlay.selected.title : ""
                 color: "#ffffff"
                 font.family: Theme.fontFamily
                 font.pixelSize: overlay.titleSize
@@ -818,6 +884,14 @@ PanelWindow {
                     shadowVerticalOffset: 2
                     shadowOpacity: 0.55
                 }
+            }
+
+            Text {
+                visible: overlay.armed && (overlay.favoritesOnly || !!(overlay.selected && overlay.favoriteFiles[overlay.selected.file]))
+                text: (overlay.selected && overlay.favoriteFiles[overlay.selected.file] ? "\u2605 Favorite" : "") + (overlay.favoritesOnly ? "   Favorites only (" + overlay.wallpapers.length + ") - Ctrl+Shift+F to exit" : "")
+                color: Theme.accent
+                font.family: Theme.fontFamily
+                font.pixelSize: 16
             }
 
             Text {

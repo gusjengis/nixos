@@ -12,6 +12,10 @@ if [ "$#" -ne 2 ]; then
   exit 2
 fi
 
+exec 9>"${XDG_RUNTIME_DIR:-/tmp}/wallpaper-sync.lock"
+flock -w 180 9
 wallpaperctl set-phases "$1" "$2"
+flock -u 9
+exec 9>&-
 
 setsid wallpaper-sync >/dev/null 2>&1 &

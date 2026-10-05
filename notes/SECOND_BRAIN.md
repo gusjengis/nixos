@@ -18,8 +18,8 @@ exists, where it lives, and what runs where.
 
 ```text
 desktop dictation ─┐
-Supernote tablet ──┼─> Raw/ ──normalize──> Normalized/ ──extract (next)──> Thoughts/ + Entities/
-typed in Obsidian ─┘   (record of truth)   (omega)                         (omega, not built yet)
+Supernote tablet ──┼─> Raw/ ──normalize──> Normalized/ ──extract───────> Thoughts/ + Entities/
+typed in Obsidian ─┘   (record of truth)   (omega)                         (omega)
 ```
 
 All stages meet in one Obsidian vault, synced by Obsidian Sync to every device,
@@ -31,8 +31,9 @@ including the headless ones that process it.
   `bcf1cb4f72f6417ec375921cbf767004`). Not in git; Obsidian Sync carries it.
 - `Templates/Raw Note.md` (in the vault): the single definition of the raw note
   format, executed by Templater in Obsidian and headless by `capture-note`.
-- Folders used by the pipeline: `Raw/`, `Raw/Images/`, `Normalized/`, and later
-  `Thoughts/`, `Entities/`. Daily notes `00 Daily Notes/` are linked via `day:`.
+- Folders used by the pipeline: `Raw/`, `Raw/Images/`, `Normalized/`,
+  `Thoughts/`, `Entities/`, plus `Thoughts.base` (saved views). Daily notes
+  `00 Daily Notes/` are linked via `day:`.
 
 ## Repo files
 
@@ -61,8 +62,10 @@ Processing, omega:
 
 | File | Role |
 |---|---|
-| `system/hosts/omega/notes.nix` | omega's vault sync and the normalizer units |
+| `system/hosts/omega/notes.nix` | omega's vault sync, normalizer and extractor units |
 | `system/hosts/omega/note-normalize.py` | `note-normalize`: Raw -> Normalized |
+| `system/hosts/omega/note-extract.py` | `note-extract`: Normalized -> Thoughts + Entities (segment, dedup, link); `note-search` |
+| `system/hosts/omega/Thoughts.base` | Bases views, copied into the vault once |
 | `system/hosts/omega/configuration.nix` | Enables the pipeline; Qwen context; embedder choice |
 | `system/modules/software/ollama.nix` | Ollama module: resident chat model, `ollama.embedders`, preload timers |
 
@@ -97,6 +100,9 @@ the Supernote import (see `CAPTURE_PLAN.md`, chunk 3, for moving that).
 | `note-normalize.path` | path unit on `Raw/`, `Raw/Images/` | Starts normalization on any change |
 | `note-normalize.timer` | 5 min after last run | Catches edits whose 10-minute quiet period expired |
 | `note-normalize.service` | oneshot | Raw -> Normalized |
+| `note-extract.path` | path unit on `Normalized/` | Starts extraction on any change |
+| `note-extract.timer` | 15 min after last run | Retries failures, catches missed changes |
+| `note-extract.service` | oneshot | Normalized -> Thoughts + Entities; state in `/var/lib/note-extract` |
 | `ollama.service` | service, tailnet `:11434` | Model server |
 | `ollama-preload.service` / `.timer` | oneshot, every 15 min | Keeps `qwen3.8:27b` resident and warm |
 | `ollama-embedders.service` / `.timer` | oneshot, every 15 min | Builds and keeps the Jina embedders resident |
@@ -120,6 +126,7 @@ RTX 3090 Ti, ~0.9 GB VRAM headroom with all of the above resident.
 | `/data/Supernote/.capture-backups/uploads/` | alpha | Every uploaded `Capture.note`, by content hash |
 | `/data/Supernote/.capture-backups/outbox/` | alpha (read by pc over `/data`) | OCR batches; `.imported` / `skipped` markers |
 | `/var/lib/ollama/models` | omega | Model blobs |
+| `/var/lib/note-extract/extract.sqlite` | omega | Embeddings, keyword index, extraction hashes, merge log (disposable) |
 | `~/.config/secrets/obsidian` | each syncing host | Obsidian login (secrets repo) |
 
 ## Commands
@@ -127,13 +134,17 @@ RTX 3090 Ti, ~0.9 GB VRAM headroom with all of the above resident.
 | Command | Where | Does |
 |---|---|---|
 | `capture-note [--source S] TEXT` | desktops | Create a raw note |
-| `note-delete --latest \| <stem> \| --orphans` | desktops | Delete a raw note and its derivatives, or clean orphans (asks first) |
+| `note-delete --latest \| <stem> \| --orphans` | desktops | Delete a raw note and its derivatives (normalized note, thoughts), or clean orphans (asks first) |
 | `note-normalize [--dry-run] [--force] [stem ...]` | omega | Run or preview normalization |
+| `note-extract [--dry-run] [--force] [--no-link] [stem ...]` | omega | Run or preview extraction (`--dry-run` prints the segmentation JSON) |
+| `note-search QUERY` | omega | Hybrid keyword + semantic search over thoughts, entities, normalized notes |
 | `ollama ps` | omega | Which models are loaded, GPU vs CPU |
 
 ## Status
 
-- Done: desktop dictation, Supernote capture, typed capture, normalization.
-- Next: extraction (`EXTRACTION_PLAN.md` build order, `DATA_MODEL.md` v1).
-- Later: semantic search surfaces, resurfacing (digest, active quests), phone
-  and car capture, agents that open PRs from notes.
+- Done: desktop dictation, Supernote capture, typed capture, normalization,
+  extraction (`EXTRACTION_PLAN.md`, `DATA_MODEL.md` v1.1), search CLI.
+- Next: judge extraction on real use and tune prompts / thresholds (open
+  problems: `EXTRACTION_PLAN.md`, "First results and known issues").
+- Later: search endpoint and launcher entry, resurfacing (digest, active
+  quests), phone and car capture, agents that open PRs from notes.

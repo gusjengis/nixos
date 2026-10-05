@@ -82,6 +82,17 @@ let
       exec bash "${wallpaperDir}/wallpaper-hide.sh" "$@"
     '';
   };
+  wallpaperFavorite = pkgs.writeShellApplication {
+    name = "wallpaper-favorite";
+    runtimeInputs = [
+      pkgs.util-linux
+      wallpaperSync
+      wallpaperctl
+    ];
+    text = ''
+      exec bash "${wallpaperDir}/wallpaper-favorite.sh" "$@"
+    '';
+  };
   # Ctrl+T in the picker: correct a wallpaper's time-of-day phases, then push.
   wallpaperPhases = pkgs.writeShellApplication {
     name = "wallpaper-phases";
@@ -211,6 +222,7 @@ in
       wallpaperctl
       wallpaperSync
       wallpaperHide
+      wallpaperFavorite
       wallpaperPhases
       wallpaperLocate
       aiUsage

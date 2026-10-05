@@ -1,0 +1,105 @@
+filters:
+  and:
+    - file.inFolder("Thoughts")
+    - '!types.contains("meta")'
+    - '!types.contains("noise")'
+    - "orphaned != true"
+formulas:
+  rank: 'if(priority == "high", 0, if(priority == "low", 2, 1))'
+views:
+  - type: table
+    name: Open tasks
+    filters:
+      and:
+        - 'types.contains("task") || types.contains("reminder")'
+        - 'status != "done"'
+        - 'status != "dropped"'
+        - 'status != "someday"'
+    groupBy:
+      property: note.tags
+      direction: ASC
+    order:
+      - file.name
+      - status
+      - priority
+      - tags
+      - captured
+      - mentions_count
+    sort:
+      - property: formula.rank
+        direction: ASC
+      - property: captured
+        direction: DESC
+  - type: table
+    name: Purchases
+    filters:
+      and:
+        - 'types.contains("purchase")'
+        - 'status != "done"'
+        - 'status != "dropped"'
+    order:
+      - file.name
+      - status
+      - priority
+      - tags
+      - captured
+  - type: table
+    name: Open questions
+    filters:
+      or:
+        - 'types.contains("question")'
+        - 'types.contains("decision")'
+    order:
+      - file.name
+      - types
+      - tags
+      - captured
+    sort:
+      - property: captured
+        direction: DESC
+  - type: table
+    name: Projects
+    filters:
+      and:
+        - 'types.contains("project")'
+    order:
+      - file.name
+      - tags
+      - captured
+  - type: table
+    name: Ideas
+    filters:
+      and:
+        - 'types.contains("idea")'
+    groupBy:
+      property: note.tags
+      direction: ASC
+    order:
+      - file.name
+      - tags
+      - mentions_count
+      - captured
+  - type: table
+    name: Recurring
+    filters:
+      and:
+        - "mentions_count > 1"
+    order:
+      - file.name
+      - types
+      - mentions_count
+      - captured
+    sort:
+      - property: mentions_count
+        direction: DESC
+  - type: table
+    name: Recent
+    order:
+      - file.name
+      - types
+      - tags
+      - captured
+    sort:
+      - property: captured
+        direction: DESC
+    limit: 100

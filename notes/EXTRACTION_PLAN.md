@@ -1,8 +1,10 @@
-# Extraction Plan (draft, iterating)
+# Extraction Plan (implemented, iterating)
 
 Second processing stage after normalization (see `CAPTURE_PLAN.md`). Turns each
 `Normalized/<stamp>.md` into atomic thought notes with types, tags, entities and
-typed links. Nothing here is implemented yet; this is the working design.
+typed links. Build order steps 1-5 are implemented in
+`system/hosts/omega/note-extract.py` (see "Implementation" below); this file
+stays the working design.
 
 The data model it produces (folders, types, tags, relations, note formats,
 ownership) is specified in `DATA_MODEL.md`; this file covers how extraction works.
@@ -116,7 +118,68 @@ from the notes.
     not state. Inferring the hierarchy of values is a later, separate pass,
     probably with a smarter model.
 
-## Current state (2026-10-04)
+## First results and known issues (2026-10-05)
+
+The vault's first `Thoughts/` and `Entities/` were not produced by the
+service: they were copied in from a test run on a copy of the vault (51 notes
+-> 333 thoughts, 78 entities, 247 cross-note links, 0 merges, ~30 min), with
+the state database copied alongside so the service only extracts what changed
+since. That run used a stricter entity rule (proper names only); the prompt now
+also allows owned objects and places such as the car, the toilet, the passport
+or the garage. The whole real vault was subsequently re-extracted with
+`note-extract --force` using prompt `v3`: 51 notes, 334 thoughts matched and
+kept, 3 new thoughts, 39 new entities, no merges or failures, 11 min 51 s.
+`Toilet`, `Passport`, and `2020 RAV4 Limited` now have entity notes and
+`mentions` / `mentioned-by` links. Omega runs this version; Obsidian Sync
+completed after the run. Existing user fields and unmatched orphaned notes
+were preserved.
+
+Outstanding problems, roughly by importance:
+
+1. **No merges.** Qwen rejected every candidate in the final run, even
+   "Apply for jobs" vs "Apply for jobs and collect notes" (0.90) and "Anime is
+   too stimulating" vs "Question if anime is too stimulating" (0.90). The
+   pipeline works (an earlier prompt merged 5); the `SAME_PROMPT` ("when in
+   doubt, different") is just conservative. Loosen it if duplicates pile up.
+2. **Link quality is about v1:** roughly 70% look right in samples. Remaining
+   errors: direction still sometimes reversed (`motivated-by` vs `motivates`,
+   "Usable local LLM answers ..."), `serves` and `example-of` overused (55 and
+   32 of 247), occasional contradictory pairs (a thought both `part-of` and
+   `has-part` of the same target, from the segmenter plus a later link).
+3. **Matching embeddings are compressed:** random pairs score ~0.51, p99 0.72,
+   and related-but-different thoughts 0.80-0.90, so similarity alone cannot
+   separate duplicates from neighbours; Qwen has to decide every case above
+   the 0.75 floor (234 cross-note pairs above it in the test vault).
+4. **Search ranking is rough:** "car repairs" did not rank the RAV4 wheel well
+   thoughts near the top; FTS uses OR over words and the retrieval half has
+   not been tuned. Reranking with Qwen is the planned fix.
+5. **Segmentation is not deterministic across runs:** the prompt includes the
+   current tags and entities, so re-extracting a note can change types, tags
+   and body wording (titles and ids stay). Re-extraction only happens when the
+   normalized note changes or with `--force`.
+6. **Titles stay terse** for terse bullets ("hyprlog track desktop",
+   "Test drives, record"), and many short bullets are flagged `unclear`.
+7. **Cost:** a full backfill holds Qwen for ~30 min (one call per 250 words,
+   up to 3 dedup checks and 1-2 link calls per thought); the OpenCode
+   auto-router queues behind it. Steady state is a few calls per new capture.
+8. **Hand-made entities are not used for aliases:** the pipeline never edits
+   an existing entity except to add `mentioned-by`, so a new alias found in a
+   note is not added to it.
+9. **Entity classification still needs tuning:** prompt `v3` explicitly asks
+   for unnamed concrete objects as well as named entities, which successfully
+   adds Toilet and Passport. Qwen also creates abstract entities (for example
+   memories, anime, agent, LLM) despite explicit exclusions. These preliminary
+   results are retained for inspection, not automatically deleted.
+10. **Re-extraction adds links but does not reconcile old ones:** existing
+    `mentions` and relation properties, including entity backlinks, remain
+    when a later segmentation stops producing them. Orphaned thoughts retain
+    their links. Inspect graph results with this limitation in mind.
+
+Manual forced runs and scheduled runs share a lock. Scheduled extraction now
+waits behind a manual run instead of failing with "another note-extract is
+running", so captures arriving during a backfill are processed afterwards.
+
+## State before implementation (2026-10-04)
 
 - Models live on omega: `qwen3.8:27b` (48k ctx, GPU), `jina-v5-retrieval`
   (GPU), `jina-v5-matching` (CPU), all resident. ~0.9 GB VRAM headroom.
@@ -126,16 +189,71 @@ from the notes.
 
 ## Build order
 
-1. Segment pass alone, dry run printing JSON. Tune on the two big brain dumps
-   (`2026-10-01-091833` has ~150 items).
-2. Write `Thoughts/` files with in-note links, plus entities; extend
-   `note-delete` to thoughts (see `DATA_MODEL.md`, Deletion).
-3. Embeddings, dedup and merge.
-4. Cross-note links.
-5. Bases views (open tasks by area, purchases, open questions). First point
-   where it becomes useful.
+1. ✓ Segment pass alone, dry run printing JSON (`note-extract --dry-run`).
+2. ✓ Write `Thoughts/` files with in-note links, plus entities; `note-delete`
+   handles thoughts (see `DATA_MODEL.md`, Deletion).
+3. ✓ Embeddings, dedup and merge.
+4. ✓ Cross-note links.
+5. ✓ Bases views (`Thoughts.base`: open tasks by tag, purchases, open
+   questions, projects, ideas, recurring, recent).
 6. Later: resurfacing (daily digest, "Active Quests" in Quickshell), routing hard
-   cases to paid models, agents that open PRs for review.
+   cases to paid models, agents that open PRs for review, search endpoint and
+   launcher entry (the CLI exists).
+
+## Implementation (2026-10-05)
+
+Code: `system/hosts/omega/note-extract.py`, units in `notes.nix`.
+
+- `note-extract.service` (oneshot) is started by `note-extract.path` (any
+  change in `Normalized/`) and `note-extract.timer` (15 min after the last
+  run). A note is extracted when the hash of its body differs from the one
+  recorded at its last extraction, so re-normalizing a note re-extracts it.
+- State, disposable: `/var/lib/note-extract/extract.sqlite` holds embeddings
+  (one table, keyed by model + dims), the FTS5 index, `extracted` (stem ->
+  body hash) and `merges` (the merge log: when, source, merged title, target,
+  score). Deleting it re-embeds everything and re-extracts every note; the
+  re-extraction matches existing thoughts, so nothing is duplicated.
+- Per note: segment (one Qwen call per <= 250-word piece, split at blank-line
+  groups, no overlap so no line is segmented twice; a piece whose answer hits
+  the output cap is halved and retried) -> match against the
+  thoughts this note produced before -> dedup -> create -> in-note links and
+  entities -> refresh indexes -> link each new thought across notes.
+- The segment prompt receives the existing tags with counts and the known
+  entities with aliases, so tags converge and entity names are reused; an
+  entity is then resolved by exact name or alias, else created.
+- Dedup and cross-note linking skip thoughts from the same capture: the
+  segmenter already merged in-note duplicates and set in-note relations from
+  the note's structure. Without this, siblings ("Disable Obsidian Sync on
+  pc / legion / mac") were merged or cross-linked with `similar-to`.
+- Merge: matching similarity >= 0.75 (`--merge-floor`, top 3) and Qwen says
+  "same thought". Embedding "title + rewritten text" scores higher than the
+  earlier raw-text measurement: random pairs ~0.51 (p99 0.72), merged
+  duplicates 0.79-0.92, so the floor sits above the random p99. The survivor gains the `source`, `mentions_count` becomes
+  its number of sources, tags are unioned, and the new wording is appended as
+  another quote.
+- Re-extraction: new thoughts are paired with the note's previous ones by
+  equal title or matching similarity >= 0.8, best pairs first. Paired thoughts
+  keep title, id, `status`, `priority` and user fields; types, tags and (for a
+  single-source thought) the body are refreshed. Unpaired old thoughts become
+  `orphaned: true`, or lose this source if they have others.
+- Linking: shortlist of 10 by matching similarity, Qwen may add up to 3
+  searches (retrieval model, 5 results each), then one more call picks
+  relations. Each relation is given as a sentence "NEW <relation> C" in both
+  directions (reverse names are flipped when written), and every link needs a
+  one-sentence `why`, which the service log prints. Without these, Qwen
+  confused directions and overused `alternative-to` / `similar-to`.
+- Every Qwen call has an output cap and length limits in its JSON schema: under
+  a grammar the model can loop inside a string until the context is full,
+  which once held the GPU for over ten minutes. A capped linking answer means
+  no links for that thought; a capped dedup answer means "different".
+- `note-search QUERY` (omega): FTS5 + retrieval embeddings over Thoughts,
+  Entities and Normalized, merged by reciprocal rank fusion.
+- `Thoughts.base` is copied into the vault root once (repo copy beside the
+  script) and is then the user's to edit.
+- Cost: ~10 s for a short note, ~3.5 min to segment the 830-word brain dump;
+  linking is 1-2 calls per new thought. A full backfill of ~50 notes takes on
+  the order of an hour and queues other Qwen callers (the auto-router) while
+  it runs.
 
 ## Decisions taken (2026-10-04)
 

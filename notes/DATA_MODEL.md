@@ -1,4 +1,4 @@
-# Second Brain Data Model (v1)
+# Second Brain Data Model (v1.1)
 
 The shape of everything the pipeline writes into the Obsidian vault. This is a
 first pass meant to be used, judged in practice, and revised. Record changes
@@ -85,6 +85,12 @@ automatically; `note-delete` is the only deletion path.
 `person`, `object` (owned things), `place`, `tool` (software or hardware),
 `organization`, `work` (book, video, course).
 
+An entity is a concrete thing, named or not: Brian, the 2020 RAV4 Limited, the
+toilet, the passport, the garage, Tailscale. Abstract concepts, activities and
+categories ("local LLM", "diet", "job search") are not entities; they are
+tags or thoughts. Once a specific entity exists the extractor uses it, so
+"my car" resolves to the RAV4 rather than to a separate "car".
+
 ## Relation types (directed; reverse written on the target automatically)
 
 | Relation | Reverse | Meaning |
@@ -132,7 +138,11 @@ Order replacement moulding for the rear-left wheel well of the 2020 RAV4 Limited
 ```
 
 Body: the thought rewritten to stand alone, then the source wording as a quote
-so the rewrite can be checked.
+so the rewrite can be checked. Each capture merged into it later appends its
+own wording as another quote.
+
+Frontmatter is written with block lists (`- item` under the key), as Obsidian
+writes it, pipeline fields first in the order above, user fields after.
 
 | Field | Values | Owner |
 |---|---|---|
@@ -142,7 +152,7 @@ so the rewrite can be checked.
 | `priority` | `low` `normal` `high` (☆ in handwriting -> `high`) | **user** after creation |
 | `tags` | free subject tags | pipeline |
 | `captured` | earliest capture time | pipeline |
-| `mentions_count` | number of captures merged into this thought | pipeline |
+| `mentions_count` | number of captures merged into this thought (= number of `source` entries) | pipeline |
 | `source` | normalized notes it came from | pipeline |
 | relation properties | lists of links | pipeline |
 | `unclear` | `true` when the extractor could not resolve meaning | pipeline |
@@ -168,8 +178,18 @@ tags: [car]
 ---
 ```
 
-Body is free for hand-written notes. Backlinks (`mentioned-by`) list every
-thought about it.
+Body is free for hand-written notes. `mentioned-by` (written by the pipeline,
+like every reverse relation) and Obsidian's backlinks list every thought about
+it. Once created, the pipeline only ever adds `mentioned-by` entries; names,
+aliases and type are the user's.
+
+## Views
+
+`Thoughts.base` in the vault root (Obsidian Bases): open tasks grouped by tag,
+purchases, open questions, projects, ideas, recurring (`mentions_count` > 1),
+recent. `meta`, `noise` and orphaned thoughts are filtered out. Created once by
+the extractor from `system/hosts/omega/Thoughts.base`; edits in the vault are
+kept.
 
 ## Deletion
 
@@ -177,7 +197,16 @@ thought about it.
 normalized note; with extraction it must also handle `Thoughts/`: a thought
 whose only `source` is that note is deleted, one with several sources loses
 that source. Found by scanning `source`, so no separate registry is needed.
+Links to deleted thoughts are removed from the remaining thoughts and
+entities. `note-delete --orphans` also covers thoughts whose sources are all
+gone.
 
 ## Changelog
 
 - v1 (2026-10-04): initial model.
+- v1.1 (2026-10-05): implemented (`note-extract`, prompt `v1`). Clarified:
+  `mentions_count` = number of sources; merges append a quote; frontmatter
+  layout; entities get `mentioned-by`; `Thoughts.base` views; note-delete
+  drops dangling links. Entities include unnamed concrete things (car,
+  toilet, passport), not only proper names (prompt `v3`, whole vault
+  re-extracted with `--force`).

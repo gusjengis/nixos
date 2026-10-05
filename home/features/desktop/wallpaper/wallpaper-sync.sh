@@ -2,7 +2,7 @@
 # Reconcile ~/Wallpapers with origin: publish local curation, collect whatever
 # the scheduled fetcher pushed.
 #
-# Three callers share this script. Ctrl+D (hide) and Ctrl+T (time-of-day
+# Picker shortcuts Ctrl+F (favorite), Ctrl+D (hide), and Ctrl+T (time-of-day
 # phases) in the picker run it so a curation change reaches the other machines
 # promptly, and an hourly timer runs it to pick up new
 # wallpapers from omega's nightly wallpaper-fetch job. flock serialises them,
@@ -39,7 +39,7 @@ if [ "$branch" = "HEAD" ]; then
 fi
 
 # Coalescing falls out of committing whatever is pending rather than a specific
-# change: several rapid Ctrl+D or Ctrl+T presses leave one commit for the first sync and
+# change: several rapid curation edits leave one commit for the first sync and
 # nothing for the ones behind it.
 if [ -n "$(git status --porcelain -- curation.json)" ]; then
   git add -- curation.json
@@ -51,12 +51,27 @@ if ! git fetch -q origin "$branch" 2>/dev/null; then
   exit 0
 fi
 
-# --autostash keeps an in-progress local fetch run's dirty metadata.json from
-# blocking the rebase.
-if ! git rebase -q --autostash "origin/$branch"; then
-  git rebase --abort >/dev/null 2>&1 || true
-  log "rebase onto origin/$branch failed, leaving the tree untouched"
-  exit 1
+# Avoid touching the worktree when only local curation needs publishing.
+if ! git merge-base --is-ancestor "origin/$branch" HEAD; then
+  # Explicit stash restoration preserves the index; --autostash does not.
+  stashed=false
+  if ! git diff --quiet || ! git diff --cached --quiet; then
+    git stash push -q -m "wallpaper-sync temporary changes"
+    stashed=true
+  fi
+  rebased=true
+  if ! git rebase -q "origin/$branch"; then
+    git rebase --abort >/dev/null 2>&1 || true
+    rebased=false
+  fi
+  if [ "$stashed" = true ] && ! git stash pop -q --index; then
+    log "could not restore local changes; preserved in git stash, resolve before syncing again"
+    exit 1
+  fi
+  if [ "$rebased" = false ]; then
+    log "rebase onto origin/$branch failed, local changes restored"
+    exit 1
+  fi
 fi
 
 if [ -n "$(git rev-list "origin/$branch..HEAD")" ]; then

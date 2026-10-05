@@ -7,12 +7,13 @@
 
 # Obsidian note processing. Raw captures arrive in the vault's Raw/ folder from
 # every channel (see notes/CAPTURE_PLAN.md); this host keeps its own synced
-# copy of the vault and turns each raw note into a cleaned-up one in
-# Normalized/. It runs here rather than on a workstation because it must keep
-# working while those are off, and the model it needs is already resident in
+# copy of the vault, turns each raw note into a cleaned-up one in
+# Normalized/, and splits those into linked atomic notes in Thoughts/ and
+# Entities/. It runs here rather than on a workstation because it must keep
+# working while those are off, and the models it needs are already resident in
 # this host's Ollama.
 #
-# Both units are system services running as the user, not user services: this
+# All units are system services running as the user, not user services: this
 # headless host has no login session and no lingering, so user units would
 # never start.
 
@@ -55,9 +56,42 @@ let
         "$@"
     '';
   };
+
+  # Second stage: Normalized/ -> Thoughts/ + Entities/ (notes/EXTRACTION_PLAN.md,
+  # notes/DATA_MODEL.md). Its SQLite cache (embeddings, keyword index, merge
+  # log) is disposable and lives in the unit's state directory.
+  stateDir = "/var/lib/note-extract";
+  matchingModel = "jina-v5-matching";
+  retrievalModel = "jina-v5-retrieval";
+  extractArgs = ''
+    --vault ${lib.escapeShellArg vault} \
+    --state ${stateDir} \
+    --ollama http://127.0.0.1:${toString config.ollama.port} \
+    --model ${lib.escapeShellArg config.ollama.preload} \
+    --matching-model ${matchingModel} \
+    --retrieval-model ${retrievalModel} \
+  '';
+  python = pkgs.python3.withPackages (ps: [ ps.pyyaml ]);
+
+  extract = pkgs.writeShellApplication {
+    name = "note-extract";
+    runtimeInputs = [ python ];
+    text = ''
+      exec python3 ${./note-extract.py} ${extractArgs} --views ${./Thoughts.base} "$@"
+    '';
+  };
+
+  # Hybrid keyword + semantic search over the vault, from the same indexes.
+  search = pkgs.writeShellApplication {
+    name = "note-search";
+    runtimeInputs = [ python ];
+    text = ''
+      exec python3 ${./note-extract.py} ${extractArgs} --search "$@"
+    '';
+  };
 in
 {
-  options.notesPipeline.enable = lib.mkEnableOption "Obsidian vault sync and raw note normalization";
+  options.notesPipeline.enable = lib.mkEnableOption "Obsidian vault sync, raw note normalization and thought extraction";
 
   config = lib.mkIf cfg.enable {
     assertions = [
@@ -65,10 +99,25 @@ in
         assertion = config.ollama.enable && config.ollama.preload != null;
         message = "notesPipeline normalizes with the resident Ollama model (ollama.preload).";
       }
+      {
+        assertion =
+          config.ollama.embedders ? ${matchingModel} && config.ollama.embedders ? ${retrievalModel};
+        message = "notesPipeline extraction needs the ${matchingModel} and ${retrievalModel} embedders.";
+      }
     ];
 
-    # `note-normalize [--dry-run] [--force] [stem ...]` for manual runs.
-    environment.systemPackages = [ normalize ];
+    # `note-normalize [--dry-run] [--force] [stem ...]`,
+    # `note-extract [--dry-run] [--force] [--no-link] [stem ...]` for manual
+    # runs, and `note-search QUERY`.
+    environment.systemPackages = [
+      normalize
+      extract
+      search
+    ];
+
+    # The state directory is created by the unit; this makes it exist (and
+    # belong to the user) for manual runs and searches before the first one.
+    systemd.tmpfiles.rules = [ "d ${stateDir} 0755 ${user} users -" ];
 
     systemd.services.obsidian-sync = {
       description = "Obsidian Sync (headless) for ${vault}";
@@ -130,6 +179,49 @@ in
       timerConfig = {
         OnBootSec = "2min";
         OnUnitInactiveSec = "5min";
+      };
+    };
+
+    systemd.services.note-extract = {
+      description = "Extract thoughts from normalized Obsidian notes";
+      after = [
+        "ollama.service"
+        "ollama-embedders.service"
+        "obsidian-sync.service"
+        "note-normalize.service"
+      ];
+      unitConfig.ConditionPathIsDirectory = "${vault}/Normalized";
+      serviceConfig = {
+        Type = "oneshot";
+        User = user;
+        Group = "users";
+        ExecStart = lib.getExe extract;
+        NoNewPrivileges = true;
+        PrivateTmp = true;
+        ProtectSystem = "strict";
+        ReadWritePaths = [
+          vault
+          stateDir
+        ];
+      };
+    };
+
+    # Normalized/ is written only by the normalizer, one atomic file per note,
+    # so a change there is always a finished note. Thoughts/ and Entities/ are
+    # not watched: the extractor writes them itself.
+    systemd.paths.note-extract = {
+      wantedBy = [ "multi-user.target" ];
+      pathConfig.PathChanged = [ "${vault}/Normalized" ];
+    };
+
+    # Retries notes that failed, and picks up anything missed while the
+    # service or sync was down. A run with nothing to do never calls the chat
+    # model; it only re-embeds thoughts that were edited by hand.
+    systemd.timers.note-extract = {
+      wantedBy = [ "timers.target" ];
+      timerConfig = {
+        OnBootSec = "5min";
+        OnUnitInactiveSec = "15min";
       };
     };
   };
