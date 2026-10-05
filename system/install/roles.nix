@@ -75,7 +75,6 @@
     "hyprland.enable" = "desktop";
 
     "dev.enable" = "development";
-    "gameDev.enable" = "development";
     "virtual-machines.enable" = "development";
 
     "gaming.enable" = "gaming";
@@ -100,7 +99,6 @@
     "desktopEnv.enable" = "desktop";
     "fleetMonitor.enable" = "fleet-monitor";
     "fleetMonitor.server.enable" = "fleet-monitor-server";
-    "gameDev.enable" = "game-dev";
     "nixBuildFarm.client.enable" = "build-farm";
     "officeNetworkDrives.enable" = "office-drives";
     "repo.networkmanager.enable" = "networkmanager";
@@ -122,7 +120,6 @@
     "bootSplash.enable" = "Apple logo and Plymouth progress bar during graphical startup.";
     "fleetMonitor.enable" = "Report this machine's hardware and workloads to the fleet dashboard.";
     "fleetMonitor.server.enable" = "Host the fleet dashboard itself. One machine only.";
-    "gameDev.enable" = "Game development toolchains.";
     "gaming.enable" = "Steam, Proton, and gaming peripherals.";
     "git.enable" = "System-wide Git configuration.";
     "grub.enable" = "GRUB as the bootloader, in EFI mode.";
