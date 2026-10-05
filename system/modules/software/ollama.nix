@@ -2,9 +2,10 @@
 #
 # One machine in the fleet keeps a small model resident on its GPU so other
 # machines can ask it questions over the tailnet without touching a metered
-# API. Today the only caller is the OpenCode auto-router's prompt classifier
-# (see home/features/agents/opencode/auto-router/), which runs on every user
-# turn and therefore has to be both free and fast.
+# API. The most demanding caller is the OpenCode auto-router's prompt
+# classifier (see home/features/agents/opencode/auto-router/), which runs on
+# every user turn and therefore has to be both free and fast; the note pipeline
+# on omega (system/hosts/omega/notes.nix) uses the same models and embedders.
 #
 # Exposure is deliberately tailnet-only: Ollama has no authentication of any
 # kind, so the port is opened on the `tailscale0` interface rather than
@@ -62,6 +63,39 @@ in
       '';
     };
 
+    embedders = lib.mkOption {
+      type = lib.types.attrsOf (
+        lib.types.submodule {
+          options = {
+            from = lib.mkOption {
+              type = lib.types.str;
+              example = "hf.co/jinaai/jina-embeddings-v5-text-small-retrieval-GGUF:Q8_0";
+              description = "Model to pull and build on (`FROM` in the Modelfile).";
+            };
+            contextLength = lib.mkOption {
+              type = lib.types.int;
+              default = 4096;
+              description = ''
+                Longest single input. Embedding context is per text, not per
+                corpus, so this only has to fit one note or query; every token
+                of it costs KV cache whether used or not.
+              '';
+            };
+            cpu = lib.mkOption {
+              type = lib.types.bool;
+              default = false;
+              description = "Keep every layer off the GPU (`num_gpu 0`).";
+            };
+          };
+        }
+      );
+      default = { };
+      description = ''
+        Embedding models, built under the attribute name from a pinned upstream
+        model with their own context, and held resident like `preload`.
+      '';
+    };
+
     contextLength = lib.mkOption {
       type = lib.types.int;
       default = 16384;
@@ -94,7 +128,11 @@ in
         # slot count. One caller at a time, with the full window, is the right
         # trade for a classifier.
         OLLAMA_NUM_PARALLEL = "1";
-        OLLAMA_MAX_LOADED_MODELS = "2";
+        # Every resident model, plus one slot so an ad-hoc model is not loaded
+        # by evicting a resident one (it still has to fit in VRAM).
+        OLLAMA_MAX_LOADED_MODELS = toString (
+          lib.length (lib.attrNames cfg.embedders) + (if cfg.preload != null then 1 else 0) + 1
+        );
       };
     };
 
@@ -167,6 +205,83 @@ in
         echo "ollama-preload: ${cfg.preload} never appeared in /api/tags" >&2
         exit 1
       '';
+    };
+
+    # Builds each embedder from its pinned upstream model with its own
+    # parameters, then loads it for good. Rerun on a timer for the same reason
+    # as ollama-preload: a daemon restart empties memory.
+    systemd.services.ollama-embedders = lib.mkIf (cfg.embedders != { }) {
+      description = "Build and hold Ollama embedding models resident";
+      after = [
+        "ollama.service"
+        "ollama-preload.service"
+      ];
+      wants = [ "ollama.service" ];
+      wantedBy = [
+        "multi-user.target"
+        "ollama.service"
+      ];
+      path = [
+        config.services.ollama.package
+        pkgs.curl
+      ];
+      environment = {
+        OLLAMA_HOST = "127.0.0.1:${toString cfg.port}";
+        # `ollama create` keeps state in the daemon, but the CLI wants a home.
+        HOME = "/run/ollama-embedders";
+      };
+      serviceConfig = {
+        Type = "oneshot";
+        RuntimeDirectory = "ollama-embedders";
+        Restart = "on-failure";
+        RestartSec = 30;
+      };
+      script =
+        ''
+          for _ in $(seq 1 360); do
+            curl -fsS --max-time 5 "http://$OLLAMA_HOST/api/tags" >/dev/null 2>&1 && break
+            sleep 10
+          done
+        ''
+        + lib.concatStrings (
+          lib.mapAttrsToList (
+            name: embedder:
+            let
+              modelfile = pkgs.writeText "${name}.Modelfile" ''
+                FROM ${embedder.from}
+                PARAMETER num_ctx ${toString embedder.contextLength}
+                # Embedding mode sizes its compute buffer by the batch, which
+                # Ollama otherwise sets to 2048: 1.2 GiB of VRAM for a 0.6B model.
+                PARAMETER num_batch 512
+                ${lib.optionalString embedder.cpu "PARAMETER num_gpu 0"}
+              '';
+            in
+            ''
+              # Pull only once, so a re-warm never depends on the internet.
+              ollama show ${lib.escapeShellArg embedder.from} >/dev/null 2>&1 \
+                || ollama pull ${lib.escapeShellArg embedder.from}
+              ollama create ${lib.escapeShellArg name} -f ${modelfile}
+              curl -fsS --max-time 600 "http://$OLLAMA_HOST/api/embed" \
+                -H 'content-type: application/json' \
+                -d ${
+                  lib.escapeShellArg (builtins.toJSON {
+                    model = name;
+                    input = "warmup";
+                    keep_alive = -1;
+                  })
+                } >/dev/null
+            ''
+          ) cfg.embedders
+        );
+    };
+
+    systemd.timers.ollama-embedders = lib.mkIf (cfg.embedders != { }) {
+      description = "Re-warm Ollama embedding models";
+      wantedBy = [ "timers.target" ];
+      timerConfig = {
+        OnBootSec = "3min";
+        OnUnitActiveSec = "15min";
+      };
     };
 
     systemd.timers.ollama-preload = lib.mkIf (cfg.preload != null) {

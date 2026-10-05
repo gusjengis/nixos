@@ -34,17 +34,30 @@
   # the Supernote OCR on alpha and the note normalizer (notes.nix) use it too,
   # so this has to be the box with the 24 GB card on it.
   #
-  # One model for both callers: qwen3.8:27b reads images as well as text, and
-  # at 18 GB it is the largest Qwen that fits the card with room for its cache.
-  # A second resident model would not fit beside it.
+  # One chat model for every caller: qwen3.8:27b reads images as well as text,
+  # and at 18 GB it is the largest Qwen that fits the card with room for its
+  # cache. A second resident chat model would not fit beside it.
   ollama.enable = true;
   ollama.models = [ "qwen3.8:27b" ];
   ollama.preload = "qwen3.8:27b";
-  # Interactive OpenCode sessions spend ~13k tokens on the system prompt alone,
-  # so 16k left almost no room for conversation. Only 16 of qwen3.8's 65 layers
-  # carry a KV cache (~64 KiB/token at f16), making 64k about 4 GiB, which fits
-  # beside the ~16 GB of weights on the 24 GB card.
-  ollama.contextLength = 65536;
+  # Only 16 of qwen3.8's 65 layers carry a KV cache: ~64 KiB/token at f16, plus
+  # ~4 KiB/token for the speculative draft head. Interactive OpenCode sessions
+  # spend ~13k tokens on the system prompt, so 48k still leaves room to talk,
+  # and the note pipeline never sends more than one page (~8k) per call.
+  # 64k would leave no room for the retrieval embedder below.
+  ollama.contextLength = 49152;
+
+  # Note pipeline embedders (notes/EXTRACTION_PLAN.md), Jina v5 text-small.
+  # Retrieval answers searches, by a person or by Qwen while linking, so it
+  # sits on the GPU for latency. Text-matching (dedup, link shortlists) only
+  # runs once per new thought in the background, so it costs no VRAM.
+  ollama.embedders = {
+    jina-v5-retrieval.from = "hf.co/jinaai/jina-embeddings-v5-text-small-retrieval-GGUF:Q8_0";
+    jina-v5-matching = {
+      from = "hf.co/jinaai/jina-embeddings-v5-text-small-text-matching-GGUF:Q8_0";
+      cpu = true;
+    };
+  };
 
   repo.networkmanager.enable = true;
   tailscale.enable = true;
