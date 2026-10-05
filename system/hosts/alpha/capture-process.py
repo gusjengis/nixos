@@ -28,8 +28,9 @@ def transcribe(image: Path, url: str, model: str) -> str:
                     "Keep the original line breaks. Reproduce indentation: nested list "
                     "items are indented 4 spaces per level relative to their parent. "
                     "Wrap crossed-out text in ~~ ~~. Do not correct spelling or wording. "
-                    "Return only the transcription, no commentary. Return an empty "
-                    "string for a blank page."
+                    "Return only the transcription, no commentary. If the page has "
+                    "no handwriting, return nothing at all: no explanation, no "
+                    "placeholder."
                 ),
                 "images": [base64.b64encode(image.read_bytes()).decode("ascii")],
             }
@@ -43,9 +44,33 @@ def transcribe(image: Path, url: str, model: str) -> str:
     )
     with urllib.request.urlopen(request, timeout=300) as response:
         answer = json.load(response)
-    return answer["message"]["content"].strip()
+    text = answer["message"]["content"].strip()
+    return "" if is_blank_reply(text) else text
 
 
+# Vision models asked to return nothing for a blank page sometimes explain
+# instead ("The provided image is completely blank..."). A short reply that
+# only talks about the page being empty is treated as no text.
+BLANK_REPLY = re.compile(
+    r"(\b(image|page|note)\b.{0,40}\b(is|appears|seems)\b.{0,20}\b(blank|empty)\b"
+    r"|\bno (handwritten|visible|legible) (text|writing)\b|\bno handwriting\b"
+    r"|\bnothing to transcribe\b)",
+    re.IGNORECASE,
+)
+
+
+def is_blank_reply(text: str) -> bool:
+    # Real notes are lists; a model explaining itself writes plain sentences.
+    first = text.lstrip()[:1]
+    return (
+        len(text) < 200
+        and first not in ("-", "*", "+", "~")
+        and not first.isdigit()
+        and bool(BLANK_REPLY.search(text))
+    )
+
+
+# Written for blank pages by earlier versions; still ignored when comparing.
 BLANK_MARKER = "*[No text recognized on this page]*"
 
 
@@ -113,7 +138,8 @@ def process(archive: Path, outbox: Path, renderer: str, url: str, model: str) ->
                 check=True,
             )
             text = transcribe(image, url, model)
-            body.append(f"{text or BLANK_MARKER}\n\n![[{image_name}]]")
+            # A blank page keeps its image, with no text at all.
+            body.append(f"{text}\n\n![[{image_name}]]" if text else f"![[{image_name}]]")
 
         created = (
             datetime.datetime.fromtimestamp(

@@ -85,6 +85,27 @@ SOURCE_HINTS = {
 }
 
 
+# Same guard as the OCR (system/hosts/alpha/capture-process.py): a short reply
+# that only says the page or note is empty means "no text".
+BLANK_REPLY = re.compile(
+    r"(\b(image|page|note)\b.{0,40}\b(is|appears|seems)\b.{0,20}\b(blank|empty)\b"
+    r"|\bno (handwritten|visible|legible) (text|writing)\b|\bno handwriting\b"
+    r"|\bnothing to transcribe\b)",
+    re.IGNORECASE,
+)
+
+
+def is_blank_reply(text: str) -> bool:
+    # Real notes are lists; a model explaining itself writes plain sentences.
+    first = text.lstrip()[:1]
+    return (
+        len(text) < 200
+        and first not in ("-", "*", "+", "~")
+        and not first.isdigit()
+        and bool(BLANK_REPLY.search(text))
+    )
+
+
 def now() -> datetime.datetime:
     return datetime.datetime.now().astimezone()
 
@@ -287,7 +308,9 @@ def normalize(args: argparse.Namespace, raw: Path) -> str:
     pages = [(clean(text), image) for text, image in pages]
     if kind != "supernote":
         pages = [("\n\n".join(text for text, _ in pages if text).strip(), None)]
-    pages = [(text, image) for text, image in pages if text or image]
+    # A page with no OCR text is blank: nothing to normalize, and asking the
+    # model about an empty page only invites commentary.
+    pages = [(text, image) for text, image in pages if text]
     content = "\n\n".join(text for text, _ in pages if text)
     if not pages:
         return "skipped: empty"
@@ -309,12 +332,12 @@ def normalize(args: argparse.Namespace, raw: Path) -> str:
             args.model,
             [{"role": "system", "content": PROMPT}, message],
         )
-        if part:
+        if part and not is_blank_reply(part):
             results.append(reindent(part))
     result = "\n\n".join(results)
     elapsed = time.monotonic() - started
     if not result:
-        raise RuntimeError("model returned nothing")
+        return "skipped: nothing to normalize"
     score = recall(content, result)
 
     meta = [
