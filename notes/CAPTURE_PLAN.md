@@ -76,6 +76,8 @@ Raw notes are the durable record; everything downstream must be rebuildable from
 - Output: Markdown lists (thoughts as bullets, details nested, tabs for indentation), spelling/grammar/punctuation fixed, misheard or misread words corrected, `~~strike~~` kept, no embeds. Frontmatter: `created`, `day`, `source`, `raw` (link), `normalized_at`, `normalizer` (model / prompt version), `raw_hash`, and `review: true` when under 80% of the raw words survive in order.
 - Raw gets exactly one added property, `normalized: "[[Normalized/<stamp>]]"`. Links are full paths because both folders hold the same file names.
 - Triggered by a systemd path unit watching `Raw/` and `Raw/Images/`; runs rescan until a pass finds nothing (changes during a run are dropped by systemd). A 5-minute timer catches edits whose quiet period expired. New notes are normalized at once (typed notes still being written wait). A raw note whose hash (excluding `normalized`) differs from `raw_hash` was edited and is redone after 10 quiet minutes. Normalized notes are generated output and are overwritten.
+- Handwritten notes are normalized one page per call (page text + that page's image), then joined into one note. Blank pages (no OCR text) are skipped; the OCR and the normalizer both drop replies that only describe an empty page.
+- The pipeline never deletes. `note-delete --latest | <stem>` (desktops) removes a raw note, its page images and its generated notes after confirmation; `note-delete --orphans` lists generated notes whose raw note is gone and deletes them on confirmation. Sync carries deletions everywhere.
 - Manual: `note-normalize [--dry-run] [--force] [stem ...]` on omega. Bump `VERSION` in the script when the prompt changes; `--force` regenerates.
 
 ## Chunks

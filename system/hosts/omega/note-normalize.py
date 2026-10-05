@@ -240,29 +240,6 @@ def link_raw(vault: Path, raw: Path, original: str, link: str) -> None:
     write_atomic(vault, raw, "---\n" + "\n".join(updated) + "\n---\n" + body)
 
 
-# More orphans than this in one run looks like a vault mid-sync or damaged,
-# not deliberate deletions, so nothing is removed.
-MAX_ORPHANS = 5
-
-
-def remove_orphans(vault: Path) -> None:
-    """Delete normalized notes whose raw note was deleted.
-
-    Raw notes are the record: deleting one deletes what was generated from it.
-    """
-    orphans = [
-        note
-        for note in sorted((vault / "Normalized").glob("*.md"))
-        if not (vault / "Raw" / note.name).exists()
-    ]
-    if len(orphans) > MAX_ORPHANS:
-        print(f"{len(orphans)} normalized notes lack a raw note; not deleting", flush=True)
-        return
-    for note in orphans:
-        note.unlink(missing_ok=True)
-        print(f"{note.stem}: raw note deleted, removed normalized note", flush=True)
-
-
 class Defer(Exception):
     """Not ready yet; try again on a later run."""
 
@@ -429,8 +406,6 @@ def main() -> None:
         # that arrive while it is still running. A note can take a minute, so
         # scan again after any pass that did work, until one finds nothing.
         failed = False
-        if not args.dry_run:
-            remove_orphans(args.vault)
         for _ in range(20):
             worked, pass_failed = run_pass(sorted(raw_dir.glob("*.md")))
             failed = failed or pass_failed

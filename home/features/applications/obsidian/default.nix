@@ -47,6 +47,16 @@ let
     '';
   };
 
+  # Explicit deletion of a raw note and everything generated from it (see
+  # note-delete.py); the pipeline itself never deletes notes.
+  noteDelete = pkgs.writeShellApplication {
+    name = "note-delete";
+    runtimeInputs = [ pkgs.python3 ];
+    text = ''
+      exec python3 "${featureDir}/note-delete.py" --vault "''${OBSIDIAN_VAULT:-${vault}}" "$@"
+    '';
+  };
+
   # Read at runtime only: Nix must never evaluate the secret, or it would be
   # copied into the world-readable store.
   credentials = "${config.home.homeDirectory}/.config/secrets/obsidian";
@@ -79,6 +89,7 @@ in
       # disabled here: Obsidian warns that running both on one device conflicts.
       pkgs.obsidian-headless
       captureNote
+      noteDelete
     ];
 
     home.activation.createObsidianVaultDirectory = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
