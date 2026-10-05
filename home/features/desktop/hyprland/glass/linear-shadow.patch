@@ -1,0 +1,9 @@
+diff --git a/src/Shaders.hpp b/src/Shaders.hpp
+--- a/src/Shaders.hpp
++++ b/src/Shaders.hpp
+@@ -639,3 +639,5 @@
+     float darkA = 1.0 - (1.0 - shadowA) * (1.0 - outlineAlpha * covOut);
++    // Preserve encoded-space black shadow density when compositing in linear light.
++    if (workLinear == 1) darkA = 1.0 - pow(1.0 - darkA, 2.2);
+ 
+     vec3 glass = vec3(0.0);

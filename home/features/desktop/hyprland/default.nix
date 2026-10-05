@@ -13,6 +13,7 @@ let
   # The portal is taken from the same flake on purpose: its version has to match
   # the compositor or screen sharing and file pickers misbehave.
   hyprlandPackages = inputs.hyprland.packages.${pkgs.stdenv.hostPlatform.system};
+  glassPackage = pkgs.callPackage ./glass/package.nix { hyprland = hyprlandPackages.hyprland; };
 
   homeRoot = "${repoRoot}/home";
   configDir = "${homeRoot}/features/desktop/hyprland/config";
@@ -61,6 +62,7 @@ in
   config = lib.mkIf config.desktopEnv.enable {
     home.packages = [
       hyprlandPackages.hyprland
+      glassPackage
       sessionEnvSync
       mailspringAfterTray
     ]
@@ -111,6 +113,9 @@ in
       source = config.lib.file.mkOutOfStoreSymlink configDir;
       force = true;
     };
+
+    # Compiled compositor plugin is immutable and rebuilt with matching headers.
+    xdg.dataFile."hyprglass/libhyprglass.so".source = "${glassPackage}/lib/libhyprglass.so";
 
     # Home Manager's `force` cannot replace a pre-existing *directory* with a
     # symlink (its `ln -Tsf` gives up on non-empty directories). Until the

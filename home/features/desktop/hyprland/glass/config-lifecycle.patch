@@ -1,0 +1,11 @@
+diff --git a/src/PluginConfig.cpp b/src/PluginConfig.cpp
+--- a/src/PluginConfig.cpp
++++ b/src/PluginConfig.cpp
+@@ -815,5 +815,6 @@
+     }
+-    s_pendingLayers.clear();
++    // Retain Lua declarations until preReload so the post-reload filter parse
++    // can reapply them. Runtime layer() calls are already committed above.
+ }
+ 
+ void validateConfig() {

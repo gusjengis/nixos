@@ -1,0 +1,110 @@
+diff --git a/src/GlassLayerSurface.cpp b/src/GlassLayerSurface.cpp
+index f8cf3e9..20f3c99 100644
+--- a/src/GlassLayerSurface.cpp
++++ b/src/GlassLayerSurface.cpp
+@@ -562,6 +562,8 @@ void CGlassLayerSurface::compositeAndRestore(PHLMONITOR monitor, float alpha, EM
+             .tint         = currentMacTint(),
+             .insetPx      = mac->inset * scale,
+             .radiusPx     = mac->radius < 0.0f ? -1.0f : mac->radius * scale,
++            .shadowScale  = mac->shadow,
++            .outlineScale = mac->outline,
+             .monitorScale = scale,
+         };
+         const auto workDesc = g_pHyprRenderer->workBufferImageDescription();
+diff --git a/src/GlassRenderer.cpp b/src/GlassRenderer.cpp
+index 2bfda6c..b1a7bbb 100644
+--- a/src/GlassRenderer.cpp
++++ b/src/GlassRenderer.cpp
+@@ -733,9 +733,9 @@ void applyMacGlass(SP<Render::IFramebuffer> wideFramebuffer, SP<Render::IFramebu
+     glUniform1f(loc("rimL2"), MacGlass::RIM_L2);
+     glUniform1f(loc("rimSide"), MacGlass::RIM_SIDE);
+     glUniform1f(loc("rimK"), MacGlass::RIM_K);
+-    glUniform1f(loc("outlineAlpha"), MacGlass::OUTLINE_ALPHA);
+-    glUniform3f(loc("shadowKey"), MacGlass::SHADOW_KEY[0], MacGlass::SHADOW_KEY[1], MacGlass::SHADOW_KEY[2]);
+-    glUniform3f(loc("shadowAmb"), MacGlass::SHADOW_AMB[0], MacGlass::SHADOW_AMB[1], MacGlass::SHADOW_AMB[2]);
++    glUniform1f(loc("outlineAlpha"), MacGlass::OUTLINE_ALPHA * draw.outlineScale);
++    glUniform3f(loc("shadowKey"), MacGlass::SHADOW_KEY[0] * draw.shadowScale, MacGlass::SHADOW_KEY[1], MacGlass::SHADOW_KEY[2]);
++    glUniform3f(loc("shadowAmb"), MacGlass::SHADOW_AMB[0] * draw.shadowScale, MacGlass::SHADOW_AMB[1], MacGlass::SHADOW_AMB[2]);
+ 
+     glUniform1f(loc("opacity"), std::clamp(alpha, 0.0f, 1.0f));
+     glUniform1i(loc("workLinear"), draw.workLinear ? 1 : 0);
+diff --git a/src/GlassRenderer.hpp b/src/GlassRenderer.hpp
+index 5a4b225..7de71ec 100644
+--- a/src/GlassRenderer.hpp
++++ b/src/GlassRenderer.hpp
+@@ -149,6 +149,8 @@ struct SMacDraw {
+     float    tint         = 1.0f;
+     float    insetPx      = 0.0f; // glass box inset inside the layer box, framebuffer px
+     float    radiusPx     = -1.0f;
++    float    shadowScale  = 1.0f;
++    float    outlineScale = 1.0f;
+     float    monitorScale = 1.0f;
+     bool     workLinear   = false;
+     float    workBlack    = 0.0f;
+diff --git a/src/PluginConfig.cpp b/src/PluginConfig.cpp
+index 5b263d3..4b60e9c 100644
+--- a/src/PluginConfig.cpp
++++ b/src/PluginConfig.cpp
+@@ -3,6 +3,7 @@
+ #include "Globals.hpp"
+ 
+ #include <algorithm>
++#include <cmath>
+ #include <charconv>
+ #include <cstring>
+ #include <hyprland/src/config/ConfigManager.hpp>
+@@ -732,6 +733,8 @@ struct SPendingLayer {
+     std::optional<ELayerMaskMode> maskMode;
+     std::optional<float>          macInset;
+     float                         macRadius = -1.0f;
++    float                         macShadow = 1.0f;
++    float                         macOutline = 1.0f;
+ };
+ 
+ static std::vector<SPendingLayer> s_pendingLayers;
+@@ -778,6 +781,25 @@ static int handleLuaLayer(lua_State* L) {
+         if (lua_isnumber(L, -1))
+             entry.macRadius = static_cast<float>(lua_tonumber(L, -1));
+         lua_pop(L, 1);
++
++        // Drop-shadow strength relative to the fitted Spotlight shadow.
++        lua_getfield(L, 2, "mac_shadow");
++        if (lua_isnumber(L, -1)) {
++            const auto value = static_cast<float>(lua_tonumber(L, -1));
++            if (!std::isfinite(value))
++                return luaL_error(L, "hyprglass.layer: mac_shadow must be finite");
++            entry.macShadow = std::clamp(value, 0.0f, 1.0f);
++        }
++        lua_pop(L, 1);
++
++        lua_getfield(L, 2, "mac_outline");
++        if (lua_isnumber(L, -1)) {
++            const auto value = static_cast<float>(lua_tonumber(L, -1));
++            if (!std::isfinite(value))
++                return luaL_error(L, "hyprglass.layer: mac_outline must be finite");
++            entry.macOutline = std::clamp(value, 0.0f, 1.0f);
++        }
++        lua_pop(L, 1);
+     }
+ 
+     s_pendingLayers.push_back(std::move(entry));
+@@ -806,7 +828,7 @@ void commitPendingLayers() {
+             if (entry.maskMode)
+                 g_pGlobalState->layerNamespaceMaskModes[entry.ns] = *entry.maskMode;
+             if (entry.macInset) {
+-                g_pGlobalState->layerNamespaceMacShapes[entry.ns] = {.inset = *entry.macInset, .radius = entry.macRadius};
++                g_pGlobalState->layerNamespaceMacShapes[entry.ns] = {.inset = *entry.macInset, .radius = entry.macRadius, .shadow = entry.macShadow, .outline = entry.macOutline};
+                 // the mac shader composites the surface itself and needs the redirect
+                 g_pGlobalState->layerNamespaceMaskModes[entry.ns] = ELayerMaskMode::ALPHA;
+             }
+diff --git a/src/PluginConfig.hpp b/src/PluginConfig.hpp
+index 5ce19b1..74de67a 100644
+--- a/src/PluginConfig.hpp
++++ b/src/PluginConfig.hpp
+@@ -397,4 +397,6 @@ void validateConfig();
+ struct SMacLayerShape {
+     float inset  = 0.0f;
+     float radius = -1.0f; // < 0: capsule
++    float shadow = 1.0f;  // drop-shadow alpha scale
++    float outline = 1.0f; // outline alpha scale
+ };

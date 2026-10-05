@@ -1,0 +1,522 @@
+diff --git a/src/Diagnostics.cpp b/src/Diagnostics.cpp
+index 1af9765..66e7af6 100644
+--- a/src/Diagnostics.cpp
++++ b/src/Diagnostics.cpp
+@@ -420,7 +420,7 @@ std::string formatStatus(IPC::Socket1::eOutputFormat format) {
+             return std::format("{{\"enabled\": {}, \"active\": {}, \"reason\": {}}}", status.enabled ? "true" : "false", status.active() ? "true" : "false",
+                                status.active() ? std::string("null") : std::format("\"{}\"", status.reason));
+         };
+-        return std::format("{{\n  \"schema\": {}, \"version\": \"{}\", \"active\": {}, \"shaders\": \"{}\", \"itemProtocol\": {},\n"
++        return std::format("{{\n  \"schema\": {}, \"version\": \"{}\", \"active\": {}, \"shaders\": \"{}\", \"itemProtocol\": {}, \"macRects\": true, \"macPlaceholder\": true,\n"
+                            "  \"features\": {{\n    \"windows\": {},\n    \"layers\": {},\n    \"subsurfaces\": {}\n  }}\n}}\n",
+                            STATUS_SCHEMA, escapeJSONStrings(std::string(PLUGIN_VERSION)), active ? "true" : "false", shaders,
+                            protocolActive ? "true" : "false", featureJson(windows), featureJson(layers), featureJson(subsurfaces));
+diff --git a/src/GlassLayerSurface.cpp b/src/GlassLayerSurface.cpp
+index 20f3c99..849a247 100644
+--- a/src/GlassLayerSurface.cpp
++++ b/src/GlassLayerSurface.cpp
+@@ -127,6 +127,8 @@ const SMacLayerShape* CGlassLayerSurface::macShape() const {
+ }
+ 
+ float CGlassLayerSurface::currentMacTint() {
++    if (const auto* shape = macShape(); shape && shape->tint >= 0.0f)
++        return shape->tint;
+     const auto& config = g_pGlobalState->config;
+     return config.macTint ? static_cast<float>(**config.macTint) : 1.0f;
+ }
+@@ -316,9 +318,10 @@ void CGlassLayerSurface::sampleAndRedirect(PHLMONITOR monitor, float alpha) {
+     const bool forceLive = config.layersForceLiveResample && **config.layersForceLiveResample;
+     const auto* mac          = macShape();
+     const bool  macTintMoved = mac && currentMacTint() != m_lastMacTint;
++    const bool  macProfileMoved = mac && mac->controlProfile != m_lastMacControlProfile;
+     const bool backgroundChanged = !m_hasCachedSample ||
+                                    currentGeneration != m_lastSceneGeneration ||
+-                                   isAnimating || m_backgroundDirty || forceLive || regionBoxChanged || macTintMoved;
++                                    isAnimating || m_backgroundDirty || forceLive || regionBoxChanged || macTintMoved || macProfileMoved;
+ 
+     const CBox sampleBox     = regionSampleBox.value_or(transformBox);
+     const bool sampleCovered = !backgroundChanged ||
+@@ -345,7 +348,7 @@ void CGlassLayerSurface::sampleAndRedirect(PHLMONITOR monitor, float alpha) {
+             // to sigma1, keep that as the narrow texture, continue to sigma2.
+             GlassRenderer::sampleBackground(m_sampleFramebuffer, source, sampleBox, m_samplePaddingRatio, 1);
+             const float tint  = currentMacTint();
+-            const auto  tp    = MacGlass::paramsForTint(tint);
++            const auto  tp    = mac->controlProfile ? MacGlass::paramsForControl(tint) : MacGlass::paramsForTint(tint);
+             const float scale = monitor ? static_cast<float>(monitor->m_scale) : 1.0f;
+             const float s1    = tp.blur.s1 * scale;
+             const float s2    = tp.blur.s2 * scale;
+@@ -353,6 +356,7 @@ void CGlassLayerSurface::sampleAndRedirect(PHLMONITOR monitor, float alpha) {
+             GlassRenderer::copyFramebuffer(m_sampleFramebuffer, m_macNarrowFramebuffer, source);
+             GlassRenderer::macBlur(m_sampleFramebuffer, std::sqrt(std::max(s2 * s2 - s1 * s1, 0.0f)), source);
+             m_lastMacTint         = tint;
++            m_lastMacControlProfile = mac->controlProfile;
+             m_hasCachedSample     = true;
+             m_lastSceneGeneration = currentGeneration;
+             m_backgroundDirty     = false;
+@@ -564,7 +568,12 @@ void CGlassLayerSurface::compositeAndRestore(PHLMONITOR monitor, float alpha, EM
+             .radiusPx     = mac->radius < 0.0f ? -1.0f : mac->radius * scale,
+             .shadowScale  = mac->shadow,
+             .outlineScale = mac->outline,
++            .controlProfile = mac->controlProfile,
++            .tangential = mac->tangential,
++            .placeholderAdditive = mac->placeholderAdditive,
+             .monitorScale = scale,
++            .rects        = mac->rects,
++            .rectCount    = mac->rectCount,
+         };
+         const auto workDesc = g_pHyprRenderer->workBufferImageDescription();
+         const auto tf       = workDesc->value().transferFunction;
+diff --git a/src/GlassLayerSurface.hpp b/src/GlassLayerSurface.hpp
+index 42adfe9..c295946 100644
+--- a/src/GlassLayerSurface.hpp
++++ b/src/GlassLayerSurface.hpp
+@@ -57,8 +57,9 @@ class CGlassLayerSurface {
+     // mac glass: narrow-blur copy taken between the two blur stages
+     SP<Render::IFramebuffer> m_macNarrowFramebuffer;
+     float                    m_lastMacTint = -1.0f;
++    bool                     m_lastMacControlProfile = false;
+     [[nodiscard]] const SMacLayerShape* macShape() const;
+-    [[nodiscard]] static float currentMacTint();
++    [[nodiscard]] float currentMacTint();
+     SP<Render::IFramebuffer> m_surfaceTempFramebuffer;
+     Vector2D     m_samplePaddingRatio;
+     bool         m_hasCachedSample = false;
+diff --git a/src/GlassRenderer.cpp b/src/GlassRenderer.cpp
+index b1a7bbb..96d3e5d 100644
+--- a/src/GlassRenderer.cpp
++++ b/src/GlassRenderer.cpp
+@@ -680,7 +680,7 @@ void applyMacGlass(SP<Render::IFramebuffer> wideFramebuffer, SP<Render::IFramebu
+     if (!wideFramebuffer || !narrowFramebuffer || !targetFramebuffer || !shaderManager.isInitialized())
+         return;
+ 
+-    const auto tp = MacGlass::paramsForTint(draw.tint);
++    const auto tp = draw.controlProfile ? MacGlass::paramsForControl(draw.tint) : MacGlass::paramsForTint(draw.tint);
+ 
+     const auto transform = Math::wlTransformToHyprutils(Math::invertTransform(g_pHyprRenderer->m_renderData.pMonitor->m_transform));
+     Mat3x3     glMatrix  = g_pHyprRenderer->projectBoxToTarget(rawBox, transform);
+@@ -715,11 +715,37 @@ void applyMacGlass(SP<Render::IFramebuffer> wideFramebuffer, SP<Render::IFramebu
+     glUniform2f(loc("glassBoxSizePx"), w - 2.0f * inset, h - 2.0f * inset);
+     const float radius = draw.radiusPx < 0.0f ? (h - 2.0f * inset > 100.0f * draw.monitorScale ? 23.0f * draw.monitorScale : 1e6f) : draw.radiusPx;
+     glUniform1f(loc("cornerRadius"), radius);
++    const int rectCount = std::clamp(draw.rectCount, 0, MAX_MAC_RECTS);
++    std::array<float, MAX_MAC_RECTS * 4> rects{};
++    std::array<float, MAX_MAC_RECTS> radii{};
++    int activeCount = 0;
++    for (int i = 0; i < rectCount; ++i) {
++        const auto& r = draw.rects[i];
++        const float x = r.x * draw.monitorScale, y = r.y * draw.monitorScale;
++        const float rw = r.width * draw.monitorScale, rh = r.height * draw.monitorScale;
++        // Optional rows disappear with the body height; never cut a platter in half.
++        if (x + rw > w - 2.0f * inset || y + rh > h - 2.0f * inset)
++            continue;
++        rects[activeCount * 4] = x;
++        rects[activeCount * 4 + 1] = y;
++        rects[activeCount * 4 + 2] = rw;
++        rects[activeCount * 4 + 3] = rh;
++        radii[activeCount++] = r.radius * draw.monitorScale;
++    }
++    glUniform1i(loc("rectMode"), rectCount > 0 ? 1 : 0);
++    glUniform1i(loc("rectCount"), activeCount);
++    if (activeCount > 0) {
++        glUniform4fv(loc("glassRects[0]"), activeCount, rects.data());
++        glUniform1fv(loc("glassRadii[0]"), activeCount, radii.data());
++    }
+     glUniform1f(loc("capA"), MacGlass::CAP_A);
+     glUniform1f(loc("capN"), MacGlass::CAP_N);
+     glUniform1f(loc("pxScale"), draw.monitorScale);
+ 
+     glUniform1f(loc("smallWeight"), 1.0f - tp.blur.w2);
++    glUniform1f(loc("tangentStrength"), draw.tangential ? 1.0f : 0.0f);
++    glUniform3f(loc("tangentParams"), tp.tangential.amplitude, tp.tangential.width, tp.tangential.power);
++    glUniform1i(loc("placeholderAdditive"), draw.placeholderAdditive && !draw.controlProfile && h - 2.0f * inset <= 100.0f * draw.monitorScale ? 1 : 0);
+     glUniform1fv(loc("lut"), 17, tp.lut.data());
+     glUniform1f(loc("chroma"), tp.chroma);
+ 
+diff --git a/src/GlassRenderer.hpp b/src/GlassRenderer.hpp
+index 7de71ec..780ab25 100644
+--- a/src/GlassRenderer.hpp
++++ b/src/GlassRenderer.hpp
+@@ -151,11 +151,16 @@ struct SMacDraw {
+     float    radiusPx     = -1.0f;
+     float    shadowScale  = 1.0f;
+     float    outlineScale = 1.0f;
++    bool     controlProfile = false;
++    bool     tangential = true;
++    bool     placeholderAdditive = false;
+     float    monitorScale = 1.0f;
+     bool     workLinear   = false;
+     float    workBlack    = 0.0f;
+     float    workWhite    = 1.0f;
+     bool     sdrGamma22   = false;
++    std::array<SMacRect, MAX_MAC_RECTS> rects{}; // logical px; scaled during upload
++    int      rectCount    = 0;
+ };
+ 
+ void applyMacGlass(SP<Render::IFramebuffer> wideFramebuffer, SP<Render::IFramebuffer> narrowFramebuffer,
+diff --git a/src/MacGlassParams.hpp b/src/MacGlassParams.hpp
+index 6896d7f..e5b196d 100644
+--- a/src/MacGlassParams.hpp
++++ b/src/MacGlassParams.hpp
+@@ -39,7 +39,7 @@ struct SBlur {
+     float s1, s2, w2;
+ };
+ inline constexpr std::array<SBlur, 3> BLUR_AT = {{
+-    {4.6536f, 40.3273f, 0.2181f},
++    {4.0000f, 40.3273f, 0.2181f},
+     {7.4105f, 32.8449f, 0.3355f},
+     {10.5681f, 32.1030f, 0.5950f},
+ }};
+@@ -77,6 +77,7 @@ struct STintParams {
+     float                 chroma;
+     SBlur                 blur;
+     SRefraction           refraction;
++    SRefraction           tangential;
+ };
+ 
+ inline STintParams paramsForTint(float tint) {
+@@ -98,9 +99,70 @@ inline STintParams paramsForTint(float tint) {
+     out.blur = {BLUR_AT[b].s1 + (BLUR_AT[b + 1].s1 - BLUR_AT[b].s1) * bf,
+                 BLUR_AT[b].s2 + (BLUR_AT[b + 1].s2 - BLUR_AT[b].s2) * bf,
+                 BLUR_AT[b].w2 + (BLUR_AT[b + 1].w2 - BLUR_AT[b].w2) * bf};
+-    out.refraction = {REFRACTION_AT[b].amplitude + (REFRACTION_AT[b + 1].amplitude - REFRACTION_AT[b].amplitude) * bf,
+-                      REFRACTION_AT[b].width + (REFRACTION_AT[b + 1].width - REFRACTION_AT[b].width) * bf,
+-                      REFRACTION_AT[b].power + (REFRACTION_AT[b + 1].power - REFRACTION_AT[b].power) * bf};
++    // Geometry-first 64px checker sweep: retain substantial tangential warp at
++    // half tint. Actual preference values, not nominal slider positions. Rejected
++    // upper-tint/corner fits fall back to the existing field; clear/full preserved.
++    constexpr std::array<float, 8> tt = {0.0f, 0.2630273f, 0.5111662f, 0.6302729f,
++                                        0.7543424f, 0.8535979f, 0.9280396f, 1.0f};
++    constexpr std::array<SRefraction, 8> normal = {{{39.919600f, 33.729300f, 5.234500f},
++                                                 {26.677756f, 28.496302f, 4.248833f},
++                                                 {16.997246f, 43.537252f, 4.218436f},
++                                                 {11.609649f, 18.226639f, 3.820612f},
++                                                 {3.669011f, 16.447176f, 1.115509f},
++                                                 {11.503688f, 6.411672f, 8.650385f},
++                                                 {11.341643f, 3.811349f, 10.135646f},
++                                                 {11.185000f, 1.297700f, 11.571400f}}};
++    constexpr std::array<SRefraction, 8> tangent = {{{10.778292f, 33.729300f, 5.234500f},
++                                                  {16.084031f, 20.367538f, 1.943776f},
++                                                  {10.957255f, 19.687857f, 1.715289f},
++                                                  {3.544863f, 22.916119f, 2.577921f},
++                                                  {3.955239f, 15.988117f, 0.746613f},
++                                                  {0.519486f, 21.093230f, 2.246949f},
++                                                  {0.255341f, 21.093230f, 2.246949f},
++                                                  {0.0f, 21.093230f, 2.246949f}}};
++    size_t ti = 0;
++    while (ti + 2 < tt.size() && tint > tt[ti + 1])
++        ++ti;
++    const float tf = (tint - tt[ti]) / (tt[ti + 1] - tt[ti]);
++    out.refraction = {normal[ti].amplitude + (normal[ti + 1].amplitude - normal[ti].amplitude) * tf,
++                      normal[ti].width + (normal[ti + 1].width - normal[ti].width) * tf,
++                      normal[ti].power + (normal[ti + 1].power - normal[ti].power) * tf};
++    out.tangential = {tangent[ti].amplitude + (tangent[ti + 1].amplitude - tangent[ti].amplitude) * tf,
++                       tangent[ti].width + (tangent[ti + 1].width - tangent[ti].width) * tf,
++                       tangent[ti].power + (tangent[ti + 1].power - tangent[ti].power) * tf};
++    return out;
++}
++
++// Control Center differs from Spotlight: black/white interiors remain about
++// 32/186 sRGB levels across tint settings. Intermediate luma and RGB response
++// still need ramp/color captures; this affine curve is endpoint-constrained.
++inline STintParams paramsForControl(float tint) {
++    auto out = paramsForTint(tint);
++    // Keep the shipped control-family optical field unchanged while retuning
++    // Spotlight; only its tone and blur have separate material fits.
++    tint = std::clamp(std::isfinite(tint) ? tint : 1.0f, 0.0f, 1.0f);
++    const float rt = tint * 2.0f;
++    const size_t ri = std::min<size_t>(static_cast<size_t>(rt), 1);
++    const float rf = rt - static_cast<float>(ri);
++    out.refraction = {REFRACTION_AT[ri].amplitude + (REFRACTION_AT[ri + 1].amplitude - REFRACTION_AT[ri].amplitude) * rf,
++                      REFRACTION_AT[ri].width + (REFRACTION_AT[ri + 1].width - REFRACTION_AT[ri].width) * rf,
++                      REFRACTION_AT[ri].power + (REFRACTION_AT[ri + 1].power - REFRACTION_AT[ri].power) * rf};
++    for (size_t k = 0; k < out.lut.size(); ++k) {
++        const float g = k == 16 ? 252.0f : static_cast<float>(k) * 16.0f;
++        out.lut[k] = (32.0f + (154.0f / 255.0f) * g) / 255.0f;
++    }
++    // Keep backdrop hue rather than inherit Spotlight's tint-dependent chroma.
++    out.chroma = 1.0f;
++    constexpr std::array<float, 3> anchors = {0.0f, 0.5210918f, 1.0f};
++    constexpr std::array<SBlur, 3> blur = {{{2.7384f, 5.0f, 0.15193f},
++                                         {3.2852f, 6.8434f, 0.43930f},
++                                         {11.6858f, 29.0006f, 0.65688f}}};
++    tint = std::clamp(std::isfinite(tint) ? tint : 1.0f, 0.0f, 1.0f);
++    const size_t i = tint > anchors[1] ? 1 : 0;
++    const float f = (tint - anchors[i]) / (anchors[i + 1] - anchors[i]);
++    out.blur = {blur[i].s1 + (blur[i + 1].s1 - blur[i].s1) * f,
++                blur[i].s2 + (blur[i + 1].s2 - blur[i].s2) * f,
++                blur[i].w2 + (blur[i + 1].w2 - blur[i].w2) * f};
+     return out;
+ }
+ 
+diff --git a/src/PluginConfig.cpp b/src/PluginConfig.cpp
+index 4b60e9c..95fad4c 100644
+--- a/src/PluginConfig.cpp
++++ b/src/PluginConfig.cpp
+@@ -192,6 +192,10 @@ void registerConfig(HANDLE handle) {
+     HyprlandAPI::addLuaFunction(handle, "hyprglass", "preset", handleLuaPreset);
+     HyprlandAPI::addLuaFunction(handle, "hyprglass", "layer", handleLuaLayer);
+     HyprlandAPI::addLuaFunction(handle, "hyprglass", "config", handleLuaConfig);
++    HyprlandAPI::addLuaFunction(handle, "hyprglass", "mac_rects_supported", [](lua_State* L) {
++        lua_pushboolean(L, true);
++        return 1;
++    });
+ }
+ 
+ // ── Config pointer initialization ────────────────────────────────────────────
+@@ -735,6 +739,12 @@ struct SPendingLayer {
+     float                         macRadius = -1.0f;
+     float                         macShadow = 1.0f;
+     float                         macOutline = 1.0f;
++    bool                          macControlProfile = false;
++    float                         macTint = -1.0f;
++    bool                          macTangential = true;
++    bool                          macPlaceholderAdditive = false;
++    std::array<SMacRect, MAX_MAC_RECTS> macRects{};
++    int                           macRectCount = 0;
+ };
+ 
+ static std::vector<SPendingLayer> s_pendingLayers;
+@@ -782,6 +792,73 @@ static int handleLuaLayer(lua_State* L) {
+             entry.macRadius = static_cast<float>(lua_tonumber(L, -1));
+         lua_pop(L, 1);
+ 
++        lua_getfield(L, 2, "mac_profile");
++        if (!lua_isnil(L, -1)) {
++            if (!lua_isstring(L, -1))
++                return luaL_error(L, "hyprglass.layer: mac_profile must be spotlight or control");
++            const std::string profile = lua_tostring(L, -1);
++            if (profile != "spotlight" && profile != "control")
++                return luaL_error(L, "hyprglass.layer: mac_profile must be spotlight or control");
++            entry.macControlProfile = profile == "control";
++        }
++        lua_pop(L, 1);
++
++        lua_getfield(L, 2, "mac_tint");
++        if (!lua_isnil(L, -1)) {
++            if (lua_type(L, -1) != LUA_TNUMBER || !std::isfinite(lua_tonumber(L, -1)))
++                return luaL_error(L, "hyprglass.layer: mac_tint must be finite");
++            entry.macTint = std::clamp(static_cast<float>(lua_tonumber(L, -1)), 0.0f, 1.0f);
++        }
++        lua_pop(L, 1);
++
++        lua_getfield(L, 2, "mac_tangential");
++        if (!lua_isnil(L, -1)) {
++            if (!lua_isboolean(L, -1))
++                return luaL_error(L, "hyprglass.layer: mac_tangential must be boolean");
++            entry.macTangential = lua_toboolean(L, -1);
++        }
++        lua_pop(L, 1);
++
++        lua_getfield(L, 2, "mac_placeholder_additive");
++        if (!lua_isnil(L, -1)) {
++            if (!lua_isboolean(L, -1))
++                return luaL_error(L, "hyprglass.layer: mac_placeholder_additive must be boolean");
++            entry.macPlaceholderAdditive = lua_toboolean(L, -1);
++        }
++        lua_pop(L, 1);
++
++        lua_getfield(L, 2, "mac_rects");
++        if (!lua_isnil(L, -1)) {
++            if (!lua_istable(L, -1))
++                return luaL_error(L, "hyprglass.layer: mac_rects must be an array");
++            entry.macRectCount = static_cast<int>(std::min<lua_Unsigned>(lua_rawlen(L, -1), MAX_MAC_RECTS));
++            constexpr const char* fields[] = {"x", "y", "width", "height", "radius"};
++            for (int i = 0; i < entry.macRectCount; ++i) {
++                lua_rawgeti(L, -1, i + 1);
++                if (!lua_istable(L, -1))
++                    return luaL_error(L, "hyprglass.layer: mac_rects entries must be tables");
++                float values[5];
++                for (int j = 0; j < 5; ++j) {
++                    lua_getfield(L, -1, fields[j]);
++                    if (lua_isnil(L, -1)) {
++                        lua_pop(L, 1);
++                        lua_rawgeti(L, -1, j + 1);
++                    }
++                    if (lua_type(L, -1) != LUA_TNUMBER)
++                        return luaL_error(L, "hyprglass.layer: mac_rects fields must be numbers");
++                    values[j] = static_cast<float>(lua_tonumber(L, -1));
++                    if (!std::isfinite(values[j]) || (j < 2 ? values[j] < 0.0f : values[j] <= 0.0f))
++                        return luaL_error(L, "hyprglass.layer: mac_rects require finite nonnegative x/y and positive width/height/radius");
++                    lua_pop(L, 1);
++                }
++                entry.macRects[i] = {values[0], values[1], values[2], values[3], values[4]};
++                lua_pop(L, 1);
++            }
++            if (entry.macRectCount > 0 && !entry.macInset)
++                entry.macInset = 0.0f;
++        }
++        lua_pop(L, 1);
++
+         // Drop-shadow strength relative to the fitted Spotlight shadow.
+         lua_getfield(L, 2, "mac_shadow");
+         if (lua_isnumber(L, -1)) {
+@@ -828,7 +905,10 @@ void commitPendingLayers() {
+             if (entry.maskMode)
+                 g_pGlobalState->layerNamespaceMaskModes[entry.ns] = *entry.maskMode;
+             if (entry.macInset) {
+-                g_pGlobalState->layerNamespaceMacShapes[entry.ns] = {.inset = *entry.macInset, .radius = entry.macRadius, .shadow = entry.macShadow, .outline = entry.macOutline};
++                g_pGlobalState->layerNamespaceMacShapes[entry.ns] = {.inset = *entry.macInset, .radius = entry.macRadius, .shadow = entry.macShadow,
++                                                                    .outline = entry.macOutline, .controlProfile = entry.macControlProfile, .tint = entry.macTint, .tangential = entry.macTangential,
++                                                                    .placeholderAdditive = entry.macPlaceholderAdditive,
++                                                                    .rects = entry.macRects, .rectCount = entry.macRectCount};
+                 // the mac shader composites the surface itself and needs the redirect
+                 g_pGlobalState->layerNamespaceMaskModes[entry.ns] = ELayerMaskMode::ALPHA;
+             }
+diff --git a/src/PluginConfig.hpp b/src/PluginConfig.hpp
+index 74de67a..0b6dbdd 100644
+--- a/src/PluginConfig.hpp
++++ b/src/PluginConfig.hpp
+@@ -2,6 +2,7 @@
+ 
+ #include <hyprland/src/config/shared/Types.hpp>
+ #include <hyprland/src/plugins/PluginAPI.hpp>
++#include <array>
+ #include <optional>
+ #include <string>
+ #include <string_view>
+@@ -394,9 +395,21 @@ void validateConfig();
+ 
+ // Per-namespace macOS glass shape, logical px. Layers with one render with the
+ // fitted macglass shader; inset leaves room for the shadow around the glass.
++inline constexpr int MAX_MAC_RECTS = 8;
++
++struct SMacRect {
++    float x = 0.0f, y = 0.0f, width = 0.0f, height = 0.0f, radius = 0.0f;
++};
++
+ struct SMacLayerShape {
+     float inset  = 0.0f;
+     float radius = -1.0f; // < 0: capsule
+     float shadow = 1.0f;  // drop-shadow alpha scale
+     float outline = 1.0f; // outline alpha scale
++    bool controlProfile = false;
++    float tint = -1.0f; // negative inherits shared tint; optional per-surface calibration
++    bool tangential = true;
++    bool placeholderAdditive = false; // semantic client ink marker: encoded RGB 124/255
++    std::array<SMacRect, MAX_MAC_RECTS> rects{}; // body logical px, relative to inset origin
++    int rectCount = 0; // zero preserves the single Spotlight shape
+ };
+diff --git a/src/Shaders.hpp b/src/Shaders.hpp
+index 9b155d0..8adcb88 100644
+--- a/src/Shaders.hpp
++++ b/src/Shaders.hpp
+@@ -530,6 +530,10 @@ uniform vec2 uvPadding;
+ uniform vec2 glassBoxOffsetPx;
+ uniform vec2 glassBoxSizePx;
+ uniform float cornerRadius;  // px; >= half the short side gives a capsule
++uniform int rectMode;        // configured union, even when all rects are skipped
++uniform int rectCount;
++uniform vec4 glassRects[8];  // x, y, width, height relative to glassBoxOffsetPx
++uniform float glassRadii[8];
+ uniform float capA;
+ uniform float capN;
+ uniform float pxScale;       // monitor scale: fitted lengths are px at 1x
+@@ -541,6 +545,9 @@ uniform float chroma;
+ uniform float refrA;
+ uniform float refrW;
+ uniform float refrP;
++uniform float tangentStrength;
++uniform vec3 tangentParams;
++uniform int placeholderAdditive;
+ 
+ uniform float rimR0;
+ uniform float rimRC;
+@@ -586,9 +593,8 @@ vec3 fromSrgb(vec3 c) {
+ // Continuous-curvature rounded box, fitted to the Spotlight capsule: each
+ // corner is a superellipse with exponent capN reaching capA * r along the
+ // long side. Returns an approximate signed distance in px (negative inside).
+-float shapeLevel(vec2 q) {
+-    vec2 S = glassBoxSizePx;
+-    float r = min(cornerRadius, 0.5 * min(S.x, S.y));
++float rectLevel(vec2 q, vec2 S, float radius) {
++    float r = min(radius, 0.5 * min(S.x, S.y));
+     float ex = min(capA * r, 0.5 * S.x);
+     float ey = min(capA * r, 0.5 * S.y);
+     vec2 c = clamp(q, vec2(ex, ey), S - vec2(ex, ey));
+@@ -597,6 +603,27 @@ float shapeLevel(vec2 q) {
+     return (f - 1.0) * min(ex, ey);
+ }
+ 
++float shapeLevel(vec2 q, out int closest) {
++    closest = -1;
++    if (rectMode == 0)
++        return rectLevel(q, glassBoxSizePx, cornerRadius);
++    float level = 1e20;
++    for (int i = 0; i < 8; ++i) {
++        if (i >= rectCount) break;
++        float candidate = rectLevel(q - glassRects[i].xy, glassRects[i].zw, glassRadii[i]);
++        if (candidate < level) {
++            level = candidate;
++            closest = i;
++        }
++    }
++    return level;
++}
++
++float shapeLevel(vec2 q) {
++    int closest;
++    return shapeLevel(q, closest);
++}
++
+ // Standard normal CDF, tanh approximation (max error ~3e-4).
+ float phi(float x) {
+     return 0.5 * (1.0 + tanh(0.7978845608 * (x + 0.044715 * x * x * x)));
+@@ -623,7 +650,11 @@ vec3 sampleBlur(vec2 posPx) {
+ void main() {
+     vec2 p = v_texcoord * fullSize;
+     vec2 q = p - glassBoxOffsetPx;
+-    float lv = shapeLevel(q);
++    int closest;
++    float lv = shapeLevel(q, closest);
++    vec2 shapeQ = closest < 0 ? q : q - glassRects[closest].xy;
++    vec2 shapeSize = closest < 0 ? glassBoxSizePx : glassRects[closest].zw;
++    float shapeRadius = closest < 0 ? cornerRadius : glassRadii[closest];
+ 
+     vec4 surf = texture(maskTex, clamp(v_texcoord * maskUVScale + maskUVOffset, 0.0, 1.0));
+ 
+@@ -643,13 +674,20 @@ void main() {
+     if (covIn > 0.0) {
+         float depth = max(-lv, 0.0) / pxScale;
+         float e = 0.25;
+-        vec2 grad = vec2(shapeLevel(q + vec2(e, 0.0)) - shapeLevel(q - vec2(e, 0.0)),
+-                         shapeLevel(q + vec2(0.0, e)) - shapeLevel(q - vec2(0.0, e)));
++        vec2 grad = vec2(rectLevel(shapeQ + vec2(e, 0.0), shapeSize, shapeRadius) - rectLevel(shapeQ - vec2(e, 0.0), shapeSize, shapeRadius),
++                         rectLevel(shapeQ + vec2(0.0, e), shapeSize, shapeRadius) - rectLevel(shapeQ - vec2(0.0, e), shapeSize, shapeRadius));
+         vec2 n = grad / max(length(grad), 1e-6);
+ 
+         float u = clamp(depth / refrW, 0.0, 1.0);
+         float D = refrA * pow(1.0 - u, refrP) * pxScale;
+-        vec3 b = sampleBlur(p - n * D);
++        // Clear Spotlight has longitudinal contraction even where the normal
++        // is vertical. Project onto the tangent to avoid extra cap compression.
++        // Half-strength calibration limits measured diagonal-edge regression;
++        // existing blur weight fades it out at tint >= 0.5 without new uniforms.
++        float tangentD = tangentStrength * tangentParams.x * pow(1.0 - clamp(depth / tangentParams.y, 0.0, 1.0), tangentParams.z) * pxScale;
++        float longPos = 2.0 * shapeQ.x / shapeSize.x - 1.0;
++        vec2 tangentShift = -longPos * tangentD * vec2(n.y * n.y, -n.x * n.y);
++        vec3 b = sampleBlur(p - n * D + tangentShift);
+ 
+         float Y = dot(b, vec3(0.2126, 0.7152, 0.0722));
+         vec3 c = vec3(lutAt(Y)) + chroma * (b - Y);
+@@ -668,6 +706,21 @@ void main() {
+     // client surface on top
+     vec3 outRGB = surf.rgb + (1.0 - surf.a) * baseRGB;
+     float outA = surf.a + (1.0 - surf.a) * baseA;
++    // Opt-in semantic marker: opaque encoded gray 124 ink, alpha is glyph coverage.
++    // Unpremultiply before HDR normalization; white text/icons/caret never match.
++    if (placeholderAdditive == 1 && covIn > 0.0 && surf.a > 0.0) {
++        vec3 ink = toSrgb(surf.rgb / surf.a);
++        // RGBA8 rounding is absolute: unpremultiplication amplifies its error at
++        // antialiased edges. Compare in premultiplied encoded space instead.
++        vec3 encodedPremult = ink * surf.a;
++        bool whiteInk = all(greaterThan(ink, vec3(0.9)));
++        bool markerInk = !whiteInk && all(lessThanEqual(
++            abs(encodedPremult - vec3(124.0 / 255.0) * surf.a), vec3(2.0 / 255.0)));
++        if (markerInk) {
++            vec3 background = toSrgb(baseRGB / baseA);
++            outRGB = fromSrgb(clamp(background + vec3(124.0 / 255.0) * surf.a, 0.0, 1.0)) * baseA;
++        }
++    }
+     fragColor = vec4(outRGB, outA) * opacity;
+ }
+ )GLSL"},

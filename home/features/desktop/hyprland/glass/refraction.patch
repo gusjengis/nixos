@@ -1,0 +1,39 @@
+diff --git a/src/MacGlassParams.hpp b/src/MacGlassParams.hpp
+--- a/src/MacGlassParams.hpp
++++ b/src/MacGlassParams.hpp
+@@ -55,3 +55,11 @@
+ inline constexpr float REFR_P = 1.5954f;
++struct SRefraction {
++    float amplitude, width, power;
++};
++inline constexpr std::array<SRefraction, 3> REFRACTION_AT = {{
++    {39.9196f, 33.7293f, 5.2345f},
++    {12.2734f, 18.7632f, 1.5954f},
++    {11.1850f, 1.2977f, 11.5714f},
++}};
+ 
+ // Rim light: out += (RC - out) * R0 * prof(depth) * ang(normal).
+@@ -78,3 +86,4 @@
+     SBlur                 blur;
++    SRefraction           refraction;
+ };
+ 
+@@ -100,3 +109,6 @@
+                 BLUR_AT[b].w2 + (BLUR_AT[b + 1].w2 - BLUR_AT[b].w2) * bf};
++    out.refraction = {REFRACTION_AT[b].amplitude + (REFRACTION_AT[b + 1].amplitude - REFRACTION_AT[b].amplitude) * bf,
++                      REFRACTION_AT[b].width + (REFRACTION_AT[b + 1].width - REFRACTION_AT[b].width) * bf,
++                      REFRACTION_AT[b].power + (REFRACTION_AT[b + 1].power - REFRACTION_AT[b].power) * bf};
+     return out;
+ }
+diff --git a/src/GlassRenderer.cpp b/src/GlassRenderer.cpp
+--- a/src/GlassRenderer.cpp
++++ b/src/GlassRenderer.cpp
+@@ -737,5 +737,5 @@
+ 
+-    glUniform1f(loc("refrA"), MacGlass::REFR_A);
+-    glUniform1f(loc("refrW"), MacGlass::REFR_W);
+-    glUniform1f(loc("refrP"), MacGlass::REFR_P);
++    glUniform1f(loc("refrA"), tp.refraction.amplitude);
++    glUniform1f(loc("refrW"), tp.refraction.width);
++    glUniform1f(loc("refrP"), tp.refraction.power);
+     glUniform1f(loc("rimR0"), MacGlass::RIM_R0);

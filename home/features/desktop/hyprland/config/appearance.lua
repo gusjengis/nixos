@@ -94,6 +94,26 @@ hl.layer_rule({
 })
 
 hl.layer_rule({
+	name = "quickshell-dropdown-no-animation",
+	match = { namespace = "^quickshell-(menu|panel|inbox|cc-.*|notification-card)$" },
+	no_anim = true,
+})
+
+-- Notification Center cards carry their own blurred material.
+hl.layer_rule({
+	name = "quickshell-inbox-blur",
+	match = { namespace = "^quickshell-inbox$" },
+	blur = true,
+	ignore_alpha = 0.2,
+})
+
+hl.layer_rule({
+	name = "quickshell-scrim-no-animation",
+	match = { namespace = "^quickshell-bar-scrim$" },
+	no_anim = true,
+})
+
+hl.layer_rule({
 	name = "quickshell-notifications-blur",
 	match = { namespace = "^quickshell-notifications$" },
 	blur = true,
@@ -119,3 +139,5 @@ colorPickerNoAnimationRule = hl.layer_rule({
 	match = { namespace = "^quickshell-tools-launcher$" },
 	no_anim = true,
 })
+
+require("glass")

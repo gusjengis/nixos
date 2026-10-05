@@ -1,0 +1,926 @@
+diff --git a/src/GlassDecoration.cpp b/src/GlassDecoration.cpp
+index bae4f7b..d0678cf 100644
+--- a/src/GlassDecoration.cpp
++++ b/src/GlassDecoration.cpp
+@@ -196,7 +196,7 @@ void CGlassDecoration::queueGlassPass(float alpha) {
+     g_pHyprRenderer->m_renderPass.add(makeUnique<CGlassPassElement>(data));
+ }
+ 
+-void CGlassDecoration::draw(PHLMONITOR monitor, float const& alpha, const SP<Workspace::CWorkspacePresentable>&) {
++void CGlassDecoration::draw(PHLMONITOR monitor, float const& alpha) {
+     if (!g_pGlobalState)
+         return;
+ 
+diff --git a/src/GlassDecoration.hpp b/src/GlassDecoration.hpp
+index a02c919..f8b5aa6 100644
+--- a/src/GlassDecoration.hpp
++++ b/src/GlassDecoration.hpp
+@@ -16,7 +16,7 @@ class CGlassDecoration : public IHyprWindowDecoration {
+ 
+     [[nodiscard]] SDecorationPositioningInfo getPositioningInfo() override;
+     void                                     onPositioningReply(const SDecorationPositioningReply& reply) override;
+-    void                                     draw(PHLMONITOR monitor, float const& alpha, const SP<Workspace::CWorkspacePresentable>& presentation) override;
++    void                                     draw(PHLMONITOR monitor, float const& alpha) override;
+     [[nodiscard]] eDecorationType            getDecorationType() override;
+     void                                     updateWindow(PHLWINDOW window) override;
+     void                                     damageEntire() override;
+diff --git a/src/main.cpp b/src/main.cpp
+index e6f3348..b257146 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -100,7 +100,7 @@ static void drawGlassForFullscreenWindow(const PHLWINDOW& window, const PHLMONIT
+         return;
+ 
+     if (auto* deco = glassDecorationFor(window))
+-        deco->draw(monitor, 1.f, dynamicPointerCast<Workspace::CWorkspacePresentable>(window->m_workspace)); // alpha unused, recomputed in renderPass
++        deco->draw(monitor, 1.f); // alpha unused, recomputed in renderPass
+ }
+ 
+ // ── Duplicate window copies ──────────────────────────────────────────────────
+diff --git a/src/BackgroundDamageObserver.cpp b/src/BackgroundDamageObserver.cpp
+--- a/src/BackgroundDamageObserver.cpp
++++ b/src/BackgroundDamageObserver.cpp
+@@ -193,14 +193,5 @@
+-        CRegion damage = wlSurface->computeDamage(box);
+-        if (damage.empty())
+-            return;
+-
+-        // X11 clients draw at their own scale; only a window root carries it
+-        if (viewWindow && viewWindow->backend().isX11() && viewWindow->backend().surfaceScale() != 1.f)
+-            damage.scale(1.0 / viewWindow->backend().surfaceScale());
+-
+-        // the animated origin, not Hyprland's animation goal: it is where the
+-        // content is actually drawn this frame
+-        damage.translate(box->pos());
+-        const CBox damagedBox = damage.getExtents();
++        // Hyprland's earlier commit handler may already have consumed buffer
++        // damage. Use global logical surface bounds for cache invalidation.
++        const CBox damagedBox = *box;
+ 
+         for (const auto& [_, state] : g_pGlobalState->layerSurfaces) {
+diff --git a/src/GlassLayerSurface.cpp b/src/GlassLayerSurface.cpp
+index 0f313d3..3ccdf3f 100644
+--- a/src/GlassLayerSurface.cpp
++++ b/src/GlassLayerSurface.cpp
+@@ -5,6 +5,7 @@
+ #include "Globals.hpp"
+ #include "LayerGeometry.hpp"
+ #include "WorkspaceAnimation.hpp"
++#include "MacGlassParams.hpp"
+ 
+ #include <algorithm>
+ #include <cmath>
+@@ -116,6 +117,20 @@ bool CGlassLayerSurface::liveResampleEnabled() const {
+     return config.layersLiveResample && **config.layersLiveResample;
+ }
+ 
++const SMacLayerShape* CGlassLayerSurface::macShape() const {
++    const auto layerSurface = m_layerSurface.lock();
++    if (!layerSurface)
++        return nullptr;
++    const auto& shapes = g_pGlobalState->layerNamespaceMacShapes;
++    const auto  it     = shapes.find(layerSurface->m_namespace);
++    return it == shapes.end() ? nullptr : &it->second;
++}
++
++float CGlassLayerSurface::currentMacTint() {
++    const auto& config = g_pGlobalState->config;
++    return config.macTint ? static_cast<float>(**config.macTint) : 1.0f;
++}
++
+ PHLLS CGlassLayerSurface::getLayerSurface() const {
+     return m_layerSurface.lock();
+ }
+@@ -297,9 +312,11 @@ void CGlassLayerSurface::sampleAndRedirect(PHLMONITOR monitor, float alpha) {
+                              WorkspaceAnimation::anyWorkspaceAnimating(monitor);
+     const auto& config = g_pGlobalState->config;
+     const bool forceLive = config.layersForceLiveResample && **config.layersForceLiveResample;
++    const auto* mac          = macShape();
++    const bool  macTintMoved = mac && currentMacTint() != m_lastMacTint;
+     const bool backgroundChanged = !m_hasCachedSample ||
+                                    currentGeneration != m_lastSceneGeneration ||
+-                                   isAnimating || m_backgroundDirty || forceLive || regionBoxChanged;
++                                   isAnimating || m_backgroundDirty || forceLive || regionBoxChanged || macTintMoved;
+ 
+     const CBox sampleBox     = regionSampleBox.value_or(transformBox);
+     const bool sampleCovered = !backgroundChanged ||
+@@ -321,6 +338,23 @@ void CGlassLayerSurface::sampleAndRedirect(PHLMONITOR monitor, float alpha) {
+     } else if (backgroundChanged) {
+         Diagnostics::recordLayerCacheMiss(monitorId);
+ 
++        if (mac) {
++            // Full-resolution sample, then the fitted two-scale Gaussian: blur
++            // to sigma1, keep that as the narrow texture, continue to sigma2.
++            GlassRenderer::sampleBackground(m_sampleFramebuffer, source, sampleBox, m_samplePaddingRatio, 1);
++            const float tint  = currentMacTint();
++            const auto  tp    = MacGlass::paramsForTint(tint);
++            const float scale = monitor ? static_cast<float>(monitor->m_scale) : 1.0f;
++            const float s1    = tp.blur.s1 * scale;
++            const float s2    = tp.blur.s2 * scale;
++            GlassRenderer::macBlur(m_sampleFramebuffer, s1, source);
++            GlassRenderer::copyFramebuffer(m_sampleFramebuffer, m_macNarrowFramebuffer, source);
++            GlassRenderer::macBlur(m_sampleFramebuffer, std::sqrt(std::max(s2 * s2 - s1 * s1, 0.0f)), source);
++            m_lastMacTint         = tint;
++            m_hasCachedSample     = true;
++            m_lastSceneGeneration = currentGeneration;
++            m_backgroundDirty     = false;
++        } else {
+         const bool isDark          = resolveThemeIsDark();
+         const std::string preset   = resolvePresetName();
+         const SResolveContext ctx  = {preset, isDark, g_pGlobalState->config, g_pGlobalState->customPresets};
+@@ -344,6 +378,7 @@ void CGlassLayerSurface::sampleAndRedirect(PHLMONITOR monitor, float alpha) {
+         m_hasCachedSample      = true;
+         m_lastSceneGeneration  = currentGeneration;
+         m_backgroundDirty      = false;
++        }
+     } else {
+         // background unchanged, reuse cached blur — skip 7 GPU operations
+         Diagnostics::recordLayerCacheHit(monitorId);
+@@ -519,6 +554,29 @@ void CGlassLayerSurface::compositeAndRestore(PHLMONITOR monitor, float alpha, EM
+             break;
+     }
+ 
++    if (const auto* mac = macShape(); mac && maskSource == EMaskSource::ALPHA_THRESHOLD && m_macNarrowFramebuffer) {
++        const float scale = static_cast<float>(monitor->m_scale);
++        GlassRenderer::SMacDraw draw{
++            .tint         = currentMacTint(),
++            .insetPx      = mac->inset * scale,
++            .radiusPx     = mac->radius < 0.0f ? -1.0f : mac->radius * scale,
++            .monitorScale = scale,
++        };
++        const auto workDesc = g_pHyprRenderer->workBufferImageDescription();
++        const auto tf       = workDesc->value().transferFunction;
++        draw.sdrGamma22     = NColorManagement::getDefaultImageDescription()->value().transferFunction == NColorManagement::CM_TRANSFER_FUNCTION_GAMMA22;
++        if (tf == NColorManagement::CM_TRANSFER_FUNCTION_EXT_LINEAR) {
++            const auto cm = g_pHyprRenderer->getCMSettings(NColorManagement::getDefaultImageDescription(), workDesc, nullptr, true,
++                                                           monitor->m_sdrMinLuminance, monitor->m_sdrMaxLuminance);
++            const float range = std::max(cm.dstTFRange.max - cm.dstTFRange.min, 1e-6f);
++            draw.workLinear   = true;
++            draw.workBlack    = (cm.srcTFRange.min - cm.dstTFRange.min) / range * cm.sdrBrightnessMultiplier;
++            draw.workWhite    = (cm.srcTFRange.max - cm.dstTFRange.min) / range * cm.sdrBrightnessMultiplier;
++        }
++        GlassRenderer::applyMacGlass(m_sampleFramebuffer, m_macNarrowFramebuffer, target, rawBox, transformBox, alpha, m_samplePaddingRatio, maskInfo, draw);
++        return;
++    }
++
+     // The glass shader composites both the glass effect and the surface content
+     // in a single pass: glass behind, surface on top, using the temp FBO alpha.
+     GlassRenderer::applyGlassEffect(m_sampleFramebuffer, target,
+diff --git a/src/GlassLayerSurface.hpp b/src/GlassLayerSurface.hpp
+index 7a07699..42adfe9 100644
+--- a/src/GlassLayerSurface.hpp
++++ b/src/GlassLayerSurface.hpp
+@@ -54,6 +54,11 @@ class CGlassLayerSurface {
+   private:
+     PHLLSREF     m_layerSurface;
+     SP<Render::IFramebuffer> m_sampleFramebuffer;
++    // mac glass: narrow-blur copy taken between the two blur stages
++    SP<Render::IFramebuffer> m_macNarrowFramebuffer;
++    float                    m_lastMacTint = -1.0f;
++    [[nodiscard]] const SMacLayerShape* macShape() const;
++    [[nodiscard]] static float currentMacTint();
+     SP<Render::IFramebuffer> m_surfaceTempFramebuffer;
+     Vector2D     m_samplePaddingRatio;
+     bool         m_hasCachedSample = false;
+diff --git a/src/GlassRenderer.cpp b/src/GlassRenderer.cpp
+index bf811e7..4205242 100644
+--- a/src/GlassRenderer.cpp
++++ b/src/GlassRenderer.cpp
+@@ -582,3 +582,161 @@ void applyGlassEffect(SP<Render::IFramebuffer> sampleFramebuffer, SP<Render::IFr
+ }
+ 
+ } // namespace GlassRenderer
++
++// ── macOS-fitted glass ──────────────────────────────────────────────────────
++
++#include "MacGlassParams.hpp"
++
++namespace GlassRenderer {
++
++static constexpr std::array<float, 9> MAC_FULLSCREEN_PROJECTION = {
++    2.0f, 0.0f, 0.0f,
++    0.0f, 2.0f, 0.0f,
++   -1.0f,-1.0f, 1.0f,
++};
++
++void macBlur(SP<Render::IFramebuffer> framebuffer, float sigma, SP<Render::IFramebuffer> callerFramebuffer) {
++    auto& shaderManager = g_pGlobalState->shaderManager;
++    if (!framebuffer || !callerFramebuffer || sigma < 0.3f || !shaderManager.isInitialized())
++        return;
++
++    const int width  = static_cast<int>(framebuffer->m_size.x);
++    const int height = static_cast<int>(framebuffer->m_size.y);
++
++    auto& temp = g_pGlobalState->blurTempFramebuffer;
++    if (!temp)
++        temp = g_pHyprRenderer->createFB("hyprglass-blur-temp");
++    if (temp->m_size.x != width || temp->m_size.y != height || temp->m_drmFormat != framebuffer->m_drmFormat)
++        temp->alloc(width, height, framebuffer->m_drmFormat);
++
++    g_pHyprRenderer->blend(false);
++    if (glIsEnabled(GL_SCISSOR_TEST))
++        glDisable(GL_SCISSOR_TEST);
++    if (glIsEnabled(GL_STENCIL_TEST))
++        glDisable(GL_STENCIL_TEST);
++
++    auto shader = g_pHyprOpenGL->useShader(shaderManager.macBlurShader);
++    shader->setUniformMatrix3fv(SHADER_PROJ, 1, GL_FALSE, MAC_FULLSCREEN_PROJECTION);
++    shader->setUniformInt(SHADER_TEX, 0);
++    const GLuint program = shader->program();
++    glUniform1f(glGetUniformLocation(program, "sigma"), sigma);
++    const GLint dirLoc = glGetUniformLocation(program, "direction");
++    glBindVertexArray(shader->getUniformLocation(SHADER_SHADER_VAO));
++    g_pHyprOpenGL->setViewport(0, 0, width, height);
++    glActiveTexture(GL_TEXTURE0);
++
++    glBindFramebuffer(GL_FRAMEBUFFER, fbId(temp));
++    framebuffer->getTexture()->bind();
++    glUniform2f(dirLoc, 1.0f / width, 0.0f);
++    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
++
++    glBindFramebuffer(GL_FRAMEBUFFER, fbId(framebuffer));
++    temp->getTexture()->bind();
++    glUniform2f(dirLoc, 0.0f, 1.0f / height);
++    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
++
++    g_pHyprRenderer->blend(true);
++    glBindFramebuffer(GL_FRAMEBUFFER, fbId(callerFramebuffer));
++    glBindVertexArray(0);
++    g_pHyprOpenGL->setViewport(0, 0, static_cast<int>(callerFramebuffer->m_size.x), static_cast<int>(callerFramebuffer->m_size.y));
++}
++
++void copyFramebuffer(SP<Render::IFramebuffer> src, SP<Render::IFramebuffer>& dst, SP<Render::IFramebuffer> callerFramebuffer) {
++    if (!src || !callerFramebuffer)
++        return;
++    if (!dst)
++        dst = g_pHyprRenderer->createFB("hyprglass-mac-narrow");
++    const int width  = static_cast<int>(src->m_size.x);
++    const int height = static_cast<int>(src->m_size.y);
++    if (dst->m_size.x != width || dst->m_size.y != height || dst->m_drmFormat != src->m_drmFormat)
++        dst->alloc(width, height, src->m_drmFormat);
++
++    if (glIsEnabled(GL_SCISSOR_TEST))
++        glDisable(GL_SCISSOR_TEST);
++    glBindFramebuffer(GL_READ_FRAMEBUFFER, fbId(src));
++    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbId(dst));
++    glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
++    glBindFramebuffer(GL_FRAMEBUFFER, fbId(callerFramebuffer));
++}
++
++void applyMacGlass(SP<Render::IFramebuffer> wideFramebuffer, SP<Render::IFramebuffer> narrowFramebuffer,
++                   SP<Render::IFramebuffer> targetFramebuffer, CBox& rawBox, CBox& transformedBox, float alpha,
++                   const Vector2D& paddingRatio, const SMaskInfo& mask, const SMacDraw& draw) {
++    auto& shaderManager = g_pGlobalState->shaderManager;
++    if (!wideFramebuffer || !narrowFramebuffer || !targetFramebuffer || !shaderManager.isInitialized())
++        return;
++
++    const auto tp = MacGlass::paramsForTint(draw.tint);
++
++    const auto transform = Math::wlTransformToHyprutils(Math::invertTransform(g_pHyprRenderer->m_renderData.pMonitor->m_transform));
++    Mat3x3     glMatrix  = g_pHyprRenderer->projectBoxToTarget(rawBox, transform);
++    glMatrix.transpose();
++
++    glBindFramebuffer(GL_FRAMEBUFFER, fbId(targetFramebuffer));
++
++    glActiveTexture(GL_TEXTURE0);
++    wideFramebuffer->getTexture()->bind();
++    glActiveTexture(GL_TEXTURE1);
++    glBindTexture(mask.target, mask.textureId);
++    glActiveTexture(GL_TEXTURE2);
++    narrowFramebuffer->getTexture()->bind();
++    glActiveTexture(GL_TEXTURE0);
++
++    auto shader = g_pHyprOpenGL->useShader(shaderManager.macShader);
++    shader->setUniformMatrix3fv(SHADER_PROJ, 1, GL_FALSE, glMatrix.getMatrix());
++    shader->setUniformInt(SHADER_TEX, 0);
++    const GLuint P = shader->program();
++    auto loc = [&](const char* name) { return glGetUniformLocation(P, name); };
++
++    glUniform1i(loc("maskTex"), 1);
++    glUniform1i(loc("texSmall"), 2);
++    glUniform2f(loc("maskUVOffset"), mask.uvOffset.x, mask.uvOffset.y);
++    glUniform2f(loc("maskUVScale"), mask.uvScale.x, mask.uvScale.y);
++
++    const float w = transformedBox.width, h = transformedBox.height;
++    glUniform2f(loc("fullSize"), w, h);
++    glUniform2f(loc("uvPadding"), paddingRatio.x, paddingRatio.y);
++    const float inset = std::clamp(draw.insetPx, 0.0f, std::min(w, h) * 0.5f - 1.0f);
++    glUniform2f(loc("glassBoxOffsetPx"), inset, inset);
++    glUniform2f(loc("glassBoxSizePx"), w - 2.0f * inset, h - 2.0f * inset);
++    glUniform1f(loc("cornerRadius"), draw.radiusPx < 0.0f ? 1e6f : draw.radiusPx);
++    glUniform1f(loc("capA"), MacGlass::CAP_A);
++    glUniform1f(loc("capN"), MacGlass::CAP_N);
++    glUniform1f(loc("pxScale"), draw.monitorScale);
++
++    glUniform1f(loc("smallWeight"), 1.0f - tp.blur.w2);
++    glUniform1fv(loc("lut"), 17, tp.lut.data());
++    glUniform1f(loc("chroma"), tp.chroma);
++
++    glUniform1f(loc("refrA"), MacGlass::REFR_A);
++    glUniform1f(loc("refrW"), MacGlass::REFR_W);
++    glUniform1f(loc("refrP"), MacGlass::REFR_P);
++    glUniform1f(loc("rimR0"), MacGlass::RIM_R0);
++    glUniform1f(loc("rimRC"), MacGlass::RIM_RC);
++    glUniform1f(loc("rimA1"), MacGlass::RIM_A1);
++    glUniform1f(loc("rimL1"), MacGlass::RIM_L1);
++    glUniform1f(loc("rimL2"), MacGlass::RIM_L2);
++    glUniform1f(loc("rimSide"), MacGlass::RIM_SIDE);
++    glUniform1f(loc("rimK"), MacGlass::RIM_K);
++    glUniform1f(loc("outlineAlpha"), MacGlass::OUTLINE_ALPHA);
++    glUniform3f(loc("shadowKey"), MacGlass::SHADOW_KEY[0], MacGlass::SHADOW_KEY[1], MacGlass::SHADOW_KEY[2]);
++    glUniform3f(loc("shadowAmb"), MacGlass::SHADOW_AMB[0], MacGlass::SHADOW_AMB[1], MacGlass::SHADOW_AMB[2]);
++
++    glUniform1f(loc("opacity"), std::clamp(alpha, 0.0f, 1.0f));
++    glUniform1i(loc("workLinear"), draw.workLinear ? 1 : 0);
++    glUniform1f(loc("workBlack"), draw.workBlack);
++    glUniform1f(loc("workWhite"), draw.workWhite);
++    glUniform1i(loc("sdrGamma22"), draw.sdrGamma22 ? 1 : 0);
++
++    glBindVertexArray(shader->getUniformLocation(SHADER_SHADER_VAO));
++    CBox damageExtents = g_pHyprRenderer->m_renderData.damage.copy().intersect(rawBox).getExtents();
++    g_pHyprOpenGL->scissor(damageExtents.w > 0 && damageExtents.h > 0 ? damageExtents : rawBox);
++    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
++    g_pHyprOpenGL->scissor(nullptr);
++
++    glActiveTexture(GL_TEXTURE2);
++    glBindTexture(GL_TEXTURE_2D, 0);
++    glActiveTexture(GL_TEXTURE0);
++}
++
++} // namespace GlassRenderer
+diff --git a/src/GlassRenderer.hpp b/src/GlassRenderer.hpp
+index b2e4486..15fd831 100644
+--- a/src/GlassRenderer.hpp
++++ b/src/GlassRenderer.hpp
+@@ -16,7 +16,9 @@
+ // Callers own their sample framebuffers; these functions operate on passed-in state.
+ namespace GlassRenderer {
+ 
+-inline constexpr int SAMPLE_PADDING_PX = 60;
++// 160 rather than upstream's 60: the mac glass blurs with sigma up to ~40 px
++// and refracts up to ~40 px inward, both of which read beyond the layer box.
++inline constexpr int SAMPLE_PADDING_PX = 160;
+ 
+ // Maximum downscale factor for blur sampling. Half-res (2) is 4x cheaper
+ // per blur pass. Only applied when blur is strong enough to hide the lower
+@@ -135,4 +137,27 @@ void applyGlassEffect(SP<Render::IFramebuffer> sampleFramebuffer, SP<Render::IFr
+                        const Vector2D& paddingRatio, const SResolveContext& resolveContext,
+                        const SMaskInfo* mask = nullptr);
+ 
++// ── macOS-fitted glass (MacGlassParams.hpp) ──────────────────────────────────
++
++// In-place exact Gaussian (sigma in sample-framebuffer texels).
++void macBlur(SP<Render::IFramebuffer> framebuffer, float sigma, SP<Render::IFramebuffer> callerFramebuffer);
++
++// Copies src into dst (reallocated to match), then re-binds callerFramebuffer.
++void copyFramebuffer(SP<Render::IFramebuffer> src, SP<Render::IFramebuffer>& dst, SP<Render::IFramebuffer> callerFramebuffer);
++
++struct SMacDraw {
++    float    tint         = 1.0f;
++    float    insetPx      = 0.0f; // glass box inset inside the layer box, framebuffer px
++    float    radiusPx     = -1.0f;
++    float    monitorScale = 1.0f;
++    bool     workLinear   = false;
++    float    workBlack    = 0.0f;
++    float    workWhite    = 1.0f;
++    bool     sdrGamma22   = false;
++};
++
++void applyMacGlass(SP<Render::IFramebuffer> wideFramebuffer, SP<Render::IFramebuffer> narrowFramebuffer,
++                   SP<Render::IFramebuffer> targetFramebuffer, CBox& rawBox, CBox& transformedBox, float alpha,
++                   const Vector2D& paddingRatio, const SMaskInfo& mask, const SMacDraw& draw);
++
+ } // namespace GlassRenderer
+diff --git a/src/Globals.hpp b/src/Globals.hpp
+index 8080e88..294d98d 100644
+--- a/src/Globals.hpp
++++ b/src/Globals.hpp
+@@ -73,6 +73,10 @@ struct SGlobalState {
+     std::unordered_map<std::string, bool> layerNamespaceLiveResample;
+     // Per-namespace mask mode override (namespace → mode)
+     std::unordered_map<std::string, ELayerMaskMode> layerNamespaceMaskModes;
++    // Per-namespace macOS glass shape (namespace -> inset/radius, logical px).
++    // Layers listed here render with the fitted macglass shader instead of
++    // liquidglass; inset leaves room for the shadow drawn around the glass.
++    std::unordered_map<std::string, SMacLayerShape> layerNamespaceMacShapes;
+ 
+     // Per-monitor generation counter, incremented when the scene behind layers
+     // changes on that monitor. Layer surfaces compare to their cached value to
+diff --git a/src/PluginConfig.cpp b/src/PluginConfig.cpp
+index d1d33b7..591663d 100644
+--- a/src/PluginConfig.cpp
++++ b/src/PluginConfig.cpp
+@@ -54,7 +54,7 @@ EDebugMode currentDebugMode() {
+ }
+ 
+ void registerConfig(HANDLE handle) {
+-    addConfigValue<Config::Values::Int>(handle, ConfigKeys::ENABLED, Config::INTEGER{1});
++    addConfigValue<Config::Values::Int>(handle, ConfigKeys::ENABLED, Config::INTEGER{0});
+     addConfigValue<Config::Values::Int>(handle, ConfigKeys::MANAGE_WINDOW_BLUR, Config::INTEGER{1});
+     addConfigValue<Config::Values::Int>(handle, ConfigKeys::SKIP_OPAQUE_WINDOWS, Config::INTEGER{1});
+     addConfigValue<Config::Values::Int>(handle, ConfigKeys::BLUR_FOLD, Config::INTEGER{1});
+@@ -66,8 +66,8 @@ void registerConfig(HANDLE handle) {
+     addConfigValue<Config::Values::Int>(handle, ConfigKeys::DEBUG_TIMERS, Config::INTEGER{0});
+ 
+     // Layer surface support
+-    addConfigValue<Config::Values::Int>(handle, ConfigKeys::LAYERS_ENABLED, Config::INTEGER{0});
+-    addConfigValue<Config::Values::String>(handle, ConfigKeys::LAYERS_NAMESPACES, Config::STRING{});
++    addConfigValue<Config::Values::Int>(handle, ConfigKeys::LAYERS_ENABLED, Config::INTEGER{1});
++    addConfigValue<Config::Values::String>(handle, ConfigKeys::LAYERS_NAMESPACES, Config::STRING{"glasstest"});
+     addConfigValue<Config::Values::String>(handle, ConfigKeys::LAYERS_EXCLUDE_NAMESPACES, Config::STRING{});
+     addConfigValue<Config::Values::String>(handle, ConfigKeys::LAYERS_PRESET, Config::STRING{});
+     addConfigValue<Config::Values::String>(handle, ConfigKeys::LAYERS_NAMESPACE_PRESETS, Config::STRING{});
+@@ -85,6 +85,9 @@ void registerConfig(HANDLE handle) {
+     addConfigValue<Config::Values::String>(handle, ConfigKeys::SUBSURFACES_PRESET, Config::STRING{});
+     addConfigValue<Config::Values::Float>(handle, ConfigKeys::SUBSURFACES_RADIUS, Config::FLOAT{-1.0});
+ 
++    // macOS glass slider (NSGlassTintAmount): 0 clear .. 1 tinted
++    addConfigValue<Config::Values::Float>(handle, ConfigKeys::MAC_TINT, Config::FLOAT{1.0});
++
+     // Window background cache
+     addConfigValue<Config::Values::Int>(handle, ConfigKeys::WINDOWS_BACKGROUND_CACHE, Config::INTEGER{1});
+     addConfigValue<Config::Values::Int>(handle, ConfigKeys::WINDOWS_LIVE_RESAMPLE, Config::INTEGER{1});
+@@ -278,6 +281,7 @@ void initConfigPointers(HANDLE handle, SPluginConfig& config) {
+     config.subsurfacesEnabled = getStaticPtr<Hyprlang::INT>(handle, ConfigKeys::SUBSURFACES_ENABLED);
+     config.subsurfacesPreset  = getStringPtr(handle, ConfigKeys::SUBSURFACES_PRESET);
+     config.subsurfacesRadius  = getStaticPtr<Hyprlang::FLOAT>(handle, ConfigKeys::SUBSURFACES_RADIUS);
++    config.macTint            = getStaticPtr<Hyprlang::FLOAT>(handle, ConfigKeys::MAC_TINT);
+ 
+     config.windowsBackgroundCache = getStaticPtr<Hyprlang::INT>(handle, ConfigKeys::WINDOWS_BACKGROUND_CACHE);
+     config.windowsLiveResample    = getStaticPtr<Hyprlang::INT>(handle, ConfigKeys::WINDOWS_LIVE_RESAMPLE);
+@@ -726,6 +730,8 @@ struct SPendingLayer {
+     bool                          exclude       = false;
+     int                           liveResample  = -1; // -1 = not set
+     std::optional<ELayerMaskMode> maskMode;
++    std::optional<float>          macInset;
++    float                         macRadius = -1.0f;
+ };
+ 
+ static std::vector<SPendingLayer> s_pendingLayers;
+@@ -762,9 +768,21 @@ static int handleLuaLayer(lua_State* L) {
+         if (lua_isstring(L, -1))
+             entry.maskMode = parseLayerMaskMode(lua_tostring(L, -1));
+         lua_pop(L, 1);
++
++        lua_getfield(L, 2, "mac_inset");
++        if (lua_isnumber(L, -1))
++            entry.macInset = static_cast<float>(lua_tonumber(L, -1));
++        lua_pop(L, 1);
++
++        lua_getfield(L, 2, "mac_radius");
++        if (lua_isnumber(L, -1))
++            entry.macRadius = static_cast<float>(lua_tonumber(L, -1));
++        lua_pop(L, 1);
+     }
+ 
+     s_pendingLayers.push_back(std::move(entry));
++    // Permit isolated runtime layer configuration without a desktop reload.
++    commitPendingLayers();
+     return 0;
+ }
+ 
+@@ -787,6 +805,11 @@ void commitPendingLayers() {
+                 g_pGlobalState->layerNamespaceLiveResample[entry.ns] = entry.liveResample != 0;
+             if (entry.maskMode)
+                 g_pGlobalState->layerNamespaceMaskModes[entry.ns] = *entry.maskMode;
++            if (entry.macInset) {
++                g_pGlobalState->layerNamespaceMacShapes[entry.ns] = {.inset = *entry.macInset, .radius = entry.macRadius};
++                // the mac shader composites the surface itself and needs the redirect
++                g_pGlobalState->layerNamespaceMaskModes[entry.ns] = ELayerMaskMode::ALPHA;
++            }
+         }
+     }
+     s_pendingLayers.clear();
+diff --git a/src/PluginConfig.hpp b/src/PluginConfig.hpp
+index 66df020..5ce19b1 100644
+--- a/src/PluginConfig.hpp
++++ b/src/PluginConfig.hpp
+@@ -129,6 +129,10 @@ inline constexpr auto SUBSURFACES_PRESET  = "plugin:hyprglass:subsurfaces:preset
+ // surface box). >= 0 = that exact radius, scaled by monitor scale.
+ inline constexpr auto SUBSURFACES_RADIUS  = "plugin:hyprglass:subsurfaces:radius";
+ 
++// macOS-fitted glass slider position, 0 (clear) .. 1 (tinted).
++// (per-namespace shape lives in SMacLayerShape below)
++inline constexpr auto MAC_TINT = "plugin:hyprglass:mac:tint";
++
+ // Window background cache kill switch; commit-driven invalidation (single
+ // global bool, no per-namespace concept for windows) and its throttle —
+ // mirrors the layers:live_resample/live_resample_fps keys above.
+@@ -333,6 +337,7 @@ struct SPluginConfig {
+     Hyprlang::INT* const*   subsurfacesEnabled = nullptr;
+     StringConfigPtr         subsurfacesPreset;
+     Hyprlang::FLOAT* const* subsurfacesRadius  = nullptr;
++    Hyprlang::FLOAT* const* macTint            = nullptr;
+ 
+     Hyprlang::INT* const* windowsBackgroundCache  = nullptr;
+     Hyprlang::INT* const* windowsLiveResample     = nullptr;
+@@ -386,3 +391,10 @@ void commitPendingLayers();
+ 
+ // Validate config values and notify user of misconfigurations
+ void validateConfig();
++
++// Per-namespace macOS glass shape, logical px. Layers with one render with the
++// fitted macglass shader; inset leaves room for the shadow around the glass.
++struct SMacLayerShape {
++    float inset  = 0.0f;
++    float radius = -1.0f; // < 0: capsule
++};
+diff --git a/src/ShaderManager.cpp b/src/ShaderManager.cpp
+index eaba12f..8641367 100644
+--- a/src/ShaderManager.cpp
++++ b/src/ShaderManager.cpp
+@@ -101,17 +101,29 @@ bool CShaderManager::compileBlurShader() {
+     return true;
+ }
+ 
++bool CShaderManager::compileMacShaders() {
++    for (auto& [shader, file] : {std::pair{macShader, "macglass.frag"}, std::pair{macBlurShader, "macblur.frag"}}) {
++        if (!shader->createProgram(g_pHyprOpenGL->m_shaders->TEXVERTSRC, loadShaderSource(file), true)) {
++            HyprlandAPI::addNotification(PHANDLE, std::format("[{}] Failed to compile {}", PLUGIN_NAME, file), CHyprColor{1.0, 0.2, 0.2, 1.0}, 5000);
++            return false;
++        }
++    }
++    return true;
++}
++
+ void CShaderManager::initializeIfNeeded() {
+     if (m_initialized)
+         return;
+ 
+-    m_initialized   = compileGlassShader() && compileBlurShader();
++    m_initialized   = compileGlassShader() && compileBlurShader() && compileMacShaders();
+     m_compileFailed = !m_initialized;
+ }
+ 
+ void CShaderManager::destroy() noexcept {
+     glassShader->destroy();
+     blurShader->destroy();
++    macShader->destroy();
++    macBlurShader->destroy();
+     m_initialized   = false;
+     m_compileFailed = false;
+ }
+diff --git a/src/ShaderManager.hpp b/src/ShaderManager.hpp
+index 70b9aa9..9ea6a8b 100644
+--- a/src/ShaderManager.hpp
++++ b/src/ShaderManager.hpp
+@@ -77,6 +77,11 @@ class CShaderManager {
+     SP<CShader>    blurShader = makeShared<CShader>();
+     SBlurUniforms  blurUniforms;
+ 
++    // macOS-fitted glass (see MacGlassParams.hpp). Uniform locations are
++    // looked up per draw; these programs only run for configured layers.
++    SP<CShader>    macShader     = makeShared<CShader>();
++    SP<CShader>    macBlurShader = makeShared<CShader>();
++
+   private:
+     bool m_initialized = false;
+     bool m_compileFailed = false;
+@@ -84,4 +89,5 @@ class CShaderManager {
+     [[nodiscard]] static std::string loadShaderSource(const char* fileName);
+     [[nodiscard]] bool compileGlassShader();
+     [[nodiscard]] bool compileBlurShader();
++    [[nodiscard]] bool compileMacShaders();
+ };
+diff --git a/src/Shaders.hpp b/src/Shaders.hpp
+index 1f6a46e..97d6730 100644
+--- a/src/Shaders.hpp
++++ b/src/Shaders.hpp
+@@ -500,6 +500,210 @@ void main() {
+         fragColor = vec4(color * glassA, glassA);
+     }
+ }
++)GLSL"},
++
++    // ========================================================================
++    // macOS 27 Liquid Glass (Spotlight family), fitted to captures of the real
++    // system at 3840x2160@1x. See MacGlassParams.hpp for the measured tables.
++    //
++    // Pipeline per fragment of the layer box:
++    //   outside the shape : drop shadow (two SDF Gaussians) + 1px dark outline
++    //   inside the shape  : edge refraction -> two-scale Gaussian blur (texSmall,
++    //                       tex) -> luma tone curve + chroma scale -> rim light
++    //   then the client's own surface (text, icons) is composited on top.
++    // All colour math happens on sRGB-encoded values, which is how macOS does it
++    // (fits in linear light were far worse). Linear FP16 work buffers (HDR) are
++    // decoded to sRGB first and re-encoded afterwards.
++    // ========================================================================
++    {"macglass.frag", R"GLSL(
++#version 300 es
++precision highp float;
++
++uniform sampler2D tex;       // wide blur, padded background sample
++uniform sampler2D texSmall;  // narrow blur, same layout
++uniform sampler2D maskTex;   // rendered layer surface, premultiplied, monitor sized
++uniform vec2 maskUVOffset;
++uniform vec2 maskUVScale;
++
++uniform vec2 fullSize;       // layer box in px
++uniform vec2 uvPadding;
++uniform vec2 glassBoxOffsetPx;
++uniform vec2 glassBoxSizePx;
++uniform float cornerRadius;  // px; >= half the short side gives a capsule
++uniform float capA;
++uniform float capN;
++uniform float pxScale;       // monitor scale: fitted lengths are px at 1x
++
++uniform float smallWeight;   // weight of texSmall in the blur mix
++uniform float lut[17];       // luma tone curve at g = 0,16,...,240,252
++uniform float chroma;
++
++uniform float refrA;
++uniform float refrW;
++uniform float refrP;
++
++uniform float rimR0;
++uniform float rimRC;
++uniform float rimA1;
++uniform float rimL1;
++uniform float rimL2;
++uniform float rimSide;
++uniform float rimK;
++
++uniform float outlineAlpha;
++uniform vec3 shadowKey;      // alpha, dy, sigma
++uniform vec3 shadowAmb;
++
++uniform float opacity;
++uniform int workLinear;      // 1: work buffer is linear (HDR / FP16)
++uniform float workBlack;     // work-buffer value of sRGB 0
++uniform float workWhite;     // work-buffer value of sRGB 1
++uniform int sdrGamma22;      // 1: SDR content is decoded with pure gamma 2.2
++
++in vec2 v_texcoord;
++layout(location = 0) out vec4 fragColor;
++
++float srgbEnc(float v) {
++    v = clamp(v, 0.0, 1.0);
++    if (sdrGamma22 == 1) return pow(v, 1.0 / 2.2);
++    return v <= 0.0031308 ? v * 12.92 : 1.055 * pow(v, 1.0 / 2.4) - 0.055;
++}
++float srgbDec(float v) {
++    v = clamp(v, 0.0, 1.0);
++    if (sdrGamma22 == 1) return pow(v, 2.2);
++    return v <= 0.04045 ? v / 12.92 : pow((v + 0.055) / 1.055, 2.4);
++}
++vec3 toSrgb(vec3 c) {
++    if (workLinear == 0) return c;
++    c = (c - workBlack) / max(workWhite - workBlack, 1e-6);
++    return vec3(srgbEnc(c.r), srgbEnc(c.g), srgbEnc(c.b));
++}
++vec3 fromSrgb(vec3 c) {
++    if (workLinear == 0) return c;
++    return vec3(srgbDec(c.r), srgbDec(c.g), srgbDec(c.b)) * (workWhite - workBlack) + workBlack;
++}
++
++// Continuous-curvature rounded box, fitted to the Spotlight capsule: each
++// corner is a superellipse with exponent capN reaching capA * r along the
++// long side. Returns an approximate signed distance in px (negative inside).
++float shapeLevel(vec2 q) {
++    vec2 S = glassBoxSizePx;
++    float r = min(cornerRadius, 0.5 * min(S.x, S.y));
++    float ex = min(capA * r, 0.5 * S.x);
++    float ey = min(capA * r, 0.5 * S.y);
++    vec2 c = clamp(q, vec2(ex, ey), S - vec2(ex, ey));
++    vec2 d = abs(q - c) / vec2(ex, ey);
++    float f = pow(pow(d.x, capN) + pow(d.y, capN), 1.0 / capN);
++    return (f - 1.0) * min(ex, ey);
++}
++
++// Standard normal CDF, tanh approximation (max error ~3e-4).
++float phi(float x) {
++    return 0.5 * (1.0 + tanh(0.7978845608 * (x + 0.044715 * x * x * x)));
++}
++
++float lutAt(float y) {
++    float g = clamp(y, 0.0, 1.0) * 255.0;
++    if (g < 240.0) {
++        float fi = floor(g / 16.0);
++        int i = int(fi);
++        return mix(lut[i], lut[i + 1], (g - fi * 16.0) / 16.0);
++    }
++    return mix(lut[15], lut[16], (g - 240.0) / 12.0);
++}
++
++vec3 sampleBlur(vec2 posPx) {
++    vec2 uv = posPx / fullSize;
++    vec2 tuv = clamp(uv * (1.0 - 2.0 * uvPadding) + uvPadding, 0.0005, 0.9995);
++    vec3 s = texture(texSmall, tuv).rgb;
++    vec3 b = texture(tex, tuv).rgb;
++    return toSrgb(mix(b, s, smallWeight));
++}
++
++void main() {
++    vec2 p = v_texcoord * fullSize;
++    vec2 q = p - glassBoxOffsetPx;
++    float lv = shapeLevel(q);
++
++    vec4 surf = texture(maskTex, clamp(v_texcoord * maskUVScale + maskUVOffset, 0.0, 1.0));
++
++    // coverage of {sdf < 0} and of the 1px outline band {0 < sdf < 1}
++    float covIn = clamp(0.5 - lv / pxScale, 0.0, 1.0);
++    float covOut = clamp(1.5 - lv / pxScale, 0.0, 1.0) - covIn;
++
++    // drop shadow (outside, under everything)
++    float sk = shadowKey.x * phi(-shapeLevel(q - vec2(0.0, shadowKey.y * pxScale)) / (shadowKey.z * pxScale));
++    float sa = shadowAmb.x * phi(-shapeLevel(q - vec2(0.0, shadowAmb.y * pxScale)) / (shadowAmb.z * pxScale));
++    float shadowA = 1.0 - (1.0 - sk) * (1.0 - sa);
++    float darkA = 1.0 - (1.0 - shadowA) * (1.0 - outlineAlpha * covOut);
++
++    vec3 glass = vec3(0.0);
++    if (covIn > 0.0) {
++        float depth = max(-lv, 0.0) / pxScale;
++        float e = 0.25;
++        vec2 grad = vec2(shapeLevel(q + vec2(e, 0.0)) - shapeLevel(q - vec2(e, 0.0)),
++                         shapeLevel(q + vec2(0.0, e)) - shapeLevel(q - vec2(0.0, e)));
++        vec2 n = grad / max(length(grad), 1e-6);
++
++        float u = clamp(depth / refrW, 0.0, 1.0);
++        float D = refrA * pow(1.0 - u, refrP) * pxScale;
++        vec3 b = sampleBlur(p - n * D);
++
++        float Y = dot(b, vec3(0.2126, 0.7152, 0.0722));
++        vec3 c = vec3(lutAt(Y)) + chroma * (b - Y);
++
++        float d0 = max(depth - 0.5, 0.0);
++        float prof = rimA1 * exp(-d0 / rimL1) + (1.0 - rimA1) * exp(-d0 / rimL2);
++        float ang = rimSide + (1.0 - rimSide) * pow(abs(n.y), rimK);
++        c += (vec3(rimRC) - c) * rimR0 * prof * ang;
++        glass = fromSrgb(clamp(c, 0.0, 1.0));
++    }
++
++    // premultiplied: glass (opaque, coverage covIn) over the dark shadow/outline
++    vec3 baseRGB = glass * covIn;
++    float baseA = covIn + (1.0 - covIn) * darkA;
++
++    // client surface on top
++    vec3 outRGB = surf.rgb + (1.0 - surf.a) * baseRGB;
++    float outA = surf.a + (1.0 - surf.a) * baseA;
++    fragColor = vec4(outRGB, outA) * opacity;
++}
++)GLSL"},
++
++    // Exact separable Gaussian for the mac glass: support of 3 sigma, paired
++    // bilinear taps. Sigma in texels of the bound texture.
++    {"macblur.frag", R"GLSL(
++#version 300 es
++precision highp float;
++
++uniform sampler2D tex;
++uniform vec2 direction;
++uniform float sigma;
++
++in vec2 v_texcoord;
++layout(location = 0) out vec4 fragColor;
++
++void main() {
++    if (sigma < 0.3) {
++        fragColor = texture(tex, v_texcoord);
++        return;
++    }
++    int radius = int(ceil(sigma * 3.0));
++    float k = -0.5 / (sigma * sigma);
++    vec4 acc = texture(tex, v_texcoord);
++    float wsum = 1.0;
++    for (int i = 1; i <= radius; i += 2) {
++        float x1 = float(i);
++        float x2 = float(i + 1);
++        float w1 = exp(x1 * x1 * k);
++        float w2 = (i + 1 <= radius) ? exp(x2 * x2 * k) : 0.0;
++        float w = w1 + w2;
++        float off = (x1 * w1 + x2 * w2) / w;
++        acc += (texture(tex, v_texcoord + direction * off) + texture(tex, v_texcoord - direction * off)) * w;
++        wsum += 2.0 * w;
++    }
++    fragColor = acc / wsum;
++}
+ )GLSL"},
+ 
+     {"gaussianblur.frag", R"GLSL(
+diff --git a/src/main.cpp b/src/main.cpp
+index b257146..0188c48 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -321,6 +321,7 @@ static void parseLayerNamespaceFilters() {
+     });
+ 
+     g_pGlobalState->layerNamespaceMaskModes.clear();
++    g_pGlobalState->layerNamespaceMacShapes.clear();
+     parseKeyValuePairs(config.layersNamespaceMaskModes, '=', [&](const std::string& ns, const std::string& val) {
+         if (auto mode = parseLayerMaskMode(val))
+             g_pGlobalState->layerNamespaceMaskModes[ns] = *mode;
+@@ -828,12 +829,13 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
+     // the failure notification waits for the config: see notifySubsurfaceHookFailure()
+     g_pGlobalState->renderPassAddSymbolFound = renderPassAddFound;
+ 
+-    HyprlandAPI::reloadConfig();
++    // Isolated prototype: do not reload the user's monitor configuration.
+     initConfigPointers(PHANDLE, g_pGlobalState->config);
+     commitPendingPresets();
+     parseLayerNamespaceFilters();
+     commitPendingLayers();
+     validateConfig();
++    g_pGlobalState->layerNamespaceMacShapes["glasstest"] = {.inset = 110.0f, .radius = -1.0f};
+     refreshSurfaceObserver();
+     notifySubsurfaceHookFailure();
+ 
+diff --git a/src/MacGlassParams.hpp b/src/MacGlassParams.hpp
+new file mode 100644
+--- /dev/null
++++ b/src/MacGlassParams.hpp
+@@ -0,0 +1,95 @@
++#pragma once
++
++// macOS 27 Liquid Glass, Spotlight family. Every number here was fitted to
++// screenshots of the real system (3840x2160 at 1x, dark appearance) across
++// the "Liquid Glass" transparency slider (NSGlassTintAmount 0..1). Lengths
++// are px at scale 1. Source data and fitting scripts live in
++// ~/Pictures/macos-reference/08-spotlight-glass on the capture machine.
++
++#include <algorithm>
++#include <array>
++#include <cmath>
++
++namespace MacGlass {
++
++// Continuous-capsule corner: superellipse exponent and long-side reach,
++// fitted to the 640x57 Spotlight field to 0.1 px rms.
++inline constexpr float CAP_N = 2.238f;
++inline constexpr float CAP_A = 30.94f / 28.5f;
++
++// Measured slider positions.
++inline constexpr std::array<float, 5> TINTS = {0.0f, 0.25f, 0.5f, 0.75f, 1.0f};
++
++// Luma tone curve, sRGB-encoded output for input luma g/255 at
++// g = 0,16,...,240,252, per slider position.
++inline constexpr std::array<std::array<float, 17>, 5> LUTS = {{
++    {0.1255f, 0.1725f, 0.2235f, 0.2745f, 0.3216f, 0.3686f, 0.4092f, 0.4471f, 0.4784f, 0.5059f, 0.5294f, 0.5490f, 0.5608f, 0.5725f, 0.5765f, 0.5765f, 0.5725f},
++    {0.1255f, 0.1725f, 0.2235f, 0.2745f, 0.3216f, 0.3647f, 0.4039f, 0.4392f, 0.4667f, 0.4902f, 0.5098f, 0.5255f, 0.5373f, 0.5412f, 0.5412f, 0.5373f, 0.5294f},
++    {0.1255f, 0.1725f, 0.2235f, 0.2706f, 0.3176f, 0.3569f, 0.3961f, 0.4275f, 0.4549f, 0.4745f, 0.4902f, 0.5007f, 0.5059f, 0.5033f, 0.4980f, 0.4902f, 0.4784f},
++    {0.1176f, 0.1529f, 0.1882f, 0.2235f, 0.2588f, 0.2902f, 0.3176f, 0.3412f, 0.3608f, 0.3765f, 0.3882f, 0.4000f, 0.4039f, 0.4039f, 0.4039f, 0.4000f, 0.3922f},
++    {0.1255f, 0.1529f, 0.1804f, 0.2039f, 0.2275f, 0.2471f, 0.2667f, 0.2824f, 0.2980f, 0.3098f, 0.3216f, 0.3281f, 0.3333f, 0.3373f, 0.3373f, 0.3373f, 0.3373f},
++}};
++
++// Chroma scale around luma: out = lut(Y) + chroma * (in - Y).
++inline constexpr std::array<float, 5> CHROMA = {1.1169f, 1.1043f, 1.0834f, 0.8719f, 0.6635f};
++
++// Two-scale Gaussian blur in sRGB-encoded space: (1-w2) G(s1) + w2 G(s2).
++// Fitted at slider 0, 0.5 and 1; 0.25 and 0.75 are interpolated.
++struct SBlur {
++    float s1, s2, w2;
++};
++inline constexpr std::array<SBlur, 3> BLUR_AT = {{
++    {4.6536f, 40.3273f, 0.2181f},
++    {7.4105f, 32.8449f, 0.3355f},
++    {10.5681f, 32.1030f, 0.5950f},
++}};
++
++// Edge refraction: samples are pulled inward by A * (1 - depth/W)^p.
++inline constexpr float REFR_A = 12.2734f;
++inline constexpr float REFR_W = 18.7632f;
++inline constexpr float REFR_P = 1.5954f;
++
++// Rim light: out += (RC - out) * R0 * prof(depth) * ang(normal).
++inline constexpr float RIM_R0   = 0.1805f;
++inline constexpr float RIM_RC   = 1.2820f;
++inline constexpr float RIM_A1   = 0.8408f;
++inline constexpr float RIM_L1   = 0.4956f;
++inline constexpr float RIM_L2   = 2.5775f;
++inline constexpr float RIM_SIDE = 0.1967f;
++inline constexpr float RIM_K    = 13.7343f;
++
++// 1 px dark outline just outside the glass, and the drop shadow (identical
++// at every slider position): alpha, y offset, sigma.
++inline constexpr float OUTLINE_ALPHA = 0.9677f;
++inline constexpr std::array<float, 3> SHADOW_KEY = {0.547f, 23.66f, 15.87f};
++inline constexpr std::array<float, 3> SHADOW_AMB = {0.135f, -4.72f, 11.79f};
++
++struct STintParams {
++    std::array<float, 17> lut;
++    float                 chroma;
++    SBlur                 blur;
++};
++
++inline STintParams paramsForTint(float tint) {
++    tint = std::clamp(std::isfinite(tint) ? tint : 1.0f, 0.0f, 1.0f);
++
++    size_t i = 0;
++    while (i + 2 < TINTS.size() && tint > TINTS[i + 1])
++        i++;
++    const float f = (tint - TINTS[i]) / (TINTS[i + 1] - TINTS[i]);
++
++    STintParams out{};
++    for (size_t k = 0; k < 17; k++)
++        out.lut[k] = LUTS[i][k] + (LUTS[i + 1][k] - LUTS[i][k]) * f;
++    out.chroma = CHROMA[i] + (CHROMA[i + 1] - CHROMA[i]) * f;
++
++    const float bt = tint * 2.0f;
++    const size_t b = std::min<size_t>(static_cast<size_t>(bt), 1);
++    const float  bf = bt - static_cast<float>(b);
++    out.blur = {BLUR_AT[b].s1 + (BLUR_AT[b + 1].s1 - BLUR_AT[b].s1) * bf,
++                BLUR_AT[b].s2 + (BLUR_AT[b + 1].s2 - BLUR_AT[b].s2) * bf,
++                BLUR_AT[b].w2 + (BLUR_AT[b + 1].w2 - BLUR_AT[b].w2) * bf};
++    return out;
++}
++
++} // namespace MacGlass

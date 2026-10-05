@@ -1,0 +1,96 @@
+diff --git a/src/Shaders.hpp b/src/Shaders.hpp
+--- a/src/Shaders.hpp
++++ b/src/Shaders.hpp
+@@ -618,4 +618,4 @@
+     vec3 s = texture(texSmall, tuv).rgb;
+     vec3 b = texture(tex, tuv).rgb;
+-    return toSrgb(mix(b, s, smallWeight));
++    return mix(b, s, smallWeight);
+ }
+@@ -680,3 +680,7 @@
+ uniform vec2 direction;
+ uniform float sigma;
++uniform int sourceLinear;
++uniform int sourceGamma22;
++uniform float sourceBlack;
++uniform float sourceWhite;
+ 
+@@ -684,4 +688,17 @@
+ layout(location = 0) out vec4 fragColor;
+ 
++vec4 sampleEncoded(vec2 uv) {
++    vec4 c = texture(tex, uv);
++    if (sourceLinear == 0) return c;
++    vec3 v = clamp((c.rgb - sourceBlack) / max(sourceWhite - sourceBlack, 1e-6), 0.0, 1.0);
++    if (sourceGamma22 == 1) {
++        c.rgb = pow(v, vec3(1.0 / 2.2));
++    } else {
++        c.rgb = mix(1.055 * pow(v, vec3(1.0 / 2.4)) - 0.055,
++                    v * 12.92, lessThanEqual(v, vec3(0.0031308)));
++    }
++    return c;
++}
++
+ void main() {
+     if (sigma < 0.3) {
+@@ -688,3 +705,3 @@
+-        fragColor = texture(tex, v_texcoord);
++        fragColor = sampleEncoded(v_texcoord);
+         return;
+     }
+@@ -692,3 +709,3 @@
+     float k = -0.5 / (sigma * sigma);
+-    vec4 acc = texture(tex, v_texcoord);
++    vec4 acc = sampleEncoded(v_texcoord);
+     float wsum = 1.0;
+@@ -701,3 +718,3 @@
+         float off = (x1 * w1 + x2 * w2) / w;
+-        acc += (texture(tex, v_texcoord + direction * off) + texture(tex, v_texcoord - direction * off)) * w;
++        acc += (sampleEncoded(v_texcoord + direction * off) + sampleEncoded(v_texcoord - direction * off)) * w;
+         wsum += 2.0 * w;
+diff --git a/src/GlassRenderer.hpp b/src/GlassRenderer.hpp
+--- a/src/GlassRenderer.hpp
++++ b/src/GlassRenderer.hpp
+@@ -146,3 +146,3 @@
+ // In-place exact Gaussian (sigma in sample-framebuffer texels).
+-void macBlur(SP<Render::IFramebuffer> framebuffer, float sigma, SP<Render::IFramebuffer> callerFramebuffer);
++void macBlur(SP<Render::IFramebuffer> framebuffer, float sigma, SP<Render::IFramebuffer> callerFramebuffer, bool encodeSource = false);
+ 
+diff --git a/src/GlassRenderer.cpp b/src/GlassRenderer.cpp
+--- a/src/GlassRenderer.cpp
++++ b/src/GlassRenderer.cpp
+@@ -599,3 +599,3 @@
+-void macBlur(SP<Render::IFramebuffer> framebuffer, float sigma, SP<Render::IFramebuffer> callerFramebuffer) {
++void macBlur(SP<Render::IFramebuffer> framebuffer, float sigma, SP<Render::IFramebuffer> callerFramebuffer, bool encodeSource) {
+     auto& shaderManager = g_pGlobalState->shaderManager;
+     if (!framebuffer || !callerFramebuffer || sigma < 0.3f || !shaderManager.isInitialized())
+@@ -625,3 +625,15 @@
+     const GLuint program = shader->program();
+     glUniform1f(glGetUniformLocation(program, "sigma"), sigma);
++    const auto monitor = g_pHyprRenderer->m_renderData.pMonitor.lock();
++    const auto workDesc = g_pHyprRenderer->workBufferImageDescription();
++    const bool linear = encodeSource && workDesc->value().transferFunction == NColorManagement::CM_TRANSFER_FUNCTION_EXT_LINEAR;
++    glUniform1i(glGetUniformLocation(program, "sourceLinear"), linear ? 1 : 0);
++    if (linear && monitor) {
++        const auto cm = g_pHyprRenderer->getCMSettings(NColorManagement::getDefaultImageDescription(), workDesc, nullptr, true,
++                                                       monitor->m_sdrMinLuminance, monitor->m_sdrMaxLuminance);
++        const float range = std::max(cm.dstTFRange.max - cm.dstTFRange.min, 1e-6f);
++        glUniform1f(glGetUniformLocation(program, "sourceBlack"), (cm.srcTFRange.min - cm.dstTFRange.min) / range * cm.sdrBrightnessMultiplier);
++        glUniform1f(glGetUniformLocation(program, "sourceWhite"), (cm.srcTFRange.max - cm.dstTFRange.min) / range * cm.sdrBrightnessMultiplier);
++        glUniform1i(glGetUniformLocation(program, "sourceGamma22"), cm.sourceTF == NColorManagement::CM_TRANSFER_FUNCTION_GAMMA22 ? 1 : 0);
++    }
+     const GLint dirLoc = glGetUniformLocation(program, "direction");
+@@ -636,3 +649,5 @@
+     glBindFramebuffer(GL_FRAMEBUFFER, fbId(framebuffer));
+     temp->getTexture()->bind();
++    // Horizontal pass already converted the source to encoded sRGB.
++    glUniform1i(glGetUniformLocation(program, "sourceLinear"), 0);
+     glUniform2f(dirLoc, 0.0f, 1.0f / height);
+diff --git a/src/GlassLayerSurface.cpp b/src/GlassLayerSurface.cpp
+--- a/src/GlassLayerSurface.cpp
++++ b/src/GlassLayerSurface.cpp
+@@ -349,3 +349,3 @@
+             const float s2    = tp.blur.s2 * scale;
+-            GlassRenderer::macBlur(m_sampleFramebuffer, s1, source);
++            GlassRenderer::macBlur(m_sampleFramebuffer, s1, source, true);
+             GlassRenderer::copyFramebuffer(m_sampleFramebuffer, m_macNarrowFramebuffer, source);

@@ -1,0 +1,18 @@
+diff --git a/src/GlassRenderer.cpp b/src/GlassRenderer.cpp
+--- a/src/GlassRenderer.cpp
++++ b/src/GlassRenderer.cpp
+@@ -728,3 +728,4 @@
+     glUniform2f(loc("glassBoxSizePx"), w - 2.0f * inset, h - 2.0f * inset);
+-    glUniform1f(loc("cornerRadius"), draw.radiusPx < 0.0f ? 1e6f : draw.radiusPx);
++    const float radius = draw.radiusPx < 0.0f ? (h - 2.0f * inset > 100.0f * draw.monitorScale ? 23.0f * draw.monitorScale : 1e6f) : draw.radiusPx;
++    glUniform1f(loc("cornerRadius"), radius);
+     glUniform1f(loc("capA"), MacGlass::CAP_A);
+diff --git a/src/GlassLayerSurface.cpp b/src/GlassLayerSurface.cpp
+--- a/src/GlassLayerSurface.cpp
++++ b/src/GlassLayerSurface.cpp
+@@ -240,3 +240,5 @@
+     if (m_backgroundDirty)
+         return;
++    // A throttled final commit must still invalidate the next sampled frame.
++    m_backgroundDirty = true;
+ 
