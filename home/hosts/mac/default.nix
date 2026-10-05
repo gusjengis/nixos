@@ -13,7 +13,6 @@
   xdg.dataFile."quickshell/notch-monitor".text = "eDP-1\n";
   dev.enable = true;
   gaming.enable = false;
-  gameDev.enable = false;
   bambu.enable = false;
   windowsVm.enable = true;
 }

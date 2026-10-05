@@ -43,7 +43,6 @@ in
 
   # Development
   dev.enable = true;
-  gameDev.enable = false;
 
   # Gaming
   gaming.enable = false;

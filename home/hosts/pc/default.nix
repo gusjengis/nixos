@@ -4,7 +4,6 @@
   laptop.enable = false;
 
   gaming.enable = true;
-  gameDev.enable = true;
   bambu.enable = true;
   windowsVm.enable = true;
 
