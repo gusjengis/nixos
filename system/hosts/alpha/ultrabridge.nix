@@ -26,7 +26,7 @@ let
         --outbox-dir ${lib.escapeShellArg captureOutboxDir} \
         --renderer ${supernoteTool}/bin/supernote-tool \
         --ocr-url http://omega:11434/api/chat \
-        --model qwen3.6:35b-a3b-q4_K_M
+        --model qwen3.8:27b
     '';
   };
 
@@ -180,7 +180,7 @@ in
         UB_CAPTURE_ARCHIVE_DIR = captureArchiveDir;
         UB_OCR_ENABLED = "true";
         UB_OCR_API_URL = "http://omega:11434";
-        UB_OCR_MODEL = "qwen3.6:35b-a3b-q4_K_M";
+        UB_OCR_MODEL = "qwen3.8:27b";
         UB_OCR_FORMAT = "openai";
         UB_EMBED_ENABLED = "false";
         UB_CHAT_ENABLED = "false";

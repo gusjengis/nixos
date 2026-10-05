@@ -20,10 +20,16 @@ def transcribe(image: Path, url: str, model: str) -> str:
         "messages": [
             {
                 "role": "user",
+                # Raw notes stay a faithful record: wording is never corrected
+                # here (the omega normalizer does that), but layout the eye can
+                # see on the page, indentation and strike-through, is kept.
                 "content": (
-                    "Transcribe all handwritten text in this page exactly. Preserve line breaks "
-                    "and crossed-out words when possible. Return only transcription, "
-                    "no introduction or commentary. Return an empty string for a blank page."
+                    "Transcribe all handwritten text on this page exactly, as Markdown. "
+                    "Keep the original line breaks. Reproduce indentation: nested list "
+                    "items are indented 4 spaces per level relative to their parent. "
+                    "Wrap crossed-out text in ~~ ~~. Do not correct spelling or wording. "
+                    "Return only the transcription, no commentary. Return an empty "
+                    "string for a blank page."
                 ),
                 "images": [base64.b64encode(image.read_bytes()).decode("ascii")],
             }
