@@ -186,6 +186,18 @@ in
         UB_CHAT_ENABLED = "false";
       };
 
+      # Injection is a runtime DB setting, not an environment option. Keep OCR
+      # indexing, but never rewrite device-owned notebooks and cause conflicts.
+      preStart = ''
+        ${pkgs.python3}/bin/python3 - <<'PY'
+        import sqlite3
+
+        with sqlite3.connect("${stateDir}/ultrabridge.db", timeout=30) as db:
+            db.execute('CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL DEFAULT "")')
+            db.execute("INSERT INTO settings (key, value) VALUES ('sn_inject_enabled', 'false') ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+        PY
+      '';
+
       serviceConfig = {
         Type = "simple";
         ExecStart = lib.getExe package;
