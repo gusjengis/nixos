@@ -1,0 +1,58 @@
+diff --git a/src/server/src/ui/windows/launcher-window.hpp b/src/server/src/ui/windows/launcher-window.hpp
+--- a/src/server/src/ui/windows/launcher-window.hpp
++++ b/src/server/src/ui/windows/launcher-window.hpp
+@@ -5,3 +5,4 @@
+ #include <QObject>
++#include <QtCore/qtenvironmentvariables.h>
+ #include <QQmlApplicationEngine>
+ #include <QTimer>
+@@ -74,3 +75,4 @@
+   Q_PROPERTY(int lsKeyboardInteractivity READ lsKeyboardInteractivity NOTIFY lsChanged)
++  Q_PROPERTY(bool compositorGlass READ compositorGlass CONSTANT)
+   Q_PROPERTY(bool canPositionWindow READ canPositionWindow CONSTANT)
+   Q_PROPERTY(bool commandHeld READ commandHeld NOTIFY commandHeldChanged)
+@@ -122,3 +124,4 @@
+   int lsKeyboardInteractivity() const { return m_lsKeyboardInteractivity; }
++  bool compositorGlass() const { return qEnvironmentVariableIntValue("VICINAE_MAC_GLASS") == 1; }
+   static bool canPositionWindow();
+   bool commandHeld() const { return m_commandHeld; }
+diff --git a/src/server/src/ui/qml/launcher/LauncherAppearance.qml b/src/server/src/ui/qml/launcher/LauncherAppearance.qml
+--- a/src/server/src/ui/qml/launcher/LauncherAppearance.qml
++++ b/src/server/src/ui/qml/launcher/LauncherAppearance.qml
+@@ -5,3 +5,4 @@
+ QtObject {
++    property bool compositorGlass: false
+     property color windowBackground: Config.withAlpha(Theme.background, Config.windowOpacity)
+     property Component dividerComponent: null
+diff --git a/src/server/src/ui/qml/launcher/LauncherWindowLayerShell.qml b/src/server/src/ui/qml/launcher/LauncherWindowLayerShell.qml
+--- a/src/server/src/ui/qml/launcher/LauncherWindowLayerShell.qml
++++ b/src/server/src/ui/qml/launcher/LauncherWindowLayerShell.qml
+@@ -7,4 +7,9 @@
+     id: shell
+-    shadowPadding: WindowMaterial.supportsRegionalBlur ? Config.shadowSize : 0
++    nativeChrome: Launcher.compositorGlass
++    shadowEnabled: !Launcher.compositorGlass && shadowPadding > 0
++    shadowPadding: Launcher.compositorGlass ? 110 : WindowMaterial.supportsRegionalBlur ? Config.shadowSize : 0
+     appearance: LauncherAppearance {
++        compositorGlass: Launcher.compositorGlass
++        windowBackground: compositorGlass ? "transparent" : Config.withAlpha(Theme.background, Config.windowOpacity)
++        delegateBackdrop: compositorGlass ? "transparent" : Config.withAlpha(Theme.background, Config.windowOpacity)
+         searchBarHeight: 52
+diff --git a/src/server/src/ui/qml/launcher/LauncherStatusBar.qml b/src/server/src/ui/qml/launcher/LauncherStatusBar.qml
+--- a/src/server/src/ui/qml/launcher/LauncherStatusBar.qml
++++ b/src/server/src/ui/qml/launcher/LauncherStatusBar.qml
+@@ -12,3 +12,4 @@
+     readonly property alias popupAnchor: footer
++    readonly property bool compositorGlass: (root.Window.window as LauncherWindow)?.appearance.compositorGlass ?? false
+     implicitHeight: 41 + Config.borderWidth
+     clip: true
+@@ -26,3 +27,3 @@
+     MultiEffect {
+-        visible: Config.floatingStatusBar
++        visible: Config.floatingStatusBar && !root.compositorGlass
+         y: -root.backdropPad
+@@ -52,3 +53,3 @@
+         radius: root.windowRadius
+-        color: Config.withAlpha(Theme.statusBarBackground, (Config.floatingStatusBar ? 0.78 : 1.0) * Config.windowOpacity)
++        color: root.compositorGlass ? "transparent" : Config.withAlpha(Theme.statusBarBackground, (Config.floatingStatusBar ? 0.78 : 1.0) * Config.windowOpacity)
+     }

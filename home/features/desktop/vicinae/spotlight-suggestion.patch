@@ -1,0 +1,425 @@
+diff --git a/src/server/src/ui/qml/launcher/LauncherAppearance.qml b/src/server/src/ui/qml/launcher/LauncherAppearance.qml
+index 2f861b1f5..ea1f34482 100644
+--- a/src/server/src/ui/qml/launcher/LauncherAppearance.qml
++++ b/src/server/src/ui/qml/launcher/LauncherAppearance.qml
+@@ -34,4 +34,8 @@ QtObject {
+     property color delegateBackdrop: Config.withAlpha(Theme.background, Config.windowOpacity)
+     property color selectionFill: Config.withAlpha(Theme.listItemSelectionBg, Config.surfaceOpacity)
+     property color hoverFill: Config.withAlpha(Theme.listItemHoverBg, Config.surfaceOpacity)
++    // Spotlight-style selection: while the user is typing, the selected row is
++    // only brightened; it takes the accent fill once focus moves into the list.
++    property bool keyboardSelection: true
++    property color softSelectionFill: Qt.rgba(1, 1, 1, 0.17)
+ }
+diff --git a/src/server/src/ui/qml/launcher/LauncherWindowLayerShell.qml b/src/server/src/ui/qml/launcher/LauncherWindowLayerShell.qml
+index e24edaa52..9c22c94c3 100644
+--- a/src/server/src/ui/qml/launcher/LauncherWindowLayerShell.qml
++++ b/src/server/src/ui/qml/launcher/LauncherWindowLayerShell.qml
+@@ -12,6 +12,8 @@ LauncherWindow {
+         compositorGlass: Launcher.compositorGlass
+         windowBackground: compositorGlass ? "transparent" : Config.withAlpha(Theme.background, Config.windowOpacity)
+         delegateBackdrop: compositorGlass ? "transparent" : Config.withAlpha(Theme.background, Config.windowOpacity)
++        rowInset: compositorGlass ? 10 : 6
++        rowRadius: compositorGlass ? 17 : 10
+         searchBarHeight: 52
+     }
+     readonly property int shellHeight: Launcher.compacted ? appearance.searchBarHeight + 2 * appearance.contentInset + 2 * shadowPadding : expandedHeight
+diff --git a/src/server/src/ui/qml/launcher/SearchBar.qml b/src/server/src/ui/qml/launcher/SearchBar.qml
+index 9672d1c88..451fc7f7b 100644
+--- a/src/server/src/ui/qml/launcher/SearchBar.qml
++++ b/src/server/src/ui/qml/launcher/SearchBar.qml
+@@ -9,6 +9,51 @@ Item {
+     property int horizontalPadding: 20
+     property int textSize: 26
+     property bool flatAccessories: false
++    readonly property LauncherAppearance appearance: (root.Window.window as LauncherWindow)?.appearance ?? null
++
++    // Spotlight inline suggestion: the selected root result is previewed after the
++    // typed query and its icon is shown at the trailing edge of the field.
++    readonly property string suggestionTitle: {
++        if (!Launcher.searchInteractive || Launcher.hasCompleter || Launcher.compacted || Launcher.showBackButton)
++            return "";
++        if (searchInput.text.length === 0 || searchInput.cursorPosition !== searchInput.text.length || searchInput.selectedText !== "")
++            return "";
++        // qmllint disable missing-property
++        const title = root.commandView ? root.commandView.spotlightTitle : undefined;
++        // qmllint enable missing-property
++        return typeof title === "string" ? title : "";
++    }
++    readonly property string suggestionIcon: {
++        if (suggestionTitle === "")
++            return "";
++        // qmllint disable missing-property
++        const icon = root.commandView ? root.commandView.spotlightIcon : undefined;
++        // qmllint enable missing-property
++        return typeof icon === "string" ? icon : "";
++    }
++    readonly property string suggestionSuffix: {
++        if (suggestionTitle === "")
++            return "";
++        const query = searchInput.text;
++        if (suggestionTitle.length >= query.length && suggestionTitle.toLowerCase().startsWith(query.toLowerCase()))
++            return suggestionTitle.substring(query.length) + " \u2014 Open";
++        return " \u2014 " + suggestionTitle;
++    }
++
++    // Soft (query-focused) selection applies to the root Spotlight list only.
++    // qmllint disable missing-property
++    readonly property bool spotlightView: !!root.commandView && root.commandView.spotlightTitle !== undefined
++    // qmllint enable missing-property
++
++    onSpotlightViewChanged: {
++        if (!spotlightView)
++            setKeyboardSelection(true);
++    }
++
++    function setKeyboardSelection(value) {
++        if (root.appearance)
++            root.appearance.keyboardSelection = value || !root.spotlightView;
++    }
+ 
+     function focusInput() {
+         if (!Launcher.searchInteractive)
+@@ -47,9 +92,10 @@ Item {
+             // Match Quickshell's SF Pro magnifyingglass symbol.
+             text: String.fromCodePoint(0x1002AB)
+             font.family: "SF Pro"
+-            font.pixelSize: 24
+-            font.weight: Font.Medium
+-            color: Theme.textMuted
++            // Spotlight's glyph is Regular weight in a neutral ~70% white.
++            font.pixelSize: 23
++            font.weight: Font.Normal
++            color: Qt.rgba(1, 1, 1, 0.7)
+         }
+ 
+         Item {
+@@ -64,8 +110,45 @@ Item {
+                 text: searchInput.text || " "
+             }
+ 
++            Rectangle {
++                id: suggestionPill
++                visible: root.suggestionSuffix !== "" && !(root.appearance?.keyboardSelection ?? true)
++                x: suggestionText.x
++                width: suggestionText.implicitWidth + 6
++                height: 32
++                anchors.verticalCenter: parent.verticalCenter
++                radius: 8
++                color: Qt.rgba(1, 1, 1, 0.19)
++            }
++
++            Text {
++                id: suggestionText
++                renderTypeQuality: Text.VeryHighRenderTypeQuality
++                layer.enabled: true
++                layer.textureSize: Qt.size(Math.ceil(width * 4), Math.ceil(height * 4))
++                layer.smooth: true
++                layer.mipmap: true
++                visible: root.suggestionSuffix !== ""
++                // Suggestions are shown only with the cursor at the end of the query.
++                x: searchInput.cursorRectangle.x
++                width: Math.max(0, parent.width - x)
++                height: parent.height
++                verticalAlignment: Text.AlignVCenter
++                text: root.suggestionSuffix
++                font: searchInput.font
++                color: Qt.rgba(1, 1, 1, 0.67)
++                elide: Text.ElideRight
++                maximumLineCount: 1
++            }
++
+             TextInput {
+                 id: searchInput
++                // Higher-resolution text/selection/caret, area-filtered back to
++                // the same logical geometry and font metrics.
++                layer.enabled: true
++                layer.textureSize: Qt.size(Math.ceil(width * 4), Math.ceil(height * 4))
++                layer.smooth: true
++                layer.mipmap: true
+                 Accessible.name: "search-input"
+                 Accessible.description: Launcher.searchPlaceholder
+                 anchors.fill: parent
+@@ -73,13 +156,56 @@ Item {
+                 font.family: "SF Pro Display"
+                 font.pixelSize: root.textSize
+                 font.weight: Font.Medium
+-                color: Theme.foreground
++                color: "#ffffff"
+                 selectionColor: Theme.textSelectionBg
+                 selectedTextColor: Theme.textSelectionFg
+                 clip: true
+                 readOnly: !Launcher.searchInteractive
+                 echoMode: Launcher.searchRedacted ? TextInput.Password : TextInput.Normal
+ 
++                // macOS insertion point: 2x30 white bar with rounded ends that
++                // fades rather than snaps. Hidden while an inline suggestion is
++                // shown, since Spotlight then shows a selection instead.
++                cursorDelegate: Item {
++                    id: caret
++                    // TextInput positions and sizes this item to the line box.
++                    width: 2
++
++                    Rectangle {
++                        id: caretBar
++                        width: 2
++                        height: 30
++                        anchors.centerIn: parent
++                        anchors.verticalCenterOffset: -1
++                        radius: 1
++                        color: "#ffffff"
++                        visible: searchInput.cursorVisible && searchInput.selectedText === "" && root.suggestionSuffix === ""
++                    }
++
++                    SequentialAnimation {
++                        id: caretBlink
++                        running: caretBar.visible
++                        loops: Animation.Infinite
++                        PropertyAction { target: caretBar; property: "opacity"; value: 1 }
++                        PauseAnimation { duration: 500 }
++                        NumberAnimation { target: caretBar; property: "opacity"; to: 0; duration: 150 }
++                        PauseAnimation { duration: 350 }
++                        NumberAnimation { target: caretBar; property: "opacity"; to: 1; duration: 150 }
++                    }
++
++                    Connections {
++                        target: searchInput
++                        function onCursorPositionChanged() {
++                            if (caretBar.visible)
++                                caretBlink.restart();
++                        }
++                        function onTextChanged() {
++                            if (caretBar.visible)
++                                caretBlink.restart();
++                        }
++                    }
++                }
++
+                 HoverHandler {
+                     cursorShape: Qt.IBeamCursor
+                 }
+@@ -88,7 +214,9 @@ Item {
+                     anchors.fill: parent
+                     verticalAlignment: Text.AlignVCenter
+                     text: Launcher.hasCompleter ? "..." : Launcher.searchPlaceholder
+-                    color: Theme.textPlaceholder
++                    renderTypeQuality: Text.VeryHighRenderTypeQuality
++                    // Opaque gray 124 marks compositor-additive text; fallback stays 93% white.
++                    color: Launcher.compacted && Launcher.compositorPlaceholder ? "#7c7c7c" : Qt.rgba(1, 1, 1, 0.93)
+                     font: searchInput.font
+                     visible: !searchInput.displayText && Launcher.searchInteractive
+                 }
+@@ -100,6 +228,7 @@ Item {
+                 }
+ 
+                 onTextEdited: {
++                    root.setKeyboardSelection(false);
+                     if (Config.considerPreedit)
+                         return false;
+ 
+@@ -110,6 +239,8 @@ Item {
+                     if (!Config.considerPreedit)
+                         return false;
+ 
++                    root.setKeyboardSelection(false);
++
+                     searchDebounce.restart();
+                 }
+ 
+@@ -238,6 +369,11 @@ Item {
+                         return true;
+                     }
+ 
++                    if (nav === 2 && root.appearance && !root.appearance.keyboardSelection && root.commandView.currentIndex >= 0) {
++                        root.setKeyboardSelection(true);
++                        return true;
++                    }
++                    root.setKeyboardSelection(true);
+                     if (nav === 1) {
+                         // qmllint disable missing-property
+                         root.commandView.moveUp();
+@@ -264,7 +400,12 @@ Item {
+                     // qmllint disable missing-property
+                     const navigatable = typeof root.commandView.moveUp === "function";
+ 
+-                    if (navigatable && (ctrl || event.modifiers == Qt.NoModifier)) {
++                    if (navigatable && event.modifiers == Qt.NoModifier && root.appearance?.keyboardSelection && root.commandView.listModel && root.commandView.currentIndex >= 0 && root.commandView.listModel.nextSelectableIndex(-1, 1) === root.commandView.currentIndex && searchInput.text !== "") {
++                        // Like Spotlight, moving up from the first result returns focus to the query.
++                        root.setKeyboardSelection(false);
++                        event.accepted = true;
++                    } else if (navigatable && (ctrl || event.modifiers == Qt.NoModifier)) {
++                        root.setKeyboardSelection(true);
+                         event.accepted = ctrl ? (typeof root.commandView.moveSectionUp === "function" && root.commandView.moveSectionUp()) : root.commandView.moveUp();
+                         // qmllint enable missing-property
+                     } else {
+@@ -282,7 +423,13 @@ Item {
+                     // qmllint enable missing-property
+                     const ctrl = event.modifiers == Qt.ControlModifier;
+ 
+-                    if (navigatable && (ctrl || event.modifiers == Qt.NoModifier)) {
++                    if (navigatable && event.modifiers == Qt.NoModifier && root.appearance && !root.appearance.keyboardSelection && root.commandView.currentIndex >= 0) {
++                        // Like Spotlight, the first Down moves focus into the list
++                        // without skipping the suggested result.
++                        root.setKeyboardSelection(true);
++                        event.accepted = true;
++                    } else if (navigatable && (ctrl || event.modifiers == Qt.NoModifier)) {
++                        root.setKeyboardSelection(true);
+                         // qmllint disable missing-property
+                         event.accepted = ctrl ? (typeof root.commandView.moveSectionDown === "function" && root.commandView.moveSectionDown()) : root.commandView.moveDown();
+                         // qmllint enable missing-property
+@@ -369,6 +516,16 @@ Item {
+             Layout.preferredWidth: root.flatAccessories && item instanceof SearchableDropdown ? Math.min(200, (item as SearchableDropdown).preferredWidth) : 200
+         }
+ 
++        ViciImage {
++            id: suggestionIconImage
++            visible: root.suggestionIcon !== ""
++            Layout.preferredWidth: 30
++            Layout.preferredHeight: 30
++            Layout.alignment: Qt.AlignVCenter
++            source: root.suggestionIcon
++            safetyMargins: true
++        }
++
+         Binding {
+             target: accessoryLoader.item
+             property: "flat"
+@@ -402,8 +559,12 @@ Item {
+                 searchInput.forceActiveFocus();
+         }
+         function onSearchTextUpdated(text) {
+-            if (searchInput.text !== text)
++            if (searchInput.text !== text) {
+                 searchInput.text = text;
++                // A restored or injected query behaves like typed text; an empty
++                // field (new view) gives list selection the accent immediately.
++                root.setKeyboardSelection(text === "");
++            }
+         }
+         function onViewNavigatedBack() {
+             root.focusInput();
+diff --git a/src/server/src/ui/qml/list/ListItemDelegate.qml b/src/server/src/ui/qml/list/ListItemDelegate.qml
+index aec4aff2a..c265fccac 100644
+--- a/src/server/src/ui/qml/list/ListItemDelegate.qml
++++ b/src/server/src/ui/qml/list/ListItemDelegate.qml
+@@ -67,12 +67,17 @@ SelectableDelegate {
+ 
+             Text {
+                 id: titleText
++                renderTypeQuality: Text.VeryHighRenderTypeQuality
++                layer.enabled: true
++                layer.textureSize: Qt.size(Math.ceil(width * 4), Math.ceil(height * 4))
++                layer.smooth: true
++                layer.mipmap: true
+                 anchors.left: parent.left
+-                anchors.verticalCenter: root.featured && subtitleText.visible ? undefined : parent.verticalCenter
+-                anchors.top: root.featured && subtitleText.visible ? parent.top : undefined
++                // Avoid changing vertical anchors when a subtitle appears.
++                y: root.featured && subtitleText.visible ? 0 : Math.round((parent.height - height) / 2)
+                 width: Math.min(implicitWidth, textRow.availableForText - textRow.subtitleReserved)
+                 text: root.itemTitle
+-                color: root.selected ? root.appearance.selectedText : root.hovered ? root.appearance.hoveredText : Theme.foreground
++                color: root.strongSelected ? root.appearance.selectedText : root.hovered || root.softSelected ? root.appearance.hoveredText : Theme.foreground
+                 font.pointSize: root.featured ? Theme.regularFontSize * 1.14 : Theme.regularFontSize
+                 font.weight: root.featured ? Font.DemiBold : Font.Normal
+                 elide: Text.ElideRight
+@@ -81,14 +86,18 @@ SelectableDelegate {
+ 
+             Text {
+                 id: subtitleText
++                renderTypeQuality: Text.VeryHighRenderTypeQuality
++                layer.enabled: true
++                layer.textureSize: Qt.size(Math.ceil(width * 4), Math.ceil(height * 4))
++                layer.smooth: true
++                layer.mipmap: true
+                 visible: root.itemSubtitle !== ""
+                 anchors.left: root.featured ? parent.left : titleText.right
+                 anchors.leftMargin: visible && !root.featured ? textRow.spacing : 0
+-                anchors.baseline: root.featured ? undefined : titleText.baseline
+-                anchors.top: root.featured ? titleText.bottom : undefined
++                y: root.featured ? titleText.y + titleText.height + 2 : titleText.y + titleText.baselineOffset - baselineOffset
+                 width: root.featured ? textRow.availableForText : Math.min(implicitWidth, Math.max(0, textRow.availableForText - titleText.width - textRow.spacing))
+                 text: root.itemSubtitle
+-                color: root.selected ? root.appearance.selectedSecondaryText : root.hovered ? root.appearance.hoveredSecondaryText : Theme.textMuted
++                color: root.strongSelected ? root.appearance.selectedSecondaryText : root.hovered || root.softSelected ? root.appearance.hoveredSecondaryText : Theme.textMuted
+                 font.pointSize: Theme.regularFontSize
+                 elide: Text.ElideRight
+                 maximumLineCount: 1
+diff --git a/src/server/src/ui/qml/list/SelectableDelegate.qml b/src/server/src/ui/qml/list/SelectableDelegate.qml
+index 949cb2975..a8a8e89e9 100644
+--- a/src/server/src/ui/qml/list/SelectableDelegate.qml
++++ b/src/server/src/ui/qml/list/SelectableDelegate.qml
+@@ -13,6 +13,8 @@ Item {
+     property int quickAccessIndex: -1
+     readonly property LauncherAppearance appearance: (root.Window.window as LauncherWindow)?.appearance ?? fallbackAppearance
+     readonly property bool hovered: mouseArea.containsMouse && HoverActivation.active
++    readonly property bool softSelected: selected && !appearance.keyboardSelection
++    readonly property bool strongSelected: selected && appearance.keyboardSelection
+     readonly property bool quickAccessActive: Launcher.commandHeld && quickAccessIndex >= 0 && !Launcher.alertModel.visible && !Launcher.actionPanel.open && !Launcher.footerPanel.open && !Launcher.hasOverlay
+ 
+     LauncherAppearance {
+@@ -31,6 +33,7 @@ Item {
+         hoverEnabled: true
+         draggable: root.draggable
+         onItemClicked: {
++            root.appearance.keyboardSelection = true;
+             root.clicked();
+             if (Config.activateOnSingleClick)
+                 root.activated();
+@@ -47,7 +50,7 @@ Item {
+         backgroundColor: root.appearance.delegateBackdrop
+         color: {
+             if (root.selected)
+-                return root.appearance.selectionFill;
++                return root.softSelected ? root.appearance.softSelectionFill : root.appearance.selectionFill;
+             if (root.hovered)
+                 return root.appearance.hoverFill;
+             return root.appearance.delegateBackdrop;
+diff --git a/src/server/src/ui/qml/views/GenericListView.qml b/src/server/src/ui/qml/views/GenericListView.qml
+index ea55d0263..306122f75 100644
+--- a/src/server/src/ui/qml/views/GenericListView.qml
++++ b/src/server/src/ui/qml/views/GenericListView.qml
+@@ -13,6 +13,7 @@ Item {
+     property alias delegate: listView.delegate
+     property alias currentIndex: listView.currentIndex
+     property alias count: listView.count
++    readonly property Item currentItem: listView.currentItem
+ 
+     // Optional detail panel — mirrors TypedListView's SplitDetailWidget pattern.
+     // `detailComponent` is the template; `detailVisible` toggles per-item
+diff --git a/src/server/src/ui/qml/views/RootSearchList.qml b/src/server/src/ui/qml/views/RootSearchList.qml
+index 8bdbd6b0c..dda563e1a 100644
+--- a/src/server/src/ui/qml/views/RootSearchList.qml
++++ b/src/server/src/ui/qml/views/RootSearchList.qml
+@@ -11,6 +11,11 @@ GenericListView {
+     selectFirstOnReset: cmdModel.selectFirstOnReset
+     suppressEmpty: Launcher.isLoading
+ 
++    // Selected result as shown inline by the Spotlight search field.
++    readonly property bool _spotlightItem: currentItem !== null && currentItem.isSelectable && !currentItem.isSection && !currentItem.isCalculator
++    readonly property string spotlightTitle: _spotlightItem ? currentItem.title : ""
++    readonly property string spotlightIcon: _spotlightItem ? currentItem.iconSource : ""
++
+     delegate: Loader {
+         id: delegateLoader
+         width: ListView.view.width
+diff --git a/src/server/src/ui/windows/launcher-window.hpp b/src/server/src/ui/windows/launcher-window.hpp
+index 93e16e022..eb4569acb 100644
+--- a/src/server/src/ui/windows/launcher-window.hpp
++++ b/src/server/src/ui/windows/launcher-window.hpp
+@@ -74,6 +74,7 @@ private:
+   Q_PROPERTY(int lsLayer READ lsLayer NOTIFY lsChanged)
+   Q_PROPERTY(int lsKeyboardInteractivity READ lsKeyboardInteractivity NOTIFY lsChanged)
+   Q_PROPERTY(bool compositorGlass READ compositorGlass CONSTANT)
++  Q_PROPERTY(bool compositorPlaceholder READ compositorPlaceholder CONSTANT)
+   Q_PROPERTY(bool canPositionWindow READ canPositionWindow CONSTANT)
+   Q_PROPERTY(bool commandHeld READ commandHeld NOTIFY commandHeldChanged)
+   Q_PROPERTY(bool dragOverlayVisible READ dragOverlayVisible NOTIFY dragOverlayChanged)
+@@ -123,6 +124,7 @@ public:
+   int lsLayer() const { return m_lsLayer; }
+   int lsKeyboardInteractivity() const { return m_lsKeyboardInteractivity; }
+   bool compositorGlass() const { return qEnvironmentVariableIntValue("VICINAE_MAC_GLASS") == 1; }
++  bool compositorPlaceholder() const { return qEnvironmentVariableIntValue("VICINAE_MAC_PLACEHOLDER") == 1; }
+   static bool canPositionWindow();
+   bool commandHeld() const { return m_commandHeld; }
+ 

@@ -1,0 +1,92 @@
+diff --git a/src/server/src/ui/windows/launcher-window.cpp b/src/server/src/ui/windows/launcher-window.cpp
+--- a/src/server/src/ui/windows/launcher-window.cpp
++++ b/src/server/src/ui/windows/launcher-window.cpp
+@@ -272,5 +272,6 @@
+   connect(toast, &ToastService::toastHidden, this, [this]() {
+     m_toastActive = false;
+     emit toastActiveChanged();
++    tryCompaction();
+   });
+ 
+@@ -918,6 +918,5 @@ void LauncherWindow::tryCompaction() {
+ 
+-  setCompacted(!m_ctx.services->newsService()->hasUnreadNews() &&
+-               !m_ctx.services->updateService()->available() && cfg.enabled && !m_actionPanel->isOpen() &&
++  setCompacted(cfg.enabled && !m_actionPanel->isOpen() &&
+                m_ctx.navigation->searchText().isEmpty() && m_ctx.navigation->viewStackSize() == 1 &&
+                !m_toastActive);
+ }
+diff --git a/src/server/src/ui/qml/views/RootSearchList.qml b/src/server/src/ui/qml/views/RootSearchList.qml
+--- a/src/server/src/ui/qml/views/RootSearchList.qml
++++ b/src/server/src/ui/qml/views/RootSearchList.qml
+@@ -76,3 +76,4 @@
+                 itemIconSource: delegateLoader.iconSource
+-                featured: delegateLoader.index === searchListView.cmdModel.nextSelectableIndex(-1, 1)
++                featured: true
++                height: 58
+                 itemAlias: delegateLoader.alias
+diff --git a/src/server/src/ui/qml/launcher/SearchBar.qml b/src/server/src/ui/qml/launcher/SearchBar.qml
+--- a/src/server/src/ui/qml/launcher/SearchBar.qml
++++ b/src/server/src/ui/qml/launcher/SearchBar.qml
+@@ -8,4 +8,4 @@
+     required property Item commandView
+-    property int horizontalPadding: 16
+-    property int textSize: 22
++    property int horizontalPadding: 20
++    property int textSize: 26
+     property bool flatAccessories: false
+@@ -49,3 +49,3 @@
+             font.family: "SF Pro"
+-            font.pixelSize: 20
++            font.pixelSize: 24
+             font.weight: Font.Medium
+@@ -72,4 +72,5 @@
+                 verticalAlignment: TextInput.AlignVCenter
+-                font.family: Theme.fontFamily
++                font.family: "SF Pro Display"
+                 font.pixelSize: root.textSize
++                font.weight: Font.Medium
+                 color: Theme.foreground
+diff --git a/src/server/src/ui/qml/list/ListItemDelegate.qml b/src/server/src/ui/qml/list/ListItemDelegate.qml
+--- a/src/server/src/ui/qml/list/ListItemDelegate.qml
++++ b/src/server/src/ui/qml/list/ListItemDelegate.qml
+@@ -58,5 +58,5 @@
+             Layout.fillWidth: true
+             Layout.minimumWidth: 100
+-            implicitHeight: titleText.implicitHeight
++            implicitHeight: titleText.implicitHeight + (root.featured && subtitleText.visible ? subtitleText.implicitHeight + 2 : 0)
+ 
+             readonly property real spacing: root.appearance.rowTextSpacing
+@@ -66,3 +66,3 @@
+-            readonly property real subtitleReserved: subtitleText.visible ? Math.min(subtitleText.implicitWidth + spacing, availableForText * 0.5) : 0
++            readonly property real subtitleReserved: subtitleText.visible && !root.featured ? Math.min(subtitleText.implicitWidth + spacing, availableForText * 0.5) : 0
+ 
+             Text {
+@@ -70,4 +70,5 @@
+                 anchors.left: parent.left
+-                anchors.verticalCenter: parent.verticalCenter
++                anchors.verticalCenter: root.featured && subtitleText.visible ? undefined : parent.verticalCenter
++                anchors.top: root.featured && subtitleText.visible ? parent.top : undefined
+                 width: Math.min(implicitWidth, textRow.availableForText - textRow.subtitleReserved)
+                 text: root.itemTitle
+@@ -84,5 +85,6 @@
+-                anchors.left: titleText.right
+-                anchors.leftMargin: visible ? textRow.spacing : 0
+-                anchors.baseline: titleText.baseline
+-                width: Math.min(implicitWidth, Math.max(0, textRow.availableForText - titleText.width - textRow.spacing))
++                anchors.left: root.featured ? parent.left : titleText.right
++                anchors.leftMargin: visible && !root.featured ? textRow.spacing : 0
++                anchors.baseline: root.featured ? undefined : titleText.baseline
++                anchors.top: root.featured ? titleText.bottom : undefined
++                width: root.featured ? textRow.availableForText : Math.min(implicitWidth, Math.max(0, textRow.availableForText - titleText.width - textRow.spacing))
+                 text: root.itemSubtitle
+@@ -98,3 +100,3 @@
+-                anchors.left: subtitleText.visible ? subtitleText.right : titleText.right
++                anchors.left: subtitleText.visible && !root.featured ? subtitleText.right : titleText.right
+                 anchors.leftMargin: visible ? textRow.spacing : 0
+                 anchors.verticalCenter: parent.verticalCenter
+@@ -107,3 +109,3 @@
+-                anchors.left: aliasBadge.visible ? aliasBadge.right : (subtitleText.visible ? subtitleText.right : titleText.right)
++                anchors.left: aliasBadge.visible ? aliasBadge.right : (subtitleText.visible && !root.featured ? subtitleText.right : titleText.right)
+                 anchors.leftMargin: visible ? textRow.spacing + textRow.shortcutLeadingSpace : 0
+                 anchors.verticalCenter: parent.verticalCenter
