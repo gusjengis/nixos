@@ -27,13 +27,53 @@ do not assume compatibility with arbitrary upstream Hyprland or another ABI.
 Compositor plugins run inside Hyprland: an incompatible plugin can crash the
 desktop session. Do not bypass ABI checks.
 
+## ARM Layer Backend
+
+Hyprland's function-hook implementation returns false on non-x86_64 builds.
+Finding `renderLayer` therefore does not make its hook usable on ARM64: the old
+plugin reported `hook_missing`, and launcher startup correctly refused glass mode.
+
+On aarch64 only, the Home Manager module appends `../portable-layer-render.patch`
+to the pinned compositor package, installs that package, and builds Hyprglass
+against its headers. `portable-backend.patch` selects this backend on ARM64;
+x86_64 retains the existing function hook and unmodified compositor package.
+
+The fork exports `hyprland_register_layer_render_v1` and
+`hyprland_unregister_layer_render_v1`, resolved by the plugin with `dlsym`.
+This is an architecture-neutral C symbol interface with a versioned, matching
+C++ callback ABI, not a general stable C ABI. No machine-code hooks, new virtual
+methods, or compositor object-layout changes are involved. The single-owner
+registry rejects occupied registrations and unregisters only a matching owner
+and callback. Calls and registration run on the compositor's main thread.
+
+The callback receives the original render continuation directly. It wraps the
+unchanged compositor render body without recursively entering the callback.
+Both backends share the existing glass wrapper: snapshot/foreign-render guards,
+popup arguments, normal early returns, pre/post glass passes, and scoped blur
+suppression remain intact. Plugin exit unregisters before tearing down state;
+failed initialization also unregisters before its library can be unloaded.
+Compositor plugin teardown independently clears callbacks owned by the unloaded
+handle, including forced ejection/fatal faults that skip `PLUGIN_EXIT`.
+Diagnostics treat successful portable registration as an available layer backend,
+while still checking configuration and shader failure. ABI checks are unchanged.
+Missing exports or an occupied registry produce a warning, never an ARM hook fallback.
+
+This fixes layer glass only. Optional subsurface item glass still uses the existing
+`CRenderPass::add` hook and is unavailable on ARM64; window decorations use their
+existing non-hook path. Neither optional feature is enabled by this fix.
+
+Patch-application and callback regression checks do not prove ARM GPU rendering.
+After an explicit future rebuild/restart, verify `hyprctl -j hyprglass status`
+reports `features.layers.active = true`, open Vicinae/QuickShell glass surfaces,
+and check popups, close snapshots, config reload, and plugin unload/reload.
+
 ## Manual application and build
 
 In a separate Hyprglass checkout at the pinned upstream revision:
 
 ```sh
 git checkout --detach a54e7cd0232ca62a394aebebd553358dc6592652
-for patch in experimental hdr-encoding linear-shadow refraction launcher-shape config-lifecycle layer-shadow surface-material; do
+for patch in experimental hdr-encoding linear-shadow refraction launcher-shape config-lifecycle layer-shadow surface-material portable-backend; do
     git apply --check "/etc/nixos/home/features/desktop/hyprland/glass/$patch.patch"
     git apply "/etc/nixos/home/features/desktop/hyprland/glass/$patch.patch"
 done
@@ -42,11 +82,13 @@ done
 Apply the complete patch once; do not separately reverse `b14733f` first.
 Build the patched source against the matching fork, not generic Hyprland headers.
 `package.nix` provides the reproducible build recipe: fixed upstream revision
-and source hash, all eight patches in the order above, and an explicit matching
+and source hash, all nine patches in the order above, and an explicit matching
 `hyprland` argument.
 The Hyprland Home Manager module imports it and deploys the immutable compiled
 library at `~/.local/share/hyprglass/libhyprglass.so`. Its owning Lua configuration
 remains editable in the repository. Use `rehome` to rebuild.
+For a manual ARM64 build, first apply `../portable-layer-render.patch` to the
+pinned Hyprland source and use that patched compositor's installed headers.
 
 ## Integration
 

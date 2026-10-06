@@ -1,5 +1,7 @@
 # Agent Notes
 
+For survey-job LiDAR tile lookup/copy from the office ortho drive, read `notes/LIDAR_WORKFLOW.md`. It documents mounted paths, Pierce County parcel queries, tile naming, and verification.
+
 If the user asks to download wallpapers, use these preferences:
 
 - Resolution and ratio must be exactly 3840x2160 (4K, 16:9).

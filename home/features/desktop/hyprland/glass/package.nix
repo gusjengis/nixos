@@ -10,7 +10,17 @@ pkgs.hyprlandPlugins.mkHyprlandPlugin {
     rev = "a54e7cd0232ca62a394aebebd553358dc6592652";
     sha256 = "1y42bf4hfqkllma2ci2l75plxmwi8hwgwd80f0gxmmd1qqcyybgr";
   };
-  patches = [ ./experimental.patch ./hdr-encoding.patch ./linear-shadow.patch ./refraction.patch ./launcher-shape.patch ./config-lifecycle.patch ./layer-shadow.patch ./surface-material.patch ];
+  patches = [
+    ./experimental.patch
+    ./hdr-encoding.patch
+    ./linear-shadow.patch
+    ./refraction.patch
+    ./launcher-shape.patch
+    ./config-lifecycle.patch
+    ./layer-shadow.patch
+    ./surface-material.patch
+    ./portable-backend.patch
+  ];
   nativeBuildInputs = [ pkgs.wayland-scanner ];
   makeFlags = [ "HYPRGLASS_VERSION=0.9.1-macglass-experimental" ];
   enableParallelBuilding = true;

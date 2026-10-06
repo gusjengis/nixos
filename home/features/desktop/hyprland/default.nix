@@ -13,7 +13,14 @@ let
   # The portal is taken from the same flake on purpose: its version has to match
   # the compositor or screen sharing and file pickers misbehave.
   hyprlandPackages = inputs.hyprland.packages.${pkgs.stdenv.hostPlatform.system};
-  glassPackage = pkgs.callPackage ./glass/package.nix { hyprland = hyprlandPackages.hyprland; };
+  hyprland =
+    if pkgs.stdenv.hostPlatform.isAarch64 then
+      hyprlandPackages.hyprland.overrideAttrs (old: {
+        patches = (old.patches or [ ]) ++ [ ./portable-layer-render.patch ];
+      })
+    else
+      hyprlandPackages.hyprland;
+  glassPackage = pkgs.callPackage ./glass/package.nix { inherit hyprland; };
 
   homeRoot = "${repoRoot}/home";
   configDir = "${homeRoot}/features/desktop/hyprland/config";
@@ -45,7 +52,10 @@ let
   };
   mailspringAfterTray = pkgs.writeShellApplication {
     name = "mailspring-after-tray";
-    runtimeInputs = [ pkgs.systemd pkgs.coreutils ];
+    runtimeInputs = [
+      pkgs.systemd
+      pkgs.coreutils
+    ];
     text = ''
       for ((attempt = 0; attempt < 150; attempt++)); do
         if busctl --user get-property org.kde.StatusNotifierWatcher /StatusNotifierWatcher org.kde.StatusNotifierWatcher RegisteredStatusNotifierItems >/dev/null 2>&1; then
@@ -61,7 +71,7 @@ in
 {
   config = lib.mkIf config.desktopEnv.enable {
     home.packages = [
-      hyprlandPackages.hyprland
+      hyprland
       glassPackage
       sessionEnvSync
       mailspringAfterTray
@@ -103,7 +113,7 @@ in
       ];
       # Ships hyprland-portals.conf, which says which backend answers which
       # interface under Hyprland.
-      configPackages = [ hyprlandPackages.hyprland ];
+      configPackages = [ hyprland ];
     };
 
     # The whole directory is linked back into this repository, so new Hypr

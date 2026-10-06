@@ -1,0 +1,120 @@
+diff --git a/src/plugins/PluginSystem.cpp b/src/plugins/PluginSystem.cpp
+index 4cf9522..b5de9ac 100644
+--- a/src/plugins/PluginSystem.cpp
++++ b/src/plugins/PluginSystem.cpp
+@@ -1,4 +1,5 @@
+ #include "PluginSystem.hpp"
++#include "../render/LayerRenderCallback.hpp"
+ 
+ #include <dlfcn.h>
+ #include <ranges>
+@@ -140,6 +141,9 @@ void CPluginSystem::unloadPlugin(const CPlugin* plugin, bool eject) {
+     if (!plugin)
+         return;
+ 
++    // A fault/ejection skips PLUGIN_EXIT; never leave callbacks into dlclosed code.
++    Render::clearLayerRenderCallbackForOwner(plugin->m_handle);
++
+     if (!eject) {
+         PPLUGIN_EXIT_FUNC exitFunc = rc<PPLUGIN_EXIT_FUNC>(dlsym(plugin->m_handle, PLUGIN_EXIT_FUNC_STR));
+         if (exitFunc)
+diff --git a/src/render/LayerRenderCallback.hpp b/src/render/LayerRenderCallback.hpp
+new file mode 100644
+index 0000000..5f9c7e4
+--- /dev/null
++++ b/src/render/LayerRenderCallback.hpp
+@@ -0,0 +1,25 @@
++#pragma once
++
++#include "../helpers/time/Time.hpp"
++#include "../desktop/DesktopTypes.hpp"
++
++namespace Render {
++    class IHyprRenderer;
++
++    using LayerRenderOriginalV1 = void (*)(IHyprRenderer*, PHLLS, PHLMONITOR, const Time::steady_tp&, bool, bool);
++    using LayerRenderCallbackV1 = void (*)(LayerRenderOriginalV1, IHyprRenderer*, PHLLS, PHLMONITOR, const Time::steady_tp&, bool, bool);
++    using RegisterLayerRenderV1 = bool (*)(void*, LayerRenderCallbackV1);
++    using UnregisterLayerRenderV1 = bool (*)(void*, LayerRenderCallbackV1);
++
++    // Compositor-owned cleanup also covers forced ejection without PLUGIN_EXIT.
++    void clearLayerRenderCallbackForOwner(void* owner);
++}
++
++// Private fork API: C symbol lookup, matching Hyprland C++ headers/ABI required.
++// Main thread only. The callback calls the continuation synchronously, exactly
++// once with the supplied arguments, and must not retain it or unload itself.
++// One owner at a time; unregister before unload, including failed plugin init.
++extern "C" {
++    __attribute__((visibility("default"))) bool hyprland_register_layer_render_v1(void* owner, Render::LayerRenderCallbackV1 callback);
++    __attribute__((visibility("default"))) bool hyprland_unregister_layer_render_v1(void* owner, Render::LayerRenderCallbackV1 callback);
++}
+diff --git a/src/render/Renderer.cpp b/src/render/Renderer.cpp
+index 3faaf95..f685c20 100644
+--- a/src/render/Renderer.cpp
++++ b/src/render/Renderer.cpp
+@@ -1,4 +1,5 @@
+ #include "Renderer.hpp"
++#include "LayerRenderCallback.hpp"
+ #include "../Compositor.hpp"
+ #include "../helpers/math/Math.hpp"
+ #include <algorithm>
+@@ -935,7 +936,46 @@ SP<ITexture> IHyprRenderer::createTexture(const SP<Aquamarine::IBuffer> buffer,
+     return tex;
+ }
+ 
++namespace {
++    void*                        layerRenderOwner = nullptr;
++    Render::LayerRenderCallbackV1 layerRenderCallback = nullptr;
++}
++
++extern "C" bool hyprland_register_layer_render_v1(void* owner, Render::LayerRenderCallbackV1 callback) {
++    if (!owner || !callback || layerRenderOwner)
++        return false;
++    layerRenderOwner    = owner;
++    layerRenderCallback = callback;
++    return true;
++}
++
++extern "C" bool hyprland_unregister_layer_render_v1(void* owner, Render::LayerRenderCallbackV1 callback) {
++    if (!owner || owner != layerRenderOwner || callback != layerRenderCallback)
++        return false;
++    layerRenderCallback = nullptr;
++    layerRenderOwner    = nullptr;
++    return true;
++}
++
++void Render::clearLayerRenderCallbackForOwner(void* owner) {
++    if (owner && owner == layerRenderOwner) {
++        layerRenderCallback = nullptr;
++        layerRenderOwner    = nullptr;
++    }
++}
++
+ void IHyprRenderer::renderLayer(PHLLS pLayer, PHLMONITOR pMonitor, const Time::steady_tp& time, bool popups, bool lockscreen) {
++    const auto original = +[](IHyprRenderer* renderer, PHLLS layer, PHLMONITOR monitor, const Time::steady_tp& now, bool renderPopups, bool renderLockscreen) {
++        renderer->renderLayerOriginal(layer, monitor, now, renderPopups, renderLockscreen);
++    };
++    if (layerRenderCallback) {
++        layerRenderCallback(original, this, pLayer, pMonitor, time, popups, lockscreen);
++        return;
++    }
++    original(this, pLayer, pMonitor, time, popups, lockscreen);
++}
++
++void IHyprRenderer::renderLayerOriginal(PHLLS pLayer, PHLMONITOR pMonitor, const Time::steady_tp& time, bool popups, bool lockscreen) {
+     if (!pLayer)
+         return;
+ 
+diff --git a/src/render/Renderer.hpp b/src/render/Renderer.hpp
+index 739d122..b65d4b0 100644
+--- a/src/render/Renderer.hpp
++++ b/src/render/Renderer.hpp
+@@ -272,6 +272,7 @@ namespace Render {
+         void renderAllClientsForWorkspace(PHLMONITOR pMonitor, PHLWORKSPACE pWorkspace, const Time::steady_tp& now, const Vector2D& translate = {0, 0}, const float& scale = 1.f);
+         void renderWindow(PHLWINDOW, PHLMONITOR, const Time::steady_tp&, bool, eRenderPassMode, bool ignorePosition = false, bool standalone = false);
+         void renderLayer(PHLLS, PHLMONITOR, const Time::steady_tp&, bool popups = false, bool lockscreen = false);
++        void renderLayerOriginal(PHLLS, PHLMONITOR, const Time::steady_tp&, bool popups, bool lockscreen);
+         void renderSessionLockSurface(WP<SSessionLockSurface>, PHLMONITOR, const Time::steady_tp&);
+         void renderDragIcon(PHLMONITOR, const Time::steady_tp&);
+         void renderIMEPopup(CInputPopup*, PHLMONITOR, const Time::steady_tp&);
