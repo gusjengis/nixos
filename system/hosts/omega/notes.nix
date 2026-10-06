@@ -250,7 +250,7 @@ in
     };
 
     systemd.services.note-score = {
-      description = "Rank open thoughts with Jev against Facets.md";
+      description = "Rank thoughts and sort them into contexts with Jev";
       after = [
         "network-online.target"
         "obsidian-sync.service"
@@ -280,12 +280,15 @@ in
     };
 
     # Every finished extraction re-ranks (new thoughts and new links change
-    # neighbors), as does an edit to Facets.md. Cached answers make a run
-    # with nothing new free.
+    # neighbors), as does an edit to Facets.md or a context note. Answers are
+    # cached per question, so a run only asks what changed.
     systemd.services.note-extract.unitConfig.OnSuccess = [ "note-score.service" ];
     systemd.paths.note-score = {
       wantedBy = [ "multi-user.target" ];
-      pathConfig.PathChanged = [ "${vault}/Facets.md" ];
+      pathConfig.PathChanged = [
+        "${vault}/Facets.md"
+        "${vault}/Contexts"
+      ];
     };
 
     # Nightly catch-all: status edits made by hand, runs whose API calls

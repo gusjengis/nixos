@@ -16,6 +16,7 @@ Overview of the whole system: `SECOND_BRAIN.md`. How extraction produces this:
 | `Normalized/` | One cleaned note per raw note, same file name | normalizer (omega) | no; regenerated |
 | `Thoughts/` | One atomic thought per file | extractor (omega) | user fields only (below) |
 | `Entities/` | People, objects, places, tools, organizations, works | extractor (omega) | yes, freely |
+| `Contexts/` | One note per context (area of focus), nested by `parent` | seeded, then scorer discovery | yes; description, parent, name, deletion |
 
 Everything below `Raw/` can be rebuilt from `Raw/`. Nothing is deleted
 automatically; `note-delete` is the only deletion path.
@@ -160,6 +161,7 @@ writes it, pipeline fields first in the order above, user fields after.
 | `score-facet` | facet from `Facets.md` contributing most | scorer |
 | `score-parts` | readable breakdown: impact (per facet), urgency, quick, unblocks, local | scorer |
 | `score-unsure` | `true` when Jev was split on the facet or urgency rating | scorer |
+| `contexts` | links to the most specific `Contexts/` notes it belongs to (≤ 3) | scorer |
 | anything else | | **user** |
 
 The scorer (`note-score`, omega) asks Jev one request per open thought (the
@@ -174,6 +176,33 @@ User-owned fields survive re-extraction: rebuilt thoughts are matched to the
 old ones by `id` (or by content when ids shift) and user fields are carried
 over. A thought a rebuild no longer produces is marked `orphaned: true`, not
 deleted.
+
+## Context note format
+
+`Contexts/Sleep.md`:
+
+```yaml
+---
+type: context
+description: 'Sleep: bedtime, wake-up time, getting enough sleep, ...'
+parent: '[[Contexts/Health]]'   # optional; nesting
+origin: seeded                   # seeded | discovered | user
+created: 2026-10-05
+context-score: 0.71              # scorer: mean of top-5 open scores (subtree) + recency bump
+open: 12                         # scorer
+total: 30                        # scorer
+top: ['[[Thoughts/...]]', ...]   # scorer: three best open thoughts
+---
+(free text)
+<!-- note-score: generated views ... -->  embedded Bases views, rewritten by the scorer
+```
+
+Jev is asked, per thought, "is this about <path>: <description>?" for every
+context; a thought joins contexts at noul ≥ 0.6, keeping only the most
+specific (an ancestor is implied). A context's views include its whole
+subtree. `Dashboard.md` (created once, then the user's) ranks contexts by
+`context-score`. Renaming a context note breaks its links until the next run
+reassigns thoughts.
 
 ## Entity note format
 
@@ -224,3 +253,4 @@ gone.
   from the Jev scorer; `Facets.md` in the vault root; `Ranked` view.
 - v1.3 (2026-10-05): `priority` removed; `score` replaces it (☆ no longer
   mapped). Existing thoughts stripped of the field.
+- v1.4 (2026-10-05): `Contexts/` notes, `contexts` on thoughts, `Dashboard.md`.
