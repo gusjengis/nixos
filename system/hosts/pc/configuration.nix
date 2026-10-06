@@ -33,7 +33,6 @@
   # NVENC in OBS) fails with CUDA_ERROR_UNKNOWN.
   boot.kernelModules = [ "nvidia_uvm" ];
   virtual-machines.enable = true;
-  programs.steam.enable = true;
   boot.loader.efi.efiSysMountPoint = "/boot/efi";
   system.stateVersion = "25.05";
 
