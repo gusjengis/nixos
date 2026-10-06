@@ -198,12 +198,14 @@ index 9672d1c88..451fc7f7b 100644
                  HoverHandler {
                      cursorShape: Qt.IBeamCursor
                  }
-@@ -88,7 +214,9 @@ Item {
+@@ -88,7 +214,11 @@ Item {
                      anchors.fill: parent
                      verticalAlignment: Text.AlignVCenter
                      text: Launcher.hasCompleter ? "..." : Launcher.searchPlaceholder
 -                    color: Theme.textPlaceholder
 +                    renderTypeQuality: Text.VeryHighRenderTypeQuality
++                    // RGB subpixel fringes cannot carry the neutral-gray compositor marker.
++                    renderType: Launcher.compacted && Launcher.compositorPlaceholder ? Text.CurveRendering : Text.QtRendering
 +                    // Opaque gray 124 marks compositor-additive text; fallback stays 93% white.
 +                    color: Launcher.compacted && Launcher.compositorPlaceholder ? "#7c7c7c" : Qt.rgba(1, 1, 1, 0.93)
                      font: searchInput.font
