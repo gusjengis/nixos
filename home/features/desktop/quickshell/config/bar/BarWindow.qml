@@ -136,13 +136,13 @@ PanelWindow {
                 onRefreshRequested: bar.refreshUsage()
                 onAccountRequested: (profile, saved) => bar.accountAction(profile, saved)
             }
-            Wifi {
-                id: wifi
-                controls: bar.systemControls
-            }
             Battery {
                 id: battery
                 batteryService: bar.battery
+            }
+            Wifi {
+                id: wifi
+                controls: bar.systemControls
             }
             Spotlight {
                 onActivated: bar.openLauncher()
@@ -159,5 +159,4 @@ PanelWindow {
             }
         }
     }
-
 }

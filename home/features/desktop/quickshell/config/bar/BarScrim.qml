@@ -11,7 +11,8 @@ PanelWindow {
 
     visible: shown && Theme.wallpaperPath !== ""
     implicitHeight: Theme.barScrimHeight
-    exclusiveZone: 0
+    // Match the wallpaper origin even when the bar reserves notch space.
+    exclusionMode: ExclusionMode.Ignore
     color: "transparent"
     WlrLayershell.namespace: "quickshell-bar-scrim"
     WlrLayershell.layer: WlrLayer.Bottom
