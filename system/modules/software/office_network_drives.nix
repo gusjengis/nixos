@@ -7,7 +7,7 @@
 
 let
   cfg = config.officeNetworkDrives;
-  credentialsFile = "/home/gusjengis/.config/secrets/office-smb-credentials";
+  credentialsFile = "/home/gusjengis/.config/secrets/logins/office";
   mountOptions = [
     "credentials=${credentialsFile}"
     "uid=1000"

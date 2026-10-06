@@ -8,6 +8,24 @@ formulas:
   rank: 'if(priority == "high", 0, if(priority == "low", 2, 1))'
 views:
   - type: table
+    name: Ranked
+    filters:
+      and:
+        - 'file.hasProperty("score")'
+        - 'status != "done"'
+        - 'status != "dropped"'
+        - 'status != "someday"'
+    order:
+      - file.name
+      - score
+      - score-facet
+      - status
+      - score-parts
+      - score-unsure
+    sort:
+      - property: score
+        direction: DESC
+  - type: table
     name: Open tasks
     filters:
       and:

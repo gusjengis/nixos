@@ -21,13 +21,13 @@ fi
 
 # Load the token directly rather than relying on the shell environment: this
 # script also runs from systemd at boot, where no one can answer a prompt.
-if [ -z "${GH_TOKEN:-}" ] && [ -r "$HOME/.config/secrets/PAT" ]; then
-    GH_TOKEN="$(< "$HOME/.config/secrets/PAT")"
+if [ -z "${GH_TOKEN:-}" ] && [ -r "$HOME/.config/secrets/api_keys/github-pat" ]; then
+    GH_TOKEN="$(< "$HOME/.config/secrets/api_keys/github-pat")"
     export GH_TOKEN
 fi
 
 if ! gh auth status >/dev/null 2>&1; then
-    echo "GitHub authentication not found, and no usable token at ~/.config/secrets/PAT." >&2
+    echo "GitHub authentication not found, and no usable token at ~/.config/secrets/api_keys/github-pat." >&2
     echo "Run 'gh auth login' manually, or place a valid token in that file." >&2
     exit 1
 fi

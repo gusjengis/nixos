@@ -127,7 +127,7 @@ RTX 3090 Ti, ~0.9 GB VRAM headroom with all of the above resident.
 | `/data/Supernote/.capture-backups/outbox/` | alpha (read by pc over `/data`) | OCR batches; `.imported` / `skipped` markers |
 | `/var/lib/ollama/models` | omega | Model blobs |
 | `/var/lib/note-extract/extract.sqlite` | omega | Embeddings, keyword index, extraction hashes, merge log (disposable) |
-| `~/.config/secrets/obsidian` | each syncing host | Obsidian login (secrets repo) |
+| `~/.config/secrets/logins/obsidian` | each syncing host | Obsidian login (secrets repo) |
 
 ## Commands
 

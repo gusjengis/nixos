@@ -44,6 +44,12 @@
       url = "github:JuliusBrussee/caveman";
       flake = false;
     };
+    # TypeSafe agent skill (how to build with Jev) for OpenCode.
+    # Update to latest: nix flake update typesafe-skills && rehome
+    typesafe-skills = {
+      url = "github:typesafe-ai/skills";
+      flake = false;
+    };
     # OpenCode pinned upstream, ahead of the nixpkgs package.
     # Bump by editing the tag below, then: nix flake update opencode && rehome
     opencode = {

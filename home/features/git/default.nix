@@ -9,7 +9,7 @@ let
 
   # Path only. The token is read at runtime by shell code, never by Nix:
   # anything Nix reads is copied into the world-readable /nix/store.
-  patFile = "${config.home.homeDirectory}/.config/secrets/PAT";
+  patFile = "${config.home.homeDirectory}/.config/secrets/api_keys/github-pat";
 in
 {
   home.packages = with pkgs; [

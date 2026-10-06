@@ -185,7 +185,7 @@ in
     };
     credentialsFile = lib.mkOption {
       type = lib.types.str;
-      default = "${config.home.homeDirectory}/.config/secrets/trevornomad-credentials";
+      default = "${config.home.homeDirectory}/.config/secrets/logins/office";
       description = "RDP credential file";
     };
 
@@ -220,7 +220,7 @@ in
       };
       credentialsFile = lib.mkOption {
         type = lib.types.str;
-        default = "${config.home.homeDirectory}/.config/secrets/windows-smb-credentials";
+        default = "${config.home.homeDirectory}/.config/secrets/logins/windows-vm";
         description = "Credential file holding the OG password";
       };
       smbShare = lib.mkOption {

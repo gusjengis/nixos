@@ -158,7 +158,19 @@ writes it, pipeline fields first in the order above, user fields after.
 | `unclear` | `true` when the extractor could not resolve meaning | pipeline |
 | `orphaned` | `true` when a rebuild no longer produces it | pipeline |
 | `extractor` | model / prompt version | pipeline |
+| `score` | float rank key, higher = more important (open, actionable thoughts only) | scorer |
+| `score-facet` | facet from `Facets.md` contributing most | scorer |
+| `score-parts` | readable breakdown: impact (per facet), urgency, quick, unblocks, local | scorer |
+| `score-unsure` | `true` when Jev was split on the facet or urgency rating | scorer |
 | anything else | | **user** |
+
+The scorer (`note-score`, omega) asks Jev one request per open thought (the
+thought, its linked neighbors' titles and first lines, mentioned entity names)
+with a Score question per facet in the vault's `Facets.md` plus urgency,
+effort, unblocks and a neighbor comparison, and combines them with the weights
+in `Facets.md`. To the extractor these are ordinary user fields, so they
+survive re-extraction. The scorer rewrites them whenever its inputs change and
+removes them when a thought is closed; hand edits to them are overwritten.
 
 User-owned fields survive re-extraction: rebuilt thoughts are matched to the
 old ones by `id` (or by content when ids shift) and user fields are carried
@@ -210,3 +222,5 @@ gone.
   drops dangling links. Entities include unnamed concrete things (car,
   toilet, passport), not only proper names (prompt `v3`, whole vault
   re-extracted with `--force`).
+- v1.2 (2026-10-05): `score`, `score-facet`, `score-parts`, `score-unsure`
+  from the Jev scorer; `Facets.md` in the vault root; `Ranked` view.

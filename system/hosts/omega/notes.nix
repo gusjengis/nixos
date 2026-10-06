@@ -23,7 +23,7 @@ let
   home = "/home/${user}";
   vault = "${home}/Documents/Obsidian/Notes";
   # Read at runtime only, from the secrets checkout; never evaluated by Nix.
-  credentials = "${home}/.config/secrets/obsidian";
+  credentials = "${home}/.config/secrets/logins/obsidian";
 
   obsidianSync = pkgs.writeShellApplication {
     name = "obsidian-sync";
@@ -89,6 +89,25 @@ let
       exec python3 ${./note-extract.py} ${extractArgs} --search "$@"
     '';
   };
+
+  # Third stage: rank open thoughts with Jev (TypeSafe, cloud) against the
+  # vault's Facets.md. Its answer cache is disposable; deleting it only costs
+  # one full re-score (cents).
+  scoreStateDir = "/var/lib/note-score";
+  typesafeKey = "${home}/.config/secrets/api_keys/typesafe";
+  score = pkgs.writeShellApplication {
+    name = "note-score";
+    runtimeInputs = [ python ];
+    text = ''
+      exec python3 ${./note-score.py} \
+        --vault ${lib.escapeShellArg vault} \
+        --state ${scoreStateDir} \
+        --lock ${stateDir}/lock \
+        --extract-module ${./note-extract.py} \
+        --key-file ${lib.escapeShellArg typesafeKey} \
+        "$@"
+    '';
+  };
 in
 {
   options.notesPipeline.enable = lib.mkEnableOption "Obsidian vault sync, raw note normalization and thought extraction";
@@ -108,16 +127,21 @@ in
 
     # `note-normalize [--dry-run] [--force] [stem ...]`,
     # `note-extract [--dry-run] [--force] [--no-link] [stem ...]` for manual
-    # runs, and `note-search QUERY`.
+    # runs, `note-search QUERY`, and `note-score [--dry-run] [title ...]` /
+    # `note-score --show [-v]` for the current ranking.
     environment.systemPackages = [
       normalize
       extract
       search
+      score
     ];
 
     # The state directory is created by the unit; this makes it exist (and
     # belong to the user) for manual runs and searches before the first one.
-    systemd.tmpfiles.rules = [ "d ${stateDir} 0755 ${user} users -" ];
+    systemd.tmpfiles.rules = [
+      "d ${stateDir} 0755 ${user} users -"
+      "d ${scoreStateDir} 0755 ${user} users -"
+    ];
 
     systemd.services.obsidian-sync = {
       description = "Obsidian Sync (headless) for ${vault}";
@@ -222,6 +246,55 @@ in
       timerConfig = {
         OnBootSec = "5min";
         OnUnitInactiveSec = "15min";
+      };
+    };
+
+    systemd.services.note-score = {
+      description = "Rank open thoughts with Jev against Facets.md";
+      after = [
+        "network-online.target"
+        "obsidian-sync.service"
+        "note-extract.service"
+      ];
+      wants = [ "network-online.target" ];
+      unitConfig = {
+        ConditionPathExists = [
+          typesafeKey
+          "${vault}/Facets.md"
+        ];
+      };
+      serviceConfig = {
+        Type = "oneshot";
+        User = user;
+        Group = "users";
+        ExecStart = lib.getExe score;
+        NoNewPrivileges = true;
+        PrivateTmp = true;
+        ProtectSystem = "strict";
+        ReadWritePaths = [
+          vault
+          stateDir
+          scoreStateDir
+        ];
+      };
+    };
+
+    # Every finished extraction re-ranks (new thoughts and new links change
+    # neighbors), as does an edit to Facets.md. Cached answers make a run
+    # with nothing new free.
+    systemd.services.note-extract.unitConfig.OnSuccess = [ "note-score.service" ];
+    systemd.paths.note-score = {
+      wantedBy = [ "multi-user.target" ];
+      pathConfig.PathChanged = [ "${vault}/Facets.md" ];
+    };
+
+    # Nightly catch-all: status edits made by hand, runs whose API calls
+    # failed, and anything missed while the network was down.
+    systemd.timers.note-score = {
+      wantedBy = [ "timers.target" ];
+      timerConfig = {
+        OnCalendar = "*-*-* 03:30";
+        Persistent = true;
       };
     };
   };

@@ -72,6 +72,11 @@ in
     # Update to latest: nix flake update caveman && rehome
     "opencode/skills/caveman-suite".source = "${inputs.caveman}/skills";
 
+    # TypeSafe skill: Jev API, question types and patterns, with its reference
+    # files. The API key is exported as TYPESAFE_API_KEY by features/secrets.
+    # Update to latest: nix flake update typesafe-skills && rehome
+    "opencode/skills/typesafe-ai".source = "${inputs.typesafe-skills}/skills/typesafe-ai";
+
     # Caveman's OpenCode installer makes Caveman default-on by adding this
     # always-loaded rule file. Source it from the pinned flake input instead of
     # running the installer, so the behavior is reproducible through Home Manager.

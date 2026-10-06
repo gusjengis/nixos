@@ -59,7 +59,7 @@ let
 
   # Read at runtime only: Nix must never evaluate the secret, or it would be
   # copied into the world-readable store.
-  credentials = "${config.home.homeDirectory}/.config/secrets/obsidian";
+  credentials = "${config.home.homeDirectory}/.config/secrets/logins/obsidian";
 
   obsidianSync = pkgs.writeShellApplication {
     name = "obsidian-sync";
