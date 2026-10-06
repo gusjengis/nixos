@@ -51,7 +51,7 @@ CLOSED = {"done", "dropped"}
 
 DEFAULT_MIX = {
     "impact": 0.55, "urgency": 0.25, "quick": 0.10, "unblocks": 0.10,
-    "local": 0.10, "secondary": 0.2, "priority-boost": 0.15, "blocks-boost": 0.03,
+    "local": 0.10, "secondary": 0.2, "blocks-boost": 0.03,
 }
 UNSURE_BELOW = 0.35
 MAX_NEIGHBORS = 12
@@ -275,11 +275,6 @@ def combine(ex, store, rel: str, payload: dict, answers: dict, facets: list[dict
         mix["impact"] * impact + mix["urgency"] * urgency + mix["quick"] * quick
         + mix["unblocks"] * unblocks + mix["local"] * local
     )
-    priority = str(meta.get("priority") or "normal").lower()
-    if priority == "high":
-        score += mix["priority-boost"]
-    elif priority == "low":
-        score -= mix["priority-boost"]
     blocked = [
         t for t in ex.targets(meta, "blocks")
         if t in store.notes and str(store.notes[t][0].get("status") or "").lower() not in CLOSED
@@ -295,7 +290,6 @@ def combine(ex, store, rel: str, payload: dict, answers: dict, facets: list[dict
         + (f"; {others}" if others else "")
         + f") · urgency {urgency:.2f} · quick {quick:.2f} · unblocks {unblocks:.2f}"
         + (f" · local {local:.2f}" if "local" in answers else "")
-        + (f" · priority {priority}" if priority != "normal" else "")
         + (f" · blocks {len(blocked)}" if blocked else "")
     )
     fields = {

@@ -111,7 +111,7 @@ from the notes.
 7. Assistant instructions and junk are excluded: "Test", "Hi Sol! Treat this as a
    prompt" -> `meta`; OCR leftovers -> `noise` (e.g. `2026-10-01-223441`, the model
    saying a page is blank; blank pages are now handled upstream).
-8. Markers carry over: ☆ -> `priority: high`; `?` / "look up" -> `question`.
+8. Markers carry over: `?` / "look up" -> `question`.
    Crossed-out items are kept as dropped history, not live tasks.
 9. Duplicates merge; nothing is deleted. Source links keep every capture.
 10. Extraction is not interpretation. No inferred values or goals the note does
@@ -233,7 +233,7 @@ Code: `system/hosts/omega/note-extract.py`, units in `notes.nix`.
   another quote.
 - Re-extraction: new thoughts are paired with the note's previous ones by
   equal title or matching similarity >= 0.8, best pairs first. Paired thoughts
-  keep title, id, `status`, `priority` and user fields; types, tags and (for a
+  keep title, id, `status` and user fields; types, tags and (for a
   single-source thought) the body are refreshed. Unpaired old thoughts become
   `orphaned: true`, or lose this source if they have others.
 - Linking: shortlist of 10 by matching similarity, Qwen may add up to 3

@@ -114,7 +114,7 @@ RELATION_KEYS = set(RELATIONS) | set(BACKWARD)
 
 # Frontmatter order; anything else (user fields) follows in its own order.
 ORDER = (
-    ["id", "type", "aliases", "types", "status", "priority", "tags", "captured"]
+    ["id", "type", "aliases", "types", "status", "tags", "captured"]
     + ["mentions_count", "source", "mentions", "mentioned-by"]
     + [k for r in RELATION_HELP for k in dict.fromkeys((r, RELATIONS[r]))]
     + ["unclear", "orphaned", "extractor"]
@@ -458,7 +458,7 @@ state. If the meaning of a line is unclear, keep its wording as the text and \
 set unclear to true.
 7. Instructions to an assistant and tests ("Test", "Hi Sol! Treat this as a \
 prompt") are type meta. Transcription junk is type noise. Keep both.
-8. "☆" means priority high. A "?" or "look up" makes it (also) a question. \
+8. A "?" or "look up" makes it (also) a question. \
 Crossed-out text (~~like this~~) is a dropped item: keep it with status dropped.
 9. A thought stated twice in this note is extracted once.
 
@@ -479,8 +479,6 @@ e.g. car, note-processing, job-search. Reuse an existing tag whenever one \
 fits. meta and noise get none.
 - status: for task, reminder, purchase and person-action: todo; done when the \
 note says it is done; dropped when crossed out. Otherwise none.
-- priority: high for ☆ or stated urgency, low when the note says it can wait, \
-otherwise normal.
 - unclear: true only if the meaning could not be resolved.
 - entities: every concrete thing the thought involves gets an entity, named \
 or not, so all thoughts about the same thing meet on one note: \
@@ -514,7 +512,6 @@ SEGMENT_SCHEMA = {
             "types": {"type": "array", "items": {"type": "string", "enum": list(TYPES)}},
             "tags": {"type": "array", "maxItems": 4, "items": {"type": "string", "maxLength": 40}},
             "status": {"type": "string", "enum": ["todo", "done", "dropped", "none"]},
-            "priority": {"type": "string", "enum": ["low", "normal", "high"]},
             "unclear": {"type": "boolean"},
             "entities": {"type": "array", "items": {
                 "type": "object",
@@ -535,7 +532,7 @@ SEGMENT_SCHEMA = {
             }},
         },
         "required": ["key", "quote", "text", "title", "types", "tags", "status",
-                     "priority", "unclear", "entities", "links"],
+                     "unclear", "entities", "links"],
     }}},
     "required": ["thoughts"],
 }
@@ -665,7 +662,6 @@ def clean_thought(raw: dict) -> dict | None:
         "types": types,
         "tags": tags,
         "status": status,
-        "priority": raw.get("priority") if raw.get("priority") in ("low", "high") else "normal",
         "unclear": bool(raw.get("unclear")),
         "entities": [] if hidden else [e for e in raw.get("entities") or [] if (e.get("name") or "").strip()],
         "links": raw.get("links") or [],
@@ -787,7 +783,6 @@ class Extractor:
         meta = {"id": self.new_id(stem, t["key"]), "types": t["types"]}
         if t["status"]:
             meta["status"] = t["status"]
-        meta["priority"] = t["priority"]
         meta["tags"] = t["tags"]
         if created:
             meta["captured"] = created

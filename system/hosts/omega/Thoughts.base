@@ -4,8 +4,6 @@ filters:
     - '!types.contains("meta")'
     - '!types.contains("noise")'
     - "orphaned != true"
-formulas:
-  rank: 'if(priority == "high", 0, if(priority == "low", 2, 1))'
 views:
   - type: table
     name: Ranked
@@ -38,14 +36,14 @@ views:
       direction: ASC
     order:
       - file.name
+      - score
       - status
-      - priority
       - tags
       - captured
       - mentions_count
     sort:
-      - property: formula.rank
-        direction: ASC
+      - property: score
+        direction: DESC
       - property: captured
         direction: DESC
   - type: table
@@ -58,7 +56,6 @@ views:
     order:
       - file.name
       - status
-      - priority
       - tags
       - captured
   - type: table

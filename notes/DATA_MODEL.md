@@ -123,7 +123,6 @@ tags or thoughts. Once a specific entity exists the extractor uses it, so
 id: th-20260930214137-02
 types: [task, purchase]
 status: todo
-priority: normal
 tags: [car]
 captured: 2026-09-30T21:41:37-07:00
 mentions_count: 1
@@ -149,7 +148,6 @@ writes it, pipeline fields first in the order above, user fields after.
 | `id` | `th-<capture stamp>-<nn>`, never changes | pipeline |
 | `types` | list from the table above | pipeline |
 | `status` | `todo` `doing` `waiting` `done` `dropped` `someday` (tasks only) | **user** after creation |
-| `priority` | `low` `normal` `high` (☆ in handwriting -> `high`) | **user** after creation |
 | `tags` | free subject tags | pipeline |
 | `captured` | earliest capture time | pipeline |
 | `mentions_count` | number of captures merged into this thought (= number of `source` entries) | pipeline |
@@ -224,3 +222,5 @@ gone.
   re-extracted with `--force`).
 - v1.2 (2026-10-05): `score`, `score-facet`, `score-parts`, `score-unsure`
   from the Jev scorer; `Facets.md` in the vault root; `Ranked` view.
+- v1.3 (2026-10-05): `priority` removed; `score` replaces it (☆ no longer
+  mapped). Existing thoughts stripped of the field.
