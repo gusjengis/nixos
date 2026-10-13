@@ -22,28 +22,6 @@ let
   user = "gusjengis";
   home = "/home/${user}";
   vault = "${home}/Documents/Obsidian/Notes";
-  # Read at runtime only, from the secrets checkout; never evaluated by Nix.
-  credentials = "${home}/.config/secrets/logins/obsidian";
-
-  obsidianSync = pkgs.writeShellApplication {
-    name = "obsidian-sync";
-    runtimeInputs = [
-      # System units get a bare PATH; the script is run with `bash`.
-      pkgs.bash
-      pkgs.obsidian-headless
-      pkgs.coreutils
-      pkgs.gnugrep
-      pkgs.gnused
-      pkgs.hostname
-    ];
-    text = ''
-      export OBSIDIAN_CREDENTIALS="${credentials}"
-      export OBSIDIAN_VAULT="${vault}"
-      # The "Notes" vault, by ID (same as the workstations' sync service).
-      export OBSIDIAN_REMOTE_VAULT="bcf1cb4f72f6417ec375921cbf767004"
-      exec bash ${../../../home/features/applications/obsidian/obsidian-sync.sh} "$@"
-    '';
-  };
 
   normalize = pkgs.writeShellApplication {
     name = "note-normalize";
@@ -204,32 +182,11 @@ in
       };
     };
 
-    systemd.services.obsidian-sync = {
-      description = "Obsidian Sync (headless) for ${vault}";
-      after = [ "network-online.target" ];
-      wants = [ "network-online.target" ];
-      wantedBy = [ "multi-user.target" ];
-      unitConfig = {
-        ConditionPathExists = credentials;
-        StartLimitIntervalSec = 0;
-      };
-      serviceConfig = {
-        User = user;
-        Group = "users";
-        ExecStart = lib.getExe obsidianSync;
-        Restart = "always";
-        # Backs off to 30 min so a bad password does not hammer the login.
-        RestartSec = 30;
-        RestartSteps = 6;
-        RestartMaxDelaySec = 1800;
-      };
-    };
-
     systemd.services.note-normalize = {
       description = "Normalize raw Obsidian notes";
       after = [
         "ollama.service"
-        "obsidian-sync.service"
+        "syncthing.service"
       ];
       unitConfig.ConditionPathIsDirectory = "${vault}/Raw";
       serviceConfig = {
@@ -272,7 +229,7 @@ in
       after = [
         "ollama.service"
         "ollama-embedders.service"
-        "obsidian-sync.service"
+        "syncthing.service"
         "note-normalize.service"
       ];
       unitConfig.ConditionPathIsDirectory = "${vault}/Normalized";
@@ -314,7 +271,7 @@ in
       description = "Build OpenCode session graph and review-only reconciliation";
       after = [
         "ollama.service"
-        "obsidian-sync.service"
+        "syncthing.service"
         "note-extract.service"
       ];
       unitConfig.ConditionPathIsDirectory = "${vault}/Sessions/OpenCode/Transcripts";
@@ -346,7 +303,7 @@ in
       description = "Rank thoughts and sort them into contexts with Jev";
       after = [
         "network-online.target"
-        "obsidian-sync.service"
+        "syncthing.service"
         "note-extract.service"
       ];
       wants = [ "network-online.target" ];

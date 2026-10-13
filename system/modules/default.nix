@@ -28,6 +28,7 @@
     ./software/vial.nix
     ./software/supernote.nix
     ./software/tailscale.nix
+    ./software/vault-sync
     ./software/fleet-monitor.nix
     ./software/office_network_drives.nix
     ./software/vms.nix

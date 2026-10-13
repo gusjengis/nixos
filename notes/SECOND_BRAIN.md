@@ -22,13 +22,27 @@ Supernote tablet ──┼─> Raw/ ──normalize──> Normalized/ ──ext
 typed in Obsidian ─┘   (record of truth)   (omega)                         (omega)
 ```
 
-All stages meet in one Obsidian vault, synced by Obsidian Sync to every device,
-including the headless ones that process it.
+All stages meet in one Obsidian vault, synced by Syncthing over Tailscale to
+desktop hosts and omega, the headless processing host. Phone sync is not enabled.
 
 ## The vault
 
-- Path on every machine: `~/Documents/Obsidian/Notes` (remote vault ID
-  `bcf1cb4f72f6417ec375921cbf767004`). Not in git; Obsidian Sync carries it.
+- Path on every participating machine: `~/Documents/Obsidian/Notes`. Not in git;
+  Syncthing carries it. Keep Obsidian's Sync core plugin disabled.
+- Separate manual-writing vault: `~/Documents/Obsidian/vault`. No starter notes
+  or Obsidian configuration; each host has its own empty Git repository.
+- Shared module: `system/modules/software/vault-sync/`. Public device IDs are
+  the module's `vaultSync.deviceIds` input; private identities remain local in
+  `~/.config/syncthing/`. Preserve `cert.pem` and `key.pem` on reinstall, or
+  generate a new identity and update its public ID. Never share one identity
+  between running hosts.
+- Syncthing ignores `.git` and per-device Obsidian workspace files. Git history
+  is local, not shared by Syncthing; use a Git remote if shared history is wanted.
+- GUI: `http://127.0.0.1:8384`. Transport: TCP 22000, allowed only on `tailscale0`;
+  public discovery, relays, and NAT traversal are disabled.
+- Omega retains incoming overwritten/deleted files for up to 30 days with
+  staggered versioning. This does not back up omega's own edits or replace an
+  independent backup.
 - `Templates/Raw Note.md` (in the vault): the single definition of the raw note
   format, executed by Templater in Obsidian and headless by `capture-note`.
 - Folders used by the pipeline: `Raw/`, `Raw/Images/`, `Normalized/`,
@@ -41,10 +55,9 @@ Capture (desktop side), `home/features/applications/obsidian/`:
 
 | File | Role |
 |---|---|
-| `default.nix` | Builds `capture-note` and `note-delete`, the headless `obsidian-sync` user service, the Supernote import timer (pc only) |
+| `default.nix` | Builds `capture-note` and `note-delete`, the Supernote import timer (pc only) |
 | `raw-note.mjs` | `capture-note`: renders the vault's raw note template headless and writes the note atomically |
 | `capture-import.py` | Imports OCR'd Supernote batches from alpha's outbox into `Raw/` |
-| `obsidian-sync.sh` | Logs in and runs `ob sync --continuous` (shared by desktops and omega) |
 | `note-delete.py` | `note-delete`: explicit deletion of a raw note and everything generated from it |
 
 Other capture pieces:
@@ -62,7 +75,8 @@ Processing, omega:
 
 | File | Role |
 |---|---|
-| `system/hosts/omega/notes.nix` | omega's vault sync, normalizer and extractor units |
+| `system/hosts/omega/notes.nix` | omega's normalizer and extractor units |
+| `system/modules/software/vault-sync/default.nix` | Shared Syncthing service and both vault folders |
 | `system/hosts/omega/note-normalize.py` | `note-normalize`: Raw -> Normalized |
 | `system/hosts/omega/note-extract.py` | `note-extract`: Normalized -> Thoughts + Entities (segment, dedup, link); `note-search` |
 | `system/hosts/omega/Thoughts.base` | Bases views, copied into the vault once |
@@ -75,7 +89,7 @@ Processing, omega:
 
 | Unit | Kind | Does |
 |---|---|---|
-| `obsidian-sync.service` | user service | Keeps the vault synced without the app (desktops with the secret) |
+| `syncthing.service` | system service, runs as vault owner | Keeps both vaults synced without the app |
 | `supernote-capture-import.timer` | user timer, 2 min, pc only, needs `/data` | Outbox -> `Raw/` via `capture-note` |
 | `capture-note`, `note-delete` | commands | Create a raw note; delete one and its derivatives |
 | Handy + Quickshell popup | session apps | Desktop dictation |
@@ -96,7 +110,7 @@ the Supernote import (see `CAPTURE_PLAN.md`, chunk 3, for moving that).
 
 | Unit | Kind | Does |
 |---|---|---|
-| `obsidian-sync.service` | system service as gusjengis | omega's own vault copy |
+| `syncthing.service` | system service as gusjengis | omega's copies of both vaults |
 | `note-normalize.path` | path unit on `Raw/`, `Raw/Images/` | Starts normalization on any change |
 | `note-normalize.timer` | 5 min after last run | Catches edits whose 10-minute quiet period expired |
 | `note-normalize.service` | oneshot | Raw -> Normalized |
