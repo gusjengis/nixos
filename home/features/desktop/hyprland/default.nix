@@ -94,6 +94,16 @@ in
       pkgs.vial
     ];
 
+    # Only the tray runs in the desktop session; tailscaled stays system-managed.
+    systemd.user.services.tailscale-tray = {
+      Unit.Description = "Tailscale system tray";
+      Service = {
+        ExecStart = "${pkgs.tailscale}/bin/tailscale systray --theme=dark:nobg";
+        Restart = "on-failure";
+        RestartSec = 3;
+      };
+    };
+
     # Portals are declared here rather than dropped into home.packages so that
     # exactly one hyprland.portal exists and it is the one built from the same
     # commit as the compositor. A portal from a different Hyprland version

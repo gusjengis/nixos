@@ -25,6 +25,7 @@
     services.tailscale = {
       enable = true;
       openFirewall = true;
+      extraSetFlags = [ "--operator=gusjengis" ];
       useRoutingFeatures =
         if config.tailscale.advertiseRoutes != [ ] then "both" else lib.mkDefault "client";
     };
@@ -68,7 +69,7 @@
           status="$(${tailscale}/bin/tailscale status -json 2>/dev/null | ${jq}/bin/jq -r .BackendState 2>/dev/null || true)"
           case "$status" in
             Running)
-              ${tailscale}/bin/tailscale set --hostname=${lib.escapeShellArg hostName} --accept-routes=true
+              ${tailscale}/bin/tailscale set --hostname=${lib.escapeShellArg hostName} --accept-routes=true ${lib.escapeShellArgs config.services.tailscale.extraSetFlags}
               exit 0
               ;;
             NeedsLogin)
@@ -90,7 +91,7 @@
 
 
         TS_AUTHKEY="$TAILSCALE_AUTH_KEY" ${tailscale}/bin/tailscale up --reset \
-          --hostname=${lib.escapeShellArg hostName} --accept-routes=true
+          --hostname=${lib.escapeShellArg hostName} --accept-routes=true ${lib.escapeShellArgs config.services.tailscale.extraSetFlags}
         # --ssh --accept-dns=true
       '';
     };
