@@ -1,4 +1,4 @@
-# Second Brain Data Model (v1.1)
+# Second Brain Data Model (v1.5)
 
 The shape of everything the pipeline writes into the Obsidian vault. This is a
 first pass meant to be used, judged in practice, and revised. Record changes
@@ -17,8 +17,16 @@ Overview of the whole system: `SECOND_BRAIN.md`. How extraction produces this:
 | `Thoughts/` | One atomic thought per file | extractor (omega) | user fields only (below) |
 | `Entities/` | People, objects, places, tools, organizations, works | extractor (omega) | yes, freely |
 | `Contexts/` | One note per context (area of focus), nested by `parent` | seeded, then scorer discovery | yes; description, parent, name, deletion |
+| `Projects/` | Durable project hubs spanning repositories | user/explicit pilot seed | yes |
+| `Repositories/` | Logical Git repositories, not individual checkouts | session processor | yes; outside generated sections |
+| `Sessions/OpenCode/` | One linked note per conversation | session processor | yes; outside generated sections |
+| `Sessions/OpenCode/Transcripts/<device>/` | Sanitized conversation records, updated per session | local collectors | no; regenerated from local OpenCode databases |
+| `Sessions/OpenCode/Reviews/` | Evidence-backed closure and new-thought proposals | session processor | yes; outside generated sections |
 
-Everything below `Raw/` can be rebuilt from `Raw/`. Nothing is deleted
+Capture-derived normalized notes and thoughts can be rebuilt from `Raw/`, but
+user-owned lifecycle decisions must be retained. Session notes/reviews rebuild
+from pooled transcripts; transcripts require the originating databases to
+regenerate. Project hubs are user-owned. Nothing is deleted
 automatically; `note-delete` is the only deletion path.
 
 ## Design decisions (v1)
@@ -38,10 +46,12 @@ automatically; `note-delete` is the only deletion path.
      `note-processing`, `job-search`, `home-automation`). The extractor is given
      the existing tags with counts and must reuse one when it fits, so the set
      converges instead of sprawling. Prune or merge tags by hand later if needed.
-3. **Projects are notes, not tags.** A project is a thought with type
-   `project`. Thoughts belonging to it link to it with `part-of`. One mechanism
-   instead of two that drift apart; the project note's backlinks are its
-   contents. (A project may still carry subject tags of its own.)
+3. **Projects are notes, not tags.** Captured project thoughts retain type
+   `project` in `Thoughts/`. Durable project hubs may live in `Projects/`, and
+   thoughts link to them with `part-of`. A repository can implement multiple
+   projects, and a project can span repositories. Session `ran-in` records the
+   working repository; `concerns` records actual subject, never inferred solely
+   from working directory.
 4. **Entities are separate notes** in `Entities/`, linked with `mentions`. Things
    that exist (the RAV4, Brian, Tailscale) rather than thoughts about them.
 5. **Links live in frontmatter, one property per relation type.** Obsidian's
@@ -52,9 +62,10 @@ automatically; `note-delete` is the only deletion path.
    surviving thought gains a `source` and its `mentions_count` goes up. Merges
    are logged on omega so a bad one can be found and undone. Everything is
    rebuildable, so being wrong is cheap.
-7. **Scope for now: captures only.** `TODOS.md`, older vault notes and Markdown
-   from other repos are not imported yet. (Long term, repo docs will be pulled
-   in for project context.)
+7. **Scope: captures plus a session-evidence pilot.** `TODOS.md`, older vault
+   notes and Markdown from other repos are not imported yet. OpenCode transcripts
+   have their own pipeline: session summaries and proposed reconciliation, not
+   indiscriminate thought extraction.
 
 ## Thought types (`types`, any number per thought)
 
@@ -148,7 +159,9 @@ writes it, pipeline fields first in the order above, user fields after.
 |---|---|---|
 | `id` | `th-<capture stamp>-<nn>`, never changes | pipeline |
 | `types` | list from the table above | pipeline |
-| `status` | `todo` `doing` `waiting` `done` `dropped` `someday` (tasks only) | **user** after creation |
+| `status` | `todo` `doing` `waiting` `done` `dropped` `someday` `dealt-with`; any thought may be marked `dealt-with` | **user** after creation |
+| `status-source`, `status-at` | manual lifecycle provenance and UTC timestamp, when changed with CLI | **user** |
+| `status-reason`, `resolution`, `evidence` | optional closure reason, outcome, and evidence links | **user** |
 | `tags` | free subject tags | pipeline |
 | `captured` | earliest capture time | pipeline |
 | `mentions_count` | number of captures merged into this thought (= number of `source` entries) | pipeline |
@@ -177,6 +190,58 @@ old ones by `id` (or by content when ids shift) and user fields are carried
 over. A thought a rebuild no longer produces is marked `orphaned: true`, not
 deleted.
 
+## Thought lifecycle and session evidence (v1.5)
+
+`dealt-with` means this thought no longer needs attention, regardless of type.
+It does not mean the original thought was false or worthless. Open views exclude
+it; historical views retain it. Existing `done`, `dropped`, and `someday`
+conventions remain supported. Edit the visible `status` property directly, or use:
+
+```bash
+thought-status "Start extraction process" --resolution completed --reason "Verified in session" --evidence "[[Sessions/OpenCode/session-note]]"
+thought-status "Start extraction process" --reopen
+```
+
+The CLI preserves body bytes and dates, writes atomically, and refuses an edit
+that changed during the update. On omega pass `--lock /var/lib/note-extract/lock`;
+else its default vault-local lock coordinates local CLI writers only. Neither
+lock coordinates Obsidian edits or remote sync. `note-score --refresh-views`
+refreshes generated views/counts and removes closed scores offline without
+classification or API calls. Existing dashboard/Base customizations are retained.
+
+Each machine's collector reads OpenCode SQLite in a read-only snapshot and
+publishes ordinary Markdown through Obsidian Sync. The editable capture policy
+is `home/features/agents/opencode/session-capture.json`. `include_sessions` is
+an explicit pilot allowlist; remove it or set `[]` for all top-level sessions.
+`--session` overrides that list for a manual run. `exclude_directories` and
+`include_children` control scope; `session_projects` supplies explicit project
+links. Repository mappings reconcile known roots across machines; otherwise
+normalized Git remote identifies the repo, falling back to OpenCode's Git root
+commit or a device-scoped local workspace identity.
+
+Transcripts include user/assistant text and sanitized tool inputs/results.
+Internal reasoning, system messages, attachments, synthetic file text, arbitrary
+metadata and known credential-path tool results are excluded. Secret-pattern
+redaction is best-effort, not a guarantee; review privacy before broad rollout.
+Literal transcript content is code-indented to avoid incidental graph links.
+Session identity is device-independent; each device retains its own transcript
+copy, and the graph note links all copies, using the freshest for review. Copies
+with divergent histories are retained, not semantically merged.
+
+Central `opencode-session-process` runs on omega, renders readable session and
+repository notes, and uses the resident model for evidence summaries and
+reconciliation proposals. Supplied transcript blocks and candidate thoughts are
+bounded; relevant earlier blocks and latest reports are preferred, and omitted
+coverage is explicit. Model paths and evidence IDs are validated against supplied
+inputs; output text cannot inject graph links. Source revisions and input hashes
+invalidate reviews; stale output is marked pending. Human annotations outside
+generated sections survive. Cache/state is disposable.
+
+**Pilot safety boundary:** no automatic thought closure or new-thought extraction.
+Reviews cite exact pooled transcript blocks, distinguish user-reported,
+assistant-claimed and tool-observed information, and leave acceptance to the user.
+No nightly repository exploration is implemented yet.
+
 ## Context note format
 
 `Contexts/Sleep.md`:
@@ -197,12 +262,30 @@ top: ['[[Thoughts/...]]', ...]   # scorer: three best open thoughts
 <!-- note-score: generated views ... -->  embedded Bases views, rewritten by the scorer
 ```
 
-Jev is asked, per thought, "is this about <path>: <description>?" for every
+Jev is asked, per thought, "is this about <description>?" for every
 context; a thought joins contexts at noul ≥ 0.6, keeping only the most
 specific (an ancestor is implied). A context's views include its whole
 subtree. `Dashboard.md` (created once, then the user's) ranks contexts by
 `context-score`. Renaming a context note breaks its links until the next run
 reassigns thoughts.
+
+Context classification uses the thought alone; priority scoring also uses
+one-hop neighbors. Answers are cached per `(model, state, question)`: editing
+one description or facet aim re-asks only that question, not every question.
+
+Nightly discovery uses the extractor's matching embeddings for unassigned
+thoughts. At least five thoughts must have cosine similarity >= 0.75 to the
+same seed. Qwen decides whether the group is coherent and proposes a name,
+description and existing parent. New contexts use `origin: discovered` and
+appear in Dashboard's New this week view. Rejected/processed groups are
+fingerprinted to avoid naming the same group every night. No sufficiently
+tight group means no new context, not a miscellaneous catch-all.
+
+Context score is a task-score rollup, not an independent model judgment of
+the project: the five highest actionable scores divided by at least three,
+plus 0.05 when any member was captured within seven days. Counts include
+descendants; the same thought can contribute to several contexts. This is a
+starting heuristic, not a validated measure of life importance.
 
 ## Entity note format
 
@@ -254,3 +337,6 @@ gone.
 - v1.3 (2026-10-05): `priority` removed; `score` replaces it (☆ no longer
   mapped). Existing thoughts stripped of the field.
 - v1.4 (2026-10-05): `Contexts/` notes, `contexts` on thoughts, `Dashboard.md`.
+- v1.5 (2026-10-06): universal `dealt-with` lifecycle, manual closure CLI,
+  pooled sanitized OpenCode transcripts, session/repository/project graph, and
+  evidence-backed review-only reconciliation pilot.

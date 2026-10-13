@@ -94,6 +94,38 @@ let
   # vault's Facets.md. Its answer cache is disposable; deleting it only costs
   # one full re-score (cents).
   scoreStateDir = "/var/lib/note-score";
+  sessionCaptureRoot = "${home}/.local/share/opencode";
+  sessionCapture = pkgs.writeShellApplication {
+    name = "opencode-session-capture";
+    runtimeInputs = [
+      python
+      pkgs.git
+    ];
+    text = ''
+      exec python3 ${../../../home/features/agents/opencode/session-capture.py} \
+        --vault ${lib.escapeShellArg vault} \
+        --data ${sessionCaptureRoot} \
+        --state ${home}/.local/state/opencode-session-capture \
+        --config /etc/nixos/home/features/agents/opencode/session-capture.json \
+        --device omega "$@"
+    '';
+  };
+  sessionStateDir = "/var/lib/session-process";
+  sessionProcess = pkgs.writeShellApplication {
+    name = "opencode-session-process";
+    runtimeInputs = [ python ];
+    text = ''
+      exec python3 ${./session-process.py} \
+        --vault ${lib.escapeShellArg vault} \
+        --state ${sessionStateDir} \
+        --lock ${stateDir}/lock \
+        --extract-module ${./note-extract.py} \
+        --ollama-url http://127.0.0.1:${toString config.ollama.port}/api/chat \
+        --model ${lib.escapeShellArg config.ollama.preload} \
+        --limit 5 \
+        "$@"
+    '';
+  };
   typesafeKey = "${home}/.config/secrets/api_keys/typesafe";
   score = pkgs.writeShellApplication {
     name = "note-score";
@@ -105,6 +137,8 @@ let
         --lock ${stateDir}/lock \
         --extract-module ${./note-extract.py} \
         --key-file ${lib.escapeShellArg typesafeKey} \
+        --ollama-url http://127.0.0.1:${toString config.ollama.port}/api/chat \
+        --discovery-model ${lib.escapeShellArg config.ollama.preload} \
         "$@"
     '';
   };
@@ -134,6 +168,8 @@ in
       extract
       search
       score
+      sessionProcess
+      sessionCapture
     ];
 
     # The state directory is created by the unit; this makes it exist (and
@@ -141,7 +177,32 @@ in
     systemd.tmpfiles.rules = [
       "d ${stateDir} 0755 ${user} users -"
       "d ${scoreStateDir} 0755 ${user} users -"
+      "d ${sessionStateDir} 0755 ${user} users -"
     ];
+
+    # Headless omega has no user session to run the Home Manager collector.
+    systemd.services.opencode-session-capture = {
+      description = "Pool local OpenCode transcripts into Obsidian";
+      unitConfig.ConditionPathIsDirectory = [
+        vault
+        sessionCaptureRoot
+      ];
+      serviceConfig = {
+        Type = "oneshot";
+        User = user;
+        Group = "users";
+        ExecStart = lib.getExe sessionCapture;
+        UMask = "0077";
+        NoNewPrivileges = true;
+      };
+    };
+    systemd.timers.opencode-session-capture = {
+      wantedBy = [ "timers.target" ];
+      timerConfig = {
+        OnBootSec = "5min";
+        OnUnitInactiveSec = "5min";
+      };
+    };
 
     systemd.services.obsidian-sync = {
       description = "Obsidian Sync (headless) for ${vault}";
@@ -249,6 +310,38 @@ in
       };
     };
 
+    systemd.services.opencode-session-process = {
+      description = "Build OpenCode session graph and review-only reconciliation";
+      after = [
+        "ollama.service"
+        "obsidian-sync.service"
+        "note-extract.service"
+      ];
+      unitConfig.ConditionPathIsDirectory = "${vault}/Sessions/OpenCode/Transcripts";
+      serviceConfig = {
+        Type = "oneshot";
+        User = user;
+        Group = "users";
+        ExecStart = lib.getExe sessionProcess;
+        NoNewPrivileges = true;
+        PrivateTmp = true;
+        ProtectSystem = "strict";
+        ReadWritePaths = [
+          vault
+          stateDir
+          sessionStateDir
+        ];
+      };
+    };
+
+    systemd.timers.opencode-session-process = {
+      wantedBy = [ "timers.target" ];
+      timerConfig = {
+        OnBootSec = "7min";
+        OnUnitInactiveSec = "15min";
+      };
+    };
+
     systemd.services.note-score = {
       description = "Rank thoughts and sort them into contexts with Jev";
       after = [
@@ -298,6 +391,23 @@ in
       timerConfig = {
         OnCalendar = "*-*-* 03:30";
         Persistent = true;
+        Unit = "note-score-nightly.service";
+      };
+    };
+
+    systemd.services.note-score-nightly = {
+      description = "Discover new note contexts and refresh rankings";
+      after = [
+        "ollama.service"
+        "note-extract.service"
+        "note-score.service"
+      ];
+      unitConfig.ConditionPathExists = [
+        typesafeKey
+        "${vault}/Facets.md"
+      ];
+      serviceConfig = config.systemd.services.note-score.serviceConfig // {
+        ExecStart = "${lib.getExe score} --discover";
       };
     };
   };

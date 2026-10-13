@@ -4,6 +4,7 @@
   lib,
   inputs,
   repoRoot,
+  hostName,
   ...
 }:
 let
@@ -31,6 +32,21 @@ let
       exec python3 "${repoRoot}/home/features/hardware/supernote/mirror-mcp.py"
     '';
   };
+  sessionCapture = pkgs.writeShellApplication {
+    name = "opencode-session-capture";
+    runtimeInputs = [
+      (pkgs.python3.withPackages (ps: [ ps.pyyaml ]))
+      pkgs.git
+    ];
+    text = ''
+      exec python3 "${configRoot}/session-capture.py" \
+        --vault "${config.home.homeDirectory}/Documents/Obsidian/Notes" \
+        --data "${config.xdg.dataHome}/opencode" \
+        --state "${config.xdg.stateHome}/opencode-session-capture" \
+        --config "${configRoot}/session-capture.json" \
+        --device ${lib.escapeShellArg hostName} "$@"
+    '';
+  };
 in
 {
   # Pinned to the upstream flake rather than pkgs.opencode, which trails behind.
@@ -39,9 +55,30 @@ in
     inputs.opencode.packages.${pkgs.stdenv.hostPlatform.system}.default
     sessionNotify
     supernoteMcp
+    sessionCapture
   ];
 
   programs.bash.shellAliases.oc = "opencode";
+
+  systemd.user.services.opencode-session-capture = lib.mkIf (hostName != "omega") {
+    Unit = {
+      Description = "Pool sanitized OpenCode transcripts into Obsidian";
+      ConditionPathIsDirectory = "${config.home.homeDirectory}/Documents/Obsidian/Notes";
+    };
+    Service = {
+      Type = "oneshot";
+      ExecStart = lib.getExe sessionCapture;
+      UMask = "0077";
+    };
+  };
+  systemd.user.timers.opencode-session-capture = lib.mkIf (hostName != "omega") {
+    Unit.Description = "Capture OpenCode sessions periodically";
+    Timer = {
+      OnBootSec = "5min";
+      OnUnitInactiveSec = "5min";
+    };
+    Install.WantedBy = [ "timers.target" ];
+  };
 
   # Settings and plugins are linked back into this repository so edits apply on
   # the next OpenCode start, and so state OpenCode writes itself (recent models,

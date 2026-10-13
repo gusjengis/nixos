@@ -1,0 +1,25 @@
+{
+  "databases": ["opencode.db", "opencode-stable.db", "opencode-local.db"],
+  "include_children": false,
+  "include_sessions": [
+    "ses_eeffdedd0ffeO7NPRuDWvdy6UI",
+    "ses_ef0d93f13ffe8Py7zfKMcaQawy",
+    "ses_ef2aaf795ffefMyLwUooxsbdO7",
+    "ses_f053d9e77ffegCBEcbW244RhKH",
+    "ses_ef1368a87ffeErn4D1WK2K5ajB"
+  ],
+  "exclude_directories": [],
+  "repositories": [
+    {
+      "paths": ["/etc/nixos"],
+      "remote": "https://github.com/gusjengis/nixos.git",
+      "name": "NixOS configuration"
+    }
+  ],
+  "session_projects": {
+    "ses_eeffdedd0ffeO7NPRuDWvdy6UI": ["[[Projects/Obsidian second brain]]"],
+    "ses_ef0d93f13ffe8Py7zfKMcaQawy": ["[[Projects/Obsidian second brain]]"],
+    "ses_ef2aaf795ffefMyLwUooxsbdO7": ["[[Projects/Obsidian second brain]]"],
+    "ses_f053d9e77ffegCBEcbW244RhKH": ["[[Projects/Obsidian second brain]]"]
+  }
+}
