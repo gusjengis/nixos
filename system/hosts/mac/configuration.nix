@@ -65,6 +65,16 @@ in
   environment.systemPackages = with pkgs; [
     iwd
   ];
+  # Install before 73-seat-late.rules so logind grants the active seat access.
+  services.udev.packages = [
+    (pkgs.writeTextFile {
+      name = "mac-lid-udev-rules";
+      destination = "/lib/udev/rules.d/72-mac-lid.rules";
+      text = ''
+        SUBSYSTEM=="input", KERNEL=="event*", ENV{ID_PATH}=="platform-macsmc-input", TAG+="uaccess"
+      '';
+    })
+  ];
   services.keyd = {
     enable = true;
 

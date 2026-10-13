@@ -97,15 +97,13 @@ end, { locked = true })
 hl.bind("switch:off:Apple SMC power/lid events", hl.dsp.exec_cmd("hyprctl reload"), { locked = true })
 
 local function lidIsClosed()
-	local command =
-		"/run/current-system/sw/bin/busctl get-property org.freedesktop.login1 /org/freedesktop/login1 org.freedesktop.login1.Manager LidClosed"
-	local process = io.popen(command)
+	local process = io.popen("lid-state")
 	if not process then
 		return false
 	end
 	local state = process:read("*a")
 	process:close()
-	return state:match("true") ~= nil
+	return state:match("^closed") ~= nil
 end
 
 -- display-recovery also reloads Hyprland. Reconcile after its scheduled monitor
