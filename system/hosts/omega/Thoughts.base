@@ -13,6 +13,7 @@ views:
         - 'status != "done"'
         - 'status != "dropped"'
         - 'status != "someday"'
+        - 'status != "dealt-with"'
     order:
       - file.name
       - score
@@ -32,6 +33,7 @@ views:
         - 'status != "done"'
         - 'status != "dropped"'
         - 'status != "someday"'
+        - 'status != "dealt-with"'
     groupBy:
       property: note.tags
       direction: ASC
@@ -54,6 +56,7 @@ views:
         - 'types.contains("purchase")'
         - 'status != "done"'
         - 'status != "dropped"'
+        - 'status != "dealt-with"'
     order:
       - file.name
       - status
@@ -62,9 +65,11 @@ views:
   - type: table
     name: Open questions
     filters:
-      or:
-        - 'types.contains("question")'
-        - 'types.contains("decision")'
+      and:
+        - or:
+            - 'types.contains("question")'
+            - 'types.contains("decision")'
+        - 'status != "dealt-with"'
     order:
       - file.name
       - types
@@ -78,6 +83,7 @@ views:
     filters:
       and:
         - 'types.contains("project")'
+        - 'status != "dealt-with"'
     order:
       - file.name
       - tags
@@ -87,6 +93,7 @@ views:
     filters:
       and:
         - 'types.contains("idea")'
+        - 'status != "dealt-with"'
     groupBy:
       property: note.tags
       direction: ASC
@@ -100,6 +107,7 @@ views:
     filters:
       and:
         - "mentions_count > 1"
+        - 'status != "dealt-with"'
     order:
       - file.name
       - types

@@ -57,6 +57,14 @@ let
     '';
   };
 
+  thoughtStatus = pkgs.writeShellApplication {
+    name = "thought-status";
+    runtimeInputs = [ (pkgs.python3.withPackages (p: [ p.pyyaml ])) ];
+    text = ''
+      exec python3 "${featureDir}/thought-status.py" --vault "''${OBSIDIAN_VAULT:-${vault}}" "$@"
+    '';
+  };
+
   # Read at runtime only: Nix must never evaluate the secret, or it would be
   # copied into the world-readable store.
   credentials = "${config.home.homeDirectory}/.config/secrets/logins/obsidian";
@@ -90,6 +98,7 @@ in
       pkgs.obsidian-headless
       captureNote
       noteDelete
+      thoughtStatus
     ];
 
     home.activation.createObsidianVaultDirectory = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
