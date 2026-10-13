@@ -6,6 +6,7 @@
   gaming.enable = true;
   bambu.enable = true;
   windowsVm.enable = true;
+  mediaEditing.enable = true;
 
   home.packages = [
     inputs.alga.packages.${pkgs.stdenv.hostPlatform.system}.default
