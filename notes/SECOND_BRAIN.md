@@ -31,12 +31,15 @@ desktop hosts and omega, the headless processing host. Phone sync is not enabled
   Syncthing carries it. Keep Obsidian's Sync core plugin disabled.
 - Separate manual-writing vault: `~/Documents/Obsidian/vault`. No starter notes
   or Obsidian configuration; each host has its own empty Git repository.
+- The shared Syncthing folder is `~/Documents/Obsidian`, including all current
+  and future vaults beneath it. New vaults need no Nix configuration changes.
 - Shared module: `system/modules/software/vault-sync/`. Public device IDs are
   the module's `vaultSync.deviceIds` input; private identities remain local in
   `~/.config/syncthing/`. Preserve `cert.pem` and `key.pem` on reinstall, or
   generate a new identity and update its public ID. Never share one identity
   between running hosts.
-- Syncthing ignores `.git` and per-device Obsidian workspace files. Git history
+- Syncthing ignores `.git` and per-device Obsidian workspace files at every
+  depth, plus nested metadata and version archives from the old shares. Git history
   is local, not shared by Syncthing; use a Git remote if shared history is wanted.
 - GUI: `http://127.0.0.1:8384`. Transport: TCP 22000, allowed only on `tailscale0`;
   public discovery, relays, and NAT traversal are disabled.
@@ -76,7 +79,7 @@ Processing, omega:
 | File | Role |
 |---|---|
 | `system/hosts/omega/notes.nix` | omega's normalizer and extractor units |
-| `system/modules/software/vault-sync/default.nix` | Shared Syncthing service and both vault folders |
+| `system/modules/software/vault-sync/default.nix` | Shared Syncthing service and root Obsidian folder |
 | `system/hosts/omega/note-normalize.py` | `note-normalize`: Raw -> Normalized |
 | `system/hosts/omega/note-extract.py` | `note-extract`: Normalized -> Thoughts + Entities (segment, dedup, link); `note-search` |
 | `system/hosts/omega/Thoughts.base` | Bases views, copied into the vault once |
@@ -89,7 +92,7 @@ Processing, omega:
 
 | Unit | Kind | Does |
 |---|---|---|
-| `syncthing.service` | system service, runs as vault owner | Keeps both vaults synced without the app |
+| `syncthing.service` | system service, runs as vault owner | Keeps the Obsidian directory synced without the app |
 | `supernote-capture-import.timer` | user timer, 2 min, pc only, needs `/data` | Outbox -> `Raw/` via `capture-note` |
 | `capture-note`, `note-delete` | commands | Create a raw note; delete one and its derivatives |
 | Handy + Quickshell popup | session apps | Desktop dictation |
@@ -110,7 +113,7 @@ the Supernote import (see `CAPTURE_PLAN.md`, chunk 3, for moving that).
 
 | Unit | Kind | Does |
 |---|---|---|
-| `syncthing.service` | system service as gusjengis | omega's copies of both vaults |
+| `syncthing.service` | system service as gusjengis | omega's copy of the Obsidian directory |
 | `note-normalize.path` | path unit on `Raw/`, `Raw/Images/` | Starts normalization on any change |
 | `note-normalize.timer` | 5 min after last run | Catches edits whose 10-minute quiet period expired |
 | `note-normalize.service` | oneshot | Raw -> Normalized |

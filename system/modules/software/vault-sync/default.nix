@@ -11,16 +11,19 @@ let
   root = "${home}/Documents/Obsidian";
   peers = lib.removeAttrs cfg.deviceIds [ hostName ];
   ignorePatterns = [
-    "/.git"
-    "/.obsidian/workspace.json"
-    "/.obsidian/workspace-mobile.json"
+    ".git"
+    "**/.obsidian/workspace.json"
+    "**/.obsidian/workspace-mobile.json"
+    ".stfolder"
+    ".stignore"
+    ".stversions"
   ];
   initialIgnores = pkgs.writeText "vault-sync.stignore" (
     lib.concatStringsSep "\n" ignorePatterns + "\n"
   );
-  folder = name: {
-    id = "obsidian-${lib.toLower name}";
-    path = "${root}/${name}";
+  folder = {
+    id = "obsidian-root";
+    path = root;
     devices = builtins.attrNames peers;
     type = "sendreceive";
     inherit ignorePatterns;
@@ -32,7 +35,7 @@ let
 in
 {
   options.vaultSync = {
-    enable = lib.mkEnableOption "Syncthing for the Notes and manual writing vaults" // {
+    enable = lib.mkEnableOption "Syncthing for the Obsidian directory and all its vaults" // {
       default = builtins.hasAttr hostName cfg.deviceIds;
     };
     user = lib.mkOption {
@@ -50,11 +53,6 @@ in
       default = "${home}/.config/syncthing";
       description = "Runtime directory containing this host's cert.pem and key.pem.";
     };
-    notes.enable =
-      lib.mkEnableOption "syncing the existing Notes vault after Obsidian Sync is stopped"
-      // {
-        default = true;
-      };
   };
 
   config = lib.mkIf cfg.enable {
@@ -79,10 +77,7 @@ in
           inherit id;
           addresses = [ "tcp://${name}:22000" ];
         }) peers;
-        folders = {
-          vault = folder "vault";
-        }
-        // lib.optionalAttrs cfg.notes.enable { Notes = folder "Notes"; };
+        folders.Obsidian = folder;
         options = {
           listenAddresses = [ "tcp://0.0.0.0:22000" ];
           globalAnnounceEnabled = false;
@@ -104,13 +99,10 @@ in
       serviceConfig.UMask = "0077";
       preStart = ''
         mkdir -p ${lib.escapeShellArg "${root}/vault"}
-        ${lib.optionalString cfg.notes.enable "mkdir -p ${lib.escapeShellArg "${root}/Notes"}"}
         # Install exclusions before the first scan, not only through the REST updater.
-        for folder in ${lib.escapeShellArg "${root}/vault"} ${lib.optionalString cfg.notes.enable (lib.escapeShellArg "${root}/Notes")}; do
-          if [ ! -e "$folder/.stignore" ]; then
-            install -m 600 ${initialIgnores} "$folder/.stignore"
-          fi
-        done
+        if [ ! -e ${lib.escapeShellArg "${root}/.stignore"} ]; then
+          install -m 600 ${initialIgnores} ${lib.escapeShellArg "${root}/.stignore"}
+        fi
         if [ ! -e ${lib.escapeShellArg "${root}/vault/.git"} ]; then
           ${lib.getExe pkgs.git} -C ${lib.escapeShellArg "${root}/vault"} init --initial-branch=main
         fi

@@ -1,6 +1,7 @@
 # Vault Sync
 
-One NixOS module configures both folders and all peers. Hosts in
+One NixOS module syncs `~/Documents/Obsidian` as one folder, including every
+current and future vault beneath it. Hosts in
 `vaultSync.deviceIds` participate by default; override the input to change the
 roster or set `vaultSync.enable = false` to opt out. No host-specific copies of
 the folder configuration are needed.
@@ -9,6 +10,11 @@ the folder configuration are needed.
 - `~/Documents/Obsidian/vault`: manual writing, created without Obsidian setup.
   Git is initialized separately on each host; `.git` never syncs. Use a Git
   remote to share commits, not Syncthing.
+- New vaults and other files beneath `~/Documents/Obsidian` sync automatically;
+  no folder-specific Nix configuration is required.
+- Git metadata and Obsidian workspace files are excluded at every depth.
+  Nested `.stfolder`, `.stignore`, and `.stversions` from old shares stay local.
+  Only the root `.stignore` controls this share.
 - `omega` stays online and retains incoming replaced/deleted files for up to
   30 days. Its own edits are not covered by Syncthing versioning.
 - Peers connect using Tailscale host names on TCP 22000. No public discovery,
@@ -41,6 +47,13 @@ copies can reintroduce previously deleted files. Review conflicts and unexpected
 notes after joining an old replica; this migration deliberately preserves data.
 
 ## Migration Backup
+
+When replacing the old `obsidian-notes` and `obsidian-vault` shares, remove
+those folder configurations on every reachable peer before enabling the
+`obsidian-root` share. Removing a Syncthing folder configuration does not
+delete its files. Do not run parent and child shares concurrently. Install
+root ignore patterns before the first scan; leave old version archives intact.
+An offline peer must retire its old shares before adopting the root share.
 
 One pre-cutover backup was made on omega at
 `~/Backups/Notes-20261013T050137Z.tar.gz` (SHA-256
