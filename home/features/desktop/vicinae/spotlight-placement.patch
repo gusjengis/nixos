@@ -1,0 +1,62 @@
+diff --git a/src/server/src/ui/windows/launcher-window.cpp b/src/server/src/ui/windows/launcher-window.cpp
+--- a/src/server/src/ui/windows/launcher-window.cpp
++++ b/src/server/src/ui/windows/launcher-window.cpp
+@@ -4,5 +4,11 @@
+ #include "ui/qml-engine-scope.hpp"
+ #ifdef Q_OS_LINUX
+ #include "internal/wayland/xdg-activation.hpp"
++#ifdef WAYLAND_LAYER_SHELL
++#include "services/window-manager/hyprland/hyprctl.hpp"
++#include <LayerShellQt/Window>
++#include <QJsonDocument>
++#include <QJsonObject>
++#endif
+ #endif
+ #include "ui/bridges/global-shortcut-bridge.hpp"
+@@ -707,7 +713,28 @@
+ bool LauncherWindow::canPositionWindow() { return Environment::supportsArbitraryWindowPlacement(); }
+ 
+ void LauncherWindow::positionOnCursorScreen() {
+-  if (!m_window || !canPositionWindow()) return;
++  if (!m_window) return;
++#if defined(Q_OS_LINUX) && defined(WAYLAND_LAYER_SHELL)
++  if (isLayerShellActive()) {
++    QPoint cursor = QCursor::pos();
++    // Wayland only updates Qt's pointer position while the pointer is over our surfaces.
++    if (qEnvironmentVariableIsSet("HYPRLAND_INSTANCE_SIGNATURE")) {
++      const auto pos = QJsonDocument::fromJson(Hyprland::Controller::oneshot("-j/cursorpos")).object();
++      if (pos.value("x").isDouble() && pos.value("y").isDouble()) {
++        cursor = QPoint(pos.value("x").toInt(), pos.value("y").toInt());
++      }
++    }
++    auto *screen = QGuiApplication::screenAt(cursor);
++    if (!screen) screen = QGuiApplication::primaryScreen();
++    if (screen) {
++      // Select the output before mapping, so QML computes margins for this opening's screen.
++      m_window->setScreen(screen);
++      LayerShellQt::Window::get(m_window)->setScreen(screen);
++    }
++    return;
++  }
++#endif
++  if (!canPositionWindow()) return;
+   auto *screen = QGuiApplication::screenAt(QCursor::pos());
+   if (!screen) screen = QGuiApplication::primaryScreen();
+   if (!screen) return;
+diff --git a/src/server/src/ui/qml/launcher/LauncherWindowLayerShell.qml b/src/server/src/ui/qml/launcher/LauncherWindowLayerShell.qml
+--- a/src/server/src/ui/qml/launcher/LauncherWindowLayerShell.qml
++++ b/src/server/src/ui/qml/launcher/LauncherWindowLayerShell.qml
+@@ -15,10 +15,11 @@
+     maximumHeight: shellHeight
+ 
+     LayerShell.Window.anchors: LayerShell.Window.AnchorTop
+-    LayerShell.Window.margins.top: Math.max(0, Math.round(Screen.height * 0.2) - shadowPadding)
++    // Use expanded bounds even while compacted, keeping the search bar stationary.
++    LayerShell.Window.margins.top: Math.max(0, Math.round((shell.screen.height - expandedHeight) / 2))
+     LayerShell.Window.exclusionZone: 0
+     LayerShell.Window.scope: "vicinae"
+-    LayerShell.Window.wantsToBeOnActiveScreen: true
++    LayerShell.Window.wantsToBeOnActiveScreen: false
+     LayerShell.Window.layer: LayerShell.Window.LayerOverlay
+     LayerShell.Window.keyboardInteractivity: Launcher.lsKeyboardInteractivity
+ 

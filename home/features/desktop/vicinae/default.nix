@@ -11,11 +11,10 @@ let
   extensionsDir = "${repoRoot}/home/features/desktop/vicinae/extensions";
   themeFile = "${repoRoot}/home/features/desktop/vicinae/spotlight.toml";
   vicinaePackage = inputs.vicinae.packages.${pkgs.stdenv.hostPlatform.system}.default.overrideAttrs (old: {
-    patches = (old.patches or [ ]) ++ [ ./spotlight-layout.patch ./spotlight-glass.patch ./spotlight-suggestion.patch ];
+    patches = (old.patches or [ ]) ++ [ ./spotlight-layout.patch ./spotlight-glass.patch ./spotlight-suggestion.patch ./spotlight-placement.patch ];
     postPatch = (old.postPatch or "") + ''
       substituteInPlace src/server/src/ui/qml/launcher/LauncherWindowLayerShell.qml \
         --replace-fail 'searchBarHeight: 52' 'searchBarHeight: 55' \
-        --replace-fail 'Screen.height * 0.2' 'Screen.height * 0.366667' \
         --replace-fail 'LayerShell.Window.exclusionZone: 0' 'LayerShell.Window.exclusionZone: -1' \
         --replace-fail 'screen.height - 37' 'screen.height - 30' \
         --replace-fail 'menu bar occupies top 37px' 'menu bar occupies top 30px' \
