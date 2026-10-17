@@ -38,6 +38,8 @@
       url = "github:gusjengis/vicinae";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    # Keep the package set tested by the fork's Nix packaging.
+    strata.url = "github:gusjengis/strata/build/1-nix-packaging";
     # Caveman skill suite for OpenCode (output-token compression).
     # Update to latest: nix flake update caveman && rehome
     caveman = {
@@ -50,10 +52,10 @@
       url = "github:typesafe-ai/skills";
       flake = false;
     };
-    # OpenCode pinned upstream, ahead of the nixpkgs package.
-    # Bump by editing the tag below, then: nix flake update opencode && rehome
+    # OpenCode release, ahead of the nixpkgs package.
+    # Update to latest: edit tag below, then: nix flake update opencode && rehome
     opencode = {
-      url = "github:anomalyco/opencode/v1.18.29";
+      url = "github:anomalyco/opencode/v1.19.3";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };

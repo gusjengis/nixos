@@ -54,6 +54,15 @@
       }
    },
    "providers": {
+      "applications": {
+         "entrypoints": {
+            "io.github.lgse.Strata": {
+               "preferences": {
+                  "defaultAction": "launch"
+               }
+            }
+         }
+      },
       "@knoopx/store.vicinae.github": {
          "preferences": {
             "numberOfResults": "50",
