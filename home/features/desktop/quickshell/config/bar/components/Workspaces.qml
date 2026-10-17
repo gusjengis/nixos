@@ -13,6 +13,7 @@ RowLayout {
     required property var barScreen
     readonly property var monitor: Hyprland.monitorFor(barScreen)
     property var workspaceState: []
+    readonly property var windowState: Hyprland.toplevels.values.map(toplevel => toplevel.lastIpcObject)
     readonly property var activeWorkspace: monitor && monitor.lastIpcObject ? monitor.lastIpcObject.activeWorkspace : null
     readonly property string activeWorkspaceName: activeWorkspace ? (activeWorkspace.address || activeWorkspace.name || "") : ""
     property int activeNumber: 0
@@ -85,7 +86,10 @@ RowLayout {
     }
 
     function occupied(number) {
-        return workspaceState.some(workspace => (workspace.address || workspace.name) === root.workspaceName(number) && root.monitor && workspace.monitor === root.monitor.name && workspace.windows > 0);
+        // Hyprland's workspace window count includes pinned windows following
+        // the active workspace. They must not keep the previous slot visible.
+        const name = root.workspaceName(number);
+        return name !== "" && windowState.some(window => window && window.mapped && !window.pinned && window.workspace && (window.workspace.address || window.workspace.name) === name);
     }
 
     function updateWorkspaceSlots() {
@@ -110,6 +114,7 @@ RowLayout {
 
     onActiveWorkspaceNameChanged: updateWorkspaceSlots()
     onWorkspaceStateChanged: updateWorkspaceSlots()
+    onWindowStateChanged: updateWorkspaceSlots()
 
     function specialWorkspace(name) {
         return workspaceState.find(workspace => (workspace.address || workspace.name) === DesktopSessions.specialName(name));
@@ -122,6 +127,7 @@ RowLayout {
 
     function refreshState() {
         Hyprland.refreshMonitors();
+        Hyprland.refreshToplevels();
         if (workspaceRequest.running)
             refreshPending = true;
         else
@@ -189,7 +195,7 @@ RowLayout {
     Connections {
         target: Hyprland
         function onRawEvent(event) {
-            const relevant = ["workspace", "workspacev2", "createworkspace", "createworkspacev2", "destroyworkspace", "destroyworkspacev2", "moveworkspace", "moveworkspacev2", "openwindow", "closewindow", "movewindow", "movewindowv2", "activespecial"];
+            const relevant = ["workspace", "workspacev2", "createworkspace", "createworkspacev2", "destroyworkspace", "destroyworkspacev2", "moveworkspace", "moveworkspacev2", "openwindow", "closewindow", "movewindow", "movewindowv2", "pin", "activespecial"];
             if (relevant.indexOf(event.name) !== -1)
                 root.refreshState();
         }
