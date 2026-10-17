@@ -1,4 +1,5 @@
 local vars = require("platform-variables")
+local sessions = require("sessions")
 local home = os.getenv("HOME")
 local repo = os.getenv("NIXOS_CONFIG_ROOT") or "/etc/nixos"
 
@@ -18,6 +19,10 @@ bind("SUPER + CTRL + SPACE", hl.dsp.exec_cmd("qs ipc call launcher remote"), "Re
 bind("SUPER + SHIFT + T", hl.dsp.exec_cmd("qs ipc call launcher tools"), "Tools Launcher")
 bind("SUPER + Q", hl.dsp.exec_cmd(vars.terminal), "Launch Terminal")
 bind("SUPER + B", hl.dsp.exec_cmd(vars.browser), "Launch Browser")
+bind("SUPER + Z", hl.dsp.exec_cmd("qs ipc call sessions toggle"), "Desktop Sessions")
+bind("SUPER + CTRL + grave", function()
+	sessions.previous()
+end, "Previous Desktop Session")
 bind("ALT + F4", hl.dsp.window.close(), "Close Program")
 bind("SUPER + F11", function()
 	local window = hl.get_active_window()
@@ -89,26 +94,13 @@ end
 
 hl.bind("SUPER + SHIFT + P", hl.dsp.window.pin({ action = "enable" }))
 
-local function monitor_workspace(workspace)
-	local monitor = hl.get_active_monitor()
-	local name = monitor.name .. ":" .. workspace
-	local legacy = hl.get_workspace(workspace)
-
-	if legacy and legacy.monitor == monitor then
-		hl.dispatch(hl.dsp.workspace.rename({ workspace = legacy, name = name }))
-		return legacy
-	end
-
-	return "name:" .. name
-end
-
 for workspace = 1, 10 do
 	local key = workspace % 10
 	bind("SUPER + " .. key, function()
-		hl.dispatch(hl.dsp.focus({ workspace = monitor_workspace(workspace), on_current_monitor = true }))
+		sessions.select_workspace(workspace)
 	end, "Workspace " .. workspace)
 	bind("SUPER + SHIFT + " .. key, function()
-		hl.dispatch(hl.dsp.window.move({ workspace = monitor_workspace(workspace) }))
+		sessions.move_window(workspace)
 	end, "Move to Workspace " .. workspace)
 end
 

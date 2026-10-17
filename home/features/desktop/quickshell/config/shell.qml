@@ -21,6 +21,15 @@ ShellRoot {
     }
 
     IpcHandler {
+        target: "sessions"
+        function toggle(): void { sessionPicker.toggle(); }
+    }
+
+    SessionPicker {
+        id: sessionPicker
+    }
+
+    IpcHandler {
         target: "focusGuard"
         function suspend(): void { FocusGuard.suspended = true; }
         function resume(): void { FocusGuard.suspended = false; }

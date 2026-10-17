@@ -19,7 +19,7 @@ hl.config({
 		force_default_wallpaper = 0,
 		disable_hyprland_logo = true, -- If true disables the random hyprland logo / anime girl background. :(
 		disable_splash_rendering = true, -- If true disables the splash screen.
-		focus_on_activate = true,
+		focus_on_activate = false,
 		initial_workspace_tracking = 0,
 	},
 })
@@ -64,8 +64,21 @@ hl.config({
 		fullscreen_on_one_column = true,
 	},
 })
+local swipe_distance = 0
 hl.gesture({
 	fingers = 3,
 	direction = "horizontal",
-	action = "workspace",
+	action = {
+		start = function()
+			swipe_distance = 0
+		end,
+		update = function(event)
+			swipe_distance = swipe_distance + event.delta.x
+		end,
+		finish = function(event)
+			if not event.cancelled and math.abs(swipe_distance) >= 80 then
+				require("sessions").cycle(swipe_distance < 0 and 1 or -1)
+			end
+		end,
+	},
 })

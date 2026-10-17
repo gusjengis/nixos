@@ -1,9 +1,11 @@
 import QtQuick
 import QtQuick.Effects
 import QtQuick.Layouts
+import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Io
 import "../../theme"
+import "../../state"
 
 RowLayout {
     id: root
@@ -75,20 +77,20 @@ RowLayout {
     spacing: 4
 
     function workspaceName(number) {
-        return root.monitor ? root.monitor.name + ":" + number : "";
+        return root.monitor ? DesktopSessions.workspaceName(number, root.monitor.name) : "";
     }
 
     function occupied(number) {
-        return workspaceState.some(workspace => (workspace.name === root.workspaceName(number) || workspace.id === number) && root.monitor && workspace.monitor === root.monitor.name);
+        return workspaceState.some(workspace => (workspace.address || workspace.name) === root.workspaceName(number) && root.monitor && workspace.monitor === root.monitor.name && workspace.windows > 0);
     }
 
     function specialWorkspace(name) {
-        return workspaceState.find(workspace => workspace.name === "special:" + name);
+        return workspaceState.find(workspace => (workspace.address || workspace.name) === DesktopSessions.specialName(name));
     }
 
     function specialWorkspaceActive(name) {
         const special = root.monitor && root.monitor.lastIpcObject ? root.monitor.lastIpcObject.specialWorkspace : null;
-        return special && special.name === "special:" + name;
+        return !!special && (special.address || special.name) === DesktopSessions.specialName(name);
     }
 
     function refreshState() {
@@ -122,6 +124,36 @@ RowLayout {
     Component.onCompleted: refreshState()
 
     Connections {
+        target: DesktopSessions
+        function onSnapshotChanged() { root.refreshState(); }
+    }
+
+    Rectangle {
+        implicitWidth: Math.min(110, sessionLabel.implicitWidth + 16)
+        implicitHeight: 26
+        radius: Theme.radius
+        color: sessionMouse.containsMouse ? Theme.barHoverFill : "transparent"
+        Text {
+            id: sessionLabel
+            anchors.fill: parent
+            anchors.leftMargin: 8
+            anchors.rightMargin: 8
+            verticalAlignment: Text.AlignVCenter
+            text: DesktopSessions.activeName
+            textFormat: Text.PlainText
+            elide: Text.ElideRight
+            color: DesktopSessions.error ? Theme.danger : Theme.barText
+            font { family: Theme.fontFamily; pixelSize: 13; weight: Font.DemiBold }
+        }
+        MouseArea {
+            id: sessionMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            onClicked: Quickshell.execDetached(["qs", "ipc", "call", "sessions", "toggle"])
+        }
+    }
+
+    Connections {
         target: Hyprland
         function onRawEvent(event) {
             const relevant = ["workspace", "workspacev2", "createworkspace", "createworkspacev2", "destroyworkspace", "destroyworkspacev2", "moveworkspace", "moveworkspacev2", "openwindow", "closewindow", "movewindow", "movewindowv2", "activespecial"];
@@ -137,9 +169,10 @@ RowLayout {
             required property int index
             readonly property int number: index + 1
             readonly property var activeWorkspace: root.monitor && root.monitor.lastIpcObject ? root.monitor.lastIpcObject.activeWorkspace : null
-            readonly property bool active: activeWorkspace && (activeWorkspace.name === root.workspaceName(number) || activeWorkspace.id === number)
+            readonly property bool active: !!activeWorkspace && (activeWorkspace.address || activeWorkspace.name) === root.workspaceName(number)
             readonly property bool occupied: root.occupied(number)
 
+            visible: active || occupied
             implicitWidth: number === 10 ? 28 : 24
             implicitHeight: 26
             radius: Theme.radius
@@ -167,8 +200,7 @@ RowLayout {
                 hoverEnabled: true
                 onClicked: {
                     if (root.monitor)
-                        Hyprland.dispatch("hl.dsp.focus({ monitor = '" + root.monitor.name + "' })");
-                    Hyprland.dispatch("hl.dsp.focus({ workspace = 'name:" + root.workspaceName(parent.number) + "'" + ", on_current_monitor = true })");
+                        DesktopSessions.selectWorkspace(parent.number, root.monitor.name);
                 }
             }
         }
@@ -224,7 +256,10 @@ RowLayout {
                     id: specialMouse
                     anchors.fill: parent
                     hoverEnabled: true
-                    onClicked: Hyprland.dispatch("hl.dsp.workspace.toggle_special('" + parent.modelData.name + "')")
+                    onClicked: {
+                        if (root.monitor)
+                            DesktopSessions.toggleSpecial(parent.modelData.name, root.monitor.name);
+                    }
                 }
             }
         }

@@ -194,7 +194,23 @@ def substitute(arguments, **values):
 
 
 def lua_string(value):
-    return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
+    return '"' + value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n").replace("\r", "\\r") + '"'
+
+
+def session_special(role):
+    runtime = os.environ["XDG_RUNTIME_DIR"]
+    instance = os.environ["HYPRLAND_INSTANCE_SIGNATURE"]
+    snapshot = json.loads((Path(runtime) / f"hyprland-sessions-{instance}.json").read_text(encoding="utf-8"))
+    workspace = snapshot["specials"][role]
+    if not snapshot.get("active") or not isinstance(workspace, str) or not workspace.startswith("special:"):
+        raise ValueError(f"invalid active session scratchpad: {role}")
+    return workspace
+
+
+def session_eval(statement):
+    result = subprocess.run(["hyprctl", "eval", statement], capture_output=True, text=True)
+    if result.returncode != 0 or result.stdout.strip() != "ok" or result.stderr.strip():
+        raise RuntimeError(f"hyprctl eval failed ({statement}): {result.stdout.strip()} {result.stderr.strip()}")
 
 
 def dispatch(lua):
@@ -207,13 +223,16 @@ def dispatch(lua):
 
 
 def exec_on_workspace(command, workspace):
-    dispatch(f"hl.dsp.exec_cmd({lua_string(shlex.join(command))}, {{ workspace = {lua_string(workspace)} }})")
+    dispatch(f"hl.dsp.exec_cmd({lua_string(shlex.join(command))}, {{ workspace = {lua_string(workspace + ' silent')}, no_initial_focus = true }})")
 
 
-def show_special_workspace(name):
-    # `toggle_special` races window creation and can hide what was just shown;
-    # focusing the workspace is idempotent.
-    dispatch(f"hl.dsp.focus({{ workspace = {lua_string('special:' + name)} }})")
+def show_special_workspace(role, workspace):
+    # Do not reveal a different session if it changed while a window was starting.
+    session_eval(
+        f"local sessions = require('sessions'); "
+        f"assert(sessions.special_name({lua_string(role)}) == {lua_string(workspace)}, 'active session changed'); "
+        f"sessions.show_special({lua_string(role)})"
+    )
 
 
 def workspace_has_windows(name):
@@ -221,7 +240,8 @@ def workspace_has_windows(name):
     if result.returncode != 0:
         return False
     try:
-        return any(client.get("workspace", {}).get("name") == name for client in json.loads(result.stdout))
+        return any((client.get("workspace", {}).get("address") or client.get("workspace", {}).get("name")) == name
+                   for client in json.loads(result.stdout))
     except json.JSONDecodeError:
         return False
 
@@ -238,7 +258,7 @@ def process_has_ancestor(pid, ancestors):
     return False
 
 
-def terminal_tmux_client():
+def terminal_tmux_client(workspace):
     windows = subprocess.run(["hyprctl", "-j", "clients"], capture_output=True, text=True)
     if windows.returncode != 0:
         return None
@@ -246,7 +266,7 @@ def terminal_tmux_client():
         terminal_pids = {
             int(client["pid"])
             for client in json.loads(windows.stdout)
-            if client.get("workspace", {}).get("name") == "special:terminal"
+            if (client.get("workspace", {}).get("address") or client.get("workspace", {}).get("name")) == workspace
         }
     except (json.JSONDecodeError, KeyError, TypeError, ValueError):
         return None
@@ -293,16 +313,19 @@ def open_project(raw_path, profile_name, current_workspace=False):
         subprocess.Popen(terminal, cwd=path, start_new_session=True)
         return
 
-    client = terminal_tmux_client()
+    workspace = session_special("terminal")
+    client = terminal_tmux_client(workspace)
     if client:
         subprocess.run(["tmux", "switch-client", "-c", client, "-t", session], check=True)
     else:
-        exec_on_workspace(terminal, "special:terminal")
+        exec_on_workspace(terminal, workspace)
         for _ in range(500):
-            if workspace_has_windows("special:terminal"):
+            if workspace_has_windows(workspace):
                 break
             time.sleep(0.02)
-    show_special_workspace("terminal")
+        else:
+            raise RuntimeError(f"Terminal did not open on {workspace}")
+    show_special_workspace("terminal", workspace)
 
 
 def web_url(query, settings):
@@ -313,34 +336,44 @@ def web_url(query, settings):
     return settings["webSearchUrl"].replace("{query}", urllib.parse.quote_plus(candidate))
 
 
-def chromium_open():
+def chromium_window(workspace):
     result = subprocess.run(["hyprctl", "-j", "clients"], capture_output=True, text=True)
     if result.returncode != 0:
-        return False
+        raise RuntimeError(f"hyprctl clients failed: {result.stderr.strip()}")
     try:
-        return any("chromium" in client.get("class", "").lower() for client in json.loads(result.stdout))
+        return next((client["address"] for client in json.loads(result.stdout)
+                     if (client.get("workspace", {}).get("address") or client.get("workspace", {}).get("name")) == workspace
+                     and "chromium" in client.get("class", "").lower()), None)
     except json.JSONDecodeError:
-        return False
+        raise RuntimeError("hyprctl clients returned invalid JSON") from None
 
 
 def open_web(query):
     url = web_url(query, config())
-    if chromium_open():
+    workspace = session_special("browser")
+    address = chromium_window(workspace)
+    if address:
+        show_special_workspace("browser", workspace)
+        session_eval(f"require('sessions').focus_window({lua_string('address:' + address)})")
         subprocess.Popen(
-            ["xdg-open", url],
+            ["chromium", "--new-tab", url],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             start_new_session=True,
         )
         return
 
-    exec_on_workspace(["chromium", url], "special:browser")
+    # Populate before showing: show_special would otherwise launch a default browser.
+    session_eval(
+        f"require('sessions').launch_special('browser', "
+        f"{lua_string(shlex.join(['chromium', '--new-window', url]))}, {lua_string(workspace)})"
+    )
     for _ in range(500):
-        if workspace_has_windows("special:browser"):
-            show_special_workspace("browser")
+        if chromium_window(workspace):
+            show_special_workspace("browser", workspace)
             return
         time.sleep(0.02)
-    raise RuntimeError("Chromium did not open on special:browser")
+    raise RuntimeError(f"Chromium did not open on {workspace}")
 
 
 def main():
