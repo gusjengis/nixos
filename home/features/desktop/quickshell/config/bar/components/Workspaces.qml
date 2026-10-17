@@ -13,6 +13,10 @@ RowLayout {
     required property var barScreen
     readonly property var monitor: Hyprland.monitorFor(barScreen)
     property var workspaceState: []
+    readonly property var activeWorkspace: monitor && monitor.lastIpcObject ? monitor.lastIpcObject.activeWorkspace : null
+    readonly property string activeWorkspaceName: activeWorkspace ? (activeWorkspace.address || activeWorkspace.name || "") : ""
+    property int activeNumber: 0
+    property var visibleWorkspaceNumbers: []
     property bool refreshPending: false
     readonly property var specialWorkspaces: [
         {
@@ -84,6 +88,29 @@ RowLayout {
         return workspaceState.some(workspace => (workspace.address || workspace.name) === root.workspaceName(number) && root.monitor && workspace.monitor === root.monitor.name && workspace.windows > 0);
     }
 
+    function updateWorkspaceSlots() {
+        const numbers = [];
+        let current = 0;
+        for (let number = 1; number <= 10; number++) {
+            const name = root.workspaceName(number);
+            const active = name !== "" && name === root.activeWorkspaceName;
+            if (active)
+                current = number;
+            if (active || root.occupied(number))
+                numbers.push(number);
+        }
+
+        // IPC and session snapshots can arrive separately. Keep the previous
+        // slots until the active workspace can be resolved in the new snapshot.
+        if (current === 0)
+            return;
+        root.activeNumber = current;
+        root.visibleWorkspaceNumbers = numbers;
+    }
+
+    onActiveWorkspaceNameChanged: updateWorkspaceSlots()
+    onWorkspaceStateChanged: updateWorkspaceSlots()
+
     function specialWorkspace(name) {
         return workspaceState.find(workspace => (workspace.address || workspace.name) === DesktopSessions.specialName(name));
     }
@@ -121,11 +148,17 @@ RowLayout {
         }
     }
 
-    Component.onCompleted: refreshState()
+    Component.onCompleted: {
+        updateWorkspaceSlots();
+        refreshState();
+    }
 
     Connections {
         target: DesktopSessions
-        function onSnapshotChanged() { root.refreshState(); }
+        function onSnapshotChanged() {
+            root.updateWorkspaceSlots();
+            root.refreshState();
+        }
     }
 
     Rectangle {
@@ -163,17 +196,17 @@ RowLayout {
     }
 
     Repeater {
-        model: 10
+        // Model the display slots, not workspace identities: an empty-workspace
+        // switch changes the number in place without removing a layout item.
+        model: root.visibleWorkspaceNumbers.length
 
         delegate: Rectangle {
             required property int index
-            readonly property int number: index + 1
-            readonly property var activeWorkspace: root.monitor && root.monitor.lastIpcObject ? root.monitor.lastIpcObject.activeWorkspace : null
-            readonly property bool active: !!activeWorkspace && (activeWorkspace.address || activeWorkspace.name) === root.workspaceName(number)
+            readonly property int number: root.visibleWorkspaceNumbers[index]
+            readonly property bool active: root.activeNumber === number
             readonly property bool occupied: root.occupied(number)
 
-            visible: active || occupied
-            implicitWidth: number === 10 ? 28 : 24
+            implicitWidth: 28
             implicitHeight: 26
             radius: Theme.radius
             // Monochrome, following the wallpaper: the active workspace is a
