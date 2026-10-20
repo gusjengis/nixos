@@ -92,6 +92,8 @@ in
       config.lib.file.mkOutOfStoreSymlink "${configRoot}/plugins/tmux-status.js";
     "opencode/tui-plugins/tmux-theme.js".source =
       config.lib.file.mkOutOfStoreSymlink "${configRoot}/tui-plugins/tmux-theme.js";
+    "opencode/tui-plugins/context-persistence.js".source =
+      config.lib.file.mkOutOfStoreSymlink "${configRoot}/tui-plugins/context-persistence.js";
 
     # Auto model router. The server plugin rewrites the model of every prompt
     # sent while the "Auto" entry is selected; the TUI plugin shows which model

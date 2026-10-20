@@ -30,6 +30,9 @@ let
     "**/.obsidian/workspace*.json"
     "**/.cache"
     "**/__pycache__"
+    # Checkpoint publication scratch is local/in-flight, never a synced root.
+    "**/.context/state/**/*.pending"
+    "**/.context/state/**/*.checkpoint-tmp-*"
     ".stfolder"
     ".stignore"
     ".stversions"

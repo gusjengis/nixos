@@ -52,10 +52,10 @@ let
       restore_log="$(mktemp)"
       trap 'rm -f "$expected_lock" "$restore_log"' EXIT
 
-      # Never trust the writable runtime copy as the source of truth. Lazy can
-      # rewrite it during restore to match a dirty clone; that is what let one
-      # machine declare itself consistent while LuaSnip was still off-lock.
-      ${pkgs.git}/bin/git -C "$HOME/.config/nvim" show HEAD:lazy-lock.json > "$expected_lock"
+      # Snapshot the checked-out lock before Lazy can rewrite it to match dirty
+      # plugin clones. This also permits an uncommitted plugin migration without
+      # resurrecting entries removed from its writable repository lockfile.
+      cp "$lock" "$expected_lock"
 
       restore() {
         cp "$expected_lock" "$lock"
