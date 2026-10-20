@@ -22,7 +22,8 @@ ShellRoot {
 
     IpcHandler {
         target: "sessions"
-        function toggle(): void { sessionPicker.toggle(); }
+        function toggle(): void { sessionPicker.toggle(false); }
+        function dispensary(): void { sessionPicker.toggle(true); }
     }
 
     SessionPicker {

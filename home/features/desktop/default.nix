@@ -1,5 +1,6 @@
 {
   imports = [
+    ./contexts
     ./cursor
     ./hyprland
     ./quickshell

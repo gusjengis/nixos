@@ -7,7 +7,7 @@ local workspaces = {
 		key = "T",
 		description = "Terminal",
 		command = function(id, signature)
-			return vars.terminal .. " --hold tmux new-session -A -s desktop-" .. signature .. "-" .. id
+			return "contextctl terminal --runtime " .. id
 		end,
 	},
 	{ name = "browser", key = "C", description = "Chromium", command = vars.browser .. " --new-window" },
@@ -17,7 +17,10 @@ local workspaces = {
 	{ name = "db", key = "D", description = "DB", command = vars.db, shift = true },
 	{ name = "slack", key = "S", description = "Slack", command = vars.slack },
 	{ name = "discord", key = "D", description = "Discord", command = vars.discord },
-	{ name = "notes", key = "N", description = "Notes", command = "obsidian" },
+	{
+		name = "notes", key = "N", description = "Context Notes",
+		command = function(id) return "contextctl notes --runtime " .. id end,
+	},
 	{ name = "music", key = "Q", description = "Music", command = vars.music, shift = true, global = true },
 	{
 		name = "musicassistant",
@@ -39,8 +42,11 @@ end
 sessions.setup({
 	specials = specials,
 	global_specials = global_specials,
-	launch_matches = { browser = { class = "^(chromium|chromium-browser|Chromium)$" } },
+	launch_matches = {
+		browser = { class = "^(chromium|chromium-browser|Chromium)$" },
+	},
 })
+require("context-terminals").setup()
 
 for _, workspace in ipairs(workspaces) do
 	local modifiers = vars.SUPER .. (workspace.shift and " + SHIFT" or "")

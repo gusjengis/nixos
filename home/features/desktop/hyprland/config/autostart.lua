@@ -5,7 +5,7 @@ hl.on("hyprland.start", function()
 	-- Refreshes the systemd/D-Bus copies of WAYLAND_DISPLAY and friends before
 	-- starting the services that need them. Without this, thunar.service
 	-- inherits the previous compositor's dead socket and crash-loops.
-	hl.exec_cmd("session-env-sync thunar.service tailscale-tray.service")
+	hl.exec_cmd("session-env-sync thunar.service tailscale-tray.service desktop-contexts.service context-shutdown-barrier.service")
 	hl.exec_cmd("hyprsunset")
 	hl.exec_cmd("hypridle")
 	hl.exec_cmd("hyprpaper")

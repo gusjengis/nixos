@@ -14,7 +14,8 @@ PanelWindow {
     property string renameId: ""
     property var closeTarget: null
     property bool awaiting: false
-    readonly property var results: DesktopSessions.sessions.filter(session => session.name.toLowerCase().includes(search.text.trim().toLowerCase()))
+    property bool dispensary: false
+    readonly property var results: (dispensary ? DesktopSessions.savedContexts : DesktopSessions.openSessions).filter(session => session.name.toLowerCase().includes(search.text.trim().toLowerCase()))
     readonly property var selected: list.currentIndex >= 0 ? results[list.currentIndex] : null
 
     visible: false
@@ -27,34 +28,40 @@ PanelWindow {
     color: "transparent"
     WlrLayershell.namespace: "quickshell-session-picker"
 
-    function open() {
+    function open(mode) {
+        const changedMode = mode !== undefined && mode !== dispensary;
+        if (mode !== undefined)
+            dispensary = mode;
         closeTarget = null;
-        if (!visible) {
+        if (!visible || changedMode) {
             const monitor = Hyprland.focusedMonitor;
             const focusedScreen = Quickshell.screens.find(candidate => monitor && candidate.name === monitor.name);
             if (focusedScreen)
                 screen = focusedScreen;
             renameId = "";
             search.text = "";
-            list.currentIndex = Math.max(0, results.findIndex(session => session.id === DesktopSessions.active));
+            list.currentIndex = Math.max(0, results.findIndex(session => session.runtime_id === DesktopSessions.active));
             visible = true;
         }
         search.forceActiveFocus();
     }
 
-    function toggle() {
+    function toggle(mode) {
+        if (DesktopSessions.busy)
+            return;
+        mode = mode === true;
         closeTarget = null;
-        if (visible && !DesktopSessions.busy)
+        if (visible && dispensary === mode)
             visible = false;
         else
-            open();
+            open(mode);
     }
 
     function beginRename() {
         if (closeTarget || !selected || DesktopSessions.busy)
             return;
         renameId = selected.id;
-        search.text = selected.name;
+        search.text = selected.persistent ? selected.name.split("/").pop() : selected.name;
         search.selectAll();
         search.forceActiveFocus();
     }
@@ -64,16 +71,18 @@ PanelWindow {
             return;
         if (renameId)
             awaiting = DesktopSessions.rename(renameId, search.text);
-        else if (create || !selected)
-            awaiting = DesktopSessions.create(search.text);
+        else if (create || !selected) {
+            if (dispensary && search.text.trim())
+                awaiting = DesktopSessions.create(search.text);
+        }
         else
             awaiting = DesktopSessions.switchSession(selected.id);
     }
 
     function beginClose() {
-        if (renameId || closeTarget || !selected || DesktopSessions.busy)
+        if (dispensary || renameId || closeTarget || !selected || !selected.runtime_id || DesktopSessions.busy)
             return;
-        closeTarget = { id: selected.id, name: selected.name, windowCount: selected.window_count };
+        closeTarget = { id: selected.runtime_id, name: selected.name, windowCount: selected.window_count };
         search.forceActiveFocus();
     }
 
@@ -149,7 +158,7 @@ PanelWindow {
             spacing: 12
 
             Text {
-                text: picker.closeTarget ? "Close session?" : picker.renameId ? "Rename session" : "Desktop sessions"
+                text: picker.closeTarget ? "Close running session?" : picker.renameId ? "Rename session" : picker.dispensary ? "Session dispensary" : "Open sessions"
                 color: Theme.text
                 font { family: Theme.fontFamily; pixelSize: 22; weight: Font.DemiBold }
             }
@@ -157,7 +166,7 @@ PanelWindow {
             ThemedTextField {
                 id: search
                 Layout.fillWidth: true
-                placeholderText: picker.renameId ? "Session name" : "Search or name a new session"
+                placeholderText: picker.renameId ? "Session name" : picker.dispensary ? "Search or create, e.g. Computing/Desktop" : "Search open sessions"
                 readOnly: DesktopSessions.busy || picker.closeTarget !== null
                 onTextChanged: list.currentIndex = 0
                 Keys.onPressed: event => {
@@ -180,7 +189,7 @@ PanelWindow {
                     } else if (event.key === Qt.Key_F2 || (ctrl && event.key === Qt.Key_R)) {
                         picker.beginRename();
                     } else if (ctrl && event.key === Qt.Key_N) {
-                        if (!picker.renameId)
+                        if (picker.dispensary && !picker.renameId)
                             picker.submit(true);
                     } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                         picker.submit(false);
@@ -198,7 +207,7 @@ PanelWindow {
             Text {
                 Layout.fillWidth: true
                 visible: picker.closeTarget !== null
-                text: picker.closeTarget ? "Close session \"" + picker.closeTarget.name + "\" (" + picker.closeTarget.windowCount + " windows)? This closes its session windows. Unsaved work may be lost if an app doesn't prompt. Global scratchpads are untouched.\nY: close session   N / Esc: cancel" : ""
+                text: picker.closeTarget ? "Close session \"" + picker.closeTarget.name + "\" (" + picker.closeTarget.windowCount + " windows)? Saved context and notes remain. Unsaved application work may be lost if an app doesn't prompt. Global scratchpads are untouched.\nY: close session   N / Esc: cancel" : ""
                 textFormat: Text.PlainText
                 color: Theme.danger
                 wrapMode: Text.Wrap
@@ -220,7 +229,7 @@ PanelWindow {
             Text {
                 Layout.fillWidth: true
                 visible: !picker.closeTarget || DesktopSessions.busy
-                text: DesktopSessions.busy ? "Applying session change..." : !DesktopSessions.available ? "No live Hyprland session." : DesktopSessions.sessions.length === 0 ? "Waiting for backend session snapshot." : picker.renameId ? "Enter: save name   Esc: close" : picker.selected && picker.selected.closing ? "Applications may still need confirmation in their remaining dialogs. Enter: return to session and focus a remaining window; Ctrl+D: retry close." : picker.results.length === 0 && search.text.trim() ? "Enter: create and switch to \"" + search.text.trim() + "\"" : "Enter: switch   Ctrl+N: create from field   F2 / Ctrl+R: rename   Ctrl+D: close session"
+                text: DesktopSessions.busy ? "Applying session change..." : !DesktopSessions.available ? "No live Hyprland session." : picker.renameId ? (picker.dispensary ? "Enter: save name (close running context first)   Esc: cancel" : "Enter: save runtime name   Esc: cancel") : !picker.dispensary && picker.selected && picker.selected.closing ? "Applications may still need confirmation. Enter: return; Ctrl+D: retry close." : picker.dispensary ? (picker.results.length === 0 && search.text.trim() ? "Enter: create saved session \"" + search.text.trim() + "\"" : "Enter: open or restore   Ctrl+N: create (Parent/Child for nesting)   F2: rename") : picker.results.length === 0 ? "No matching open sessions. Super+Shift+Z opens the dispensary." : "Enter: switch   F2: rename runtime session   Ctrl+D: close   Super+Shift+Z: dispensary"
                 textFormat: Text.PlainText
                 color: Theme.muted
                 wrapMode: Text.Wrap
@@ -258,7 +267,7 @@ PanelWindow {
                             font { family: Theme.fontFamily; pixelSize: Theme.fontSize }
                         }
                         Text {
-                            text: modelData.closing ? "Closing..." : modelData.id === DesktopSessions.active ? "Active" : modelData.id === DesktopSessions.snapshot.previous ? "Previous" : ""
+                            text: modelData.closing ? "Closing..." : modelData.runtime_id === DesktopSessions.active ? "Active" : modelData.runtime_id ? (picker.dispensary ? "Running" : modelData.id === DesktopSessions.snapshot.previous ? "Previous" : "") : "Saved"
                             color: Theme.accent
                             font { family: Theme.fontFamily; pixelSize: 12 }
                         }

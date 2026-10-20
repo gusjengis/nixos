@@ -227,6 +227,10 @@ function M.state()
 			name = item.name,
 			closing = item.closing or false,
 			window_count = #session_windows(item),
+			-- Logical remembered view is useful to any runtime-state consumer,
+			-- including when this session is not currently visible.
+			slots = item.slots,
+			visible_specials = item.visible_specials,
 		}
 	end
 	for _, output in ipairs(outputs()) do

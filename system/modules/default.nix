@@ -59,6 +59,9 @@
     networking.hostName = hostName;
 
     services.getty.autologinUser = "gusjengis";
+    # User checkpoint inhibitors save before session teardown, including
+    # machine-local terminal sessions on headless hosts.
+    services.logind.settings.Login.InhibitDelayMaxSec = 120;
     services.gvfs.enable = true;
     services.udisks2.enable = true;
     services.upower.enable = true;
