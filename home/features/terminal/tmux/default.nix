@@ -26,6 +26,8 @@ let
   };
 in
 {
+  # Every Home Manager runtime dependency receives the same native server barrier.
+  nixpkgs.overlays = [ (final: prev: { tmux = import ./package.nix { pkgs = prev; }; }) ];
   home.packages = [
     pkgs.tmux
     createTmuxSession

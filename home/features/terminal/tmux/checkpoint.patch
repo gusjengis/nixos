@@ -1,0 +1,208 @@
+--- a/cmd-queue.c
++++ b/cmd-queue.c
+@@ -17,5 +17,6 @@
+  */
+ 
+ #include <sys/types.h>
++#include <sys/wait.h>
+ 
+ #include <ctype.h>
+@@ -53,5 +54,10 @@
+ 	time_t			 time;
+ 
+ 	int			 flags;
++	int			 checkpoint;
++	u_int			 checkpoint_session;
++	u_int			 checkpoint_window;
++	u_int			 checkpoint_pane;
++	char			*checkpoint_topology;
+ 
+ 	struct cmdq_state	*state;
+@@ -463,3 +469,4 @@
+ 	free(item->name);
++	free(item->checkpoint_topology);
+ 	free(item);
+ }
+@@ -592,4 +599,116 @@
+ 	free(tmp);
+ }
+ 
++/* A waiting queue item remains owned by its queue, including on client exit.
++ * Only this queue pauses: helper jobs must be able to query the server.
++ * Re-fire through normal target resolution/error handling after completion.
++ */
++static int checkpoint_busy;
++extern const struct cmd_entry cmd_kill_session_entry;
++extern const struct cmd_entry cmd_kill_server_entry;
++extern const struct cmd_entry cmd_kill_window_entry;
++extern const struct cmd_entry cmd_kill_pane_entry;
++
++static char *
++cmdq_checkpoint_topology(void)
++{
++	struct evbuffer *buffer = evbuffer_new();
++	struct session *s;
++	struct winlink *wl;
++	struct window_pane *wp;
++	char *result;
++	RB_FOREACH(s, sessions, &sessions) {
++		evbuffer_add_printf(buffer, "s%u", s->id);
++		RB_FOREACH(wl, winlinks, &s->windows) {
++			evbuffer_add_printf(buffer, "w%u:%u", wl->idx, wl->window->id);
++			TAILQ_FOREACH(wp, &wl->window->panes, entry)
++				evbuffer_add_printf(buffer, "p%u", wp->id);
++		}
++	}
++	evbuffer_add(buffer, "", 1);
++	result = xstrdup((char *)EVBUFFER_DATA(buffer));
++	evbuffer_free(buffer);
++	return (result);
++}
++
++static void
++cmdq_checkpoint_done(struct job *job)
++{
++	struct cmdq_item *item = job_get_data(job);
++	int status = job_get_status(job);
++
++	item->checkpoint = WIFEXITED(status) && WEXITSTATUS(status) == 0 ? 2 : 3;
++	checkpoint_busy = 0;
++	item->flags &= ~CMDQ_FIRED;
++	cmdq_continue(item);
++}
++
++static enum cmd_retval
++cmdq_checkpoint(struct cmdq_item *item)
++{
++	const struct cmd_entry *entry = cmd_get_entry(item->cmd);
++	struct args *args = cmd_get_args(item->cmd);
++	struct cmd_find_state *fs = &item->target;
++	const char *command;
++	char *expanded, *topology;
++	struct format_tree *ft;
++	struct job *job;
++	u_int sid = fs->s != NULL ? fs->s->id : UINT_MAX;
++	u_int wid = fs->wl != NULL ? fs->wl->window->id : UINT_MAX;
++	u_int pid = fs->wp != NULL ? fs->wp->id : UINT_MAX;
++
++	if (entry != &cmd_kill_session_entry && entry != &cmd_kill_server_entry &&
++	    entry != &cmd_kill_window_entry && entry != &cmd_kill_pane_entry)
++		return (CMD_RETURN_NORMAL);
++	if (entry == &cmd_kill_session_entry && args_has(args, 'C'))
++		return (CMD_RETURN_NORMAL);
++	command = options_get_string(global_options, "@persistence-checkpoint");
++	if (*command == '\0')
++		return (CMD_RETURN_NORMAL);
++	if (item->checkpoint == 3) {
++		cmdq_error(item, "checkpoint failed or timed out; targets intact (see persistence log)");
++		return (CMD_RETURN_ERROR);
++	}
++	if (item->checkpoint == 2) {
++		topology = cmdq_checkpoint_topology();
++		if (strcmp(topology, item->checkpoint_topology) != 0) {
++			free(topology);
++			cmdq_error(item, "tmux topology changed during checkpoint; destruction cancelled");
++			return (CMD_RETURN_ERROR);
++		}
++		free(topology);
++		if (sid != item->checkpoint_session ||
++		    (entry == &cmd_kill_window_entry && wid != item->checkpoint_window) ||
++		    (entry == &cmd_kill_pane_entry && pid != item->checkpoint_pane)) {
++			cmdq_error(item, "checkpoint target changed; destruction cancelled");
++			return (CMD_RETURN_ERROR);
++		}
++		return (CMD_RETURN_NORMAL);
++	}
++	if (checkpoint_busy) {
++		cmdq_error(item, "checkpoint in progress; destruction cancelled, retry later");
++		return (CMD_RETURN_ERROR);
++	}
++	item->checkpoint_session = sid;
++	item->checkpoint_window = wid;
++	item->checkpoint_pane = pid;
++	item->checkpoint_topology = cmdq_checkpoint_topology();
++	ft = format_create_from_target(item);
++	format_add(ft, "checkpoint_operation", "%s", entry->name);
++	format_add(ft, "checkpoint_all", "%d", !!args_has(args, 'a'));
++	format_add(ft, "checkpoint_group", "%d", !!args_has(args, 'g'));
++	expanded = format_expand(ft, command);
++	format_free(ft);
++	job = job_run(expanded, 0, NULL, NULL, NULL, "/", NULL,
++	    cmdq_checkpoint_done, NULL, item, JOB_NOWAIT, -1, -1);
++	free(expanded);
++	if (job == NULL) {
++		cmdq_error(item, "cannot start checkpoint; destruction cancelled");
++		return (CMD_RETURN_ERROR);
++	}
++	checkpoint_busy = 1;
++	item->checkpoint = 1;
++	return (CMD_RETURN_WAIT);
++}
++
+ /* Fire command on command queue. */
+@@ -608,3 +727,4 @@
+ 	char			*tmp;
+ 
++	options_set_string(global_options, "@persistence-native", 0, "1");
+ 	if (cfg_finished)
+@@ -646,4 +766,8 @@
+ 	if (retval == CMD_RETURN_ERROR)
+ 		goto out;
+ 
++	retval = cmdq_checkpoint(item);
++	if (retval != CMD_RETURN_NORMAL)
++		goto out;
++
+ 	retval = entry->exec(cmd, item);
+--- a/window-tree.c
++++ b/window-tree.c
+@@ -1096,31 +1096,35 @@
+ 
+ static void
+ window_tree_kill_each(__unused void *modedata, void *itemdata,
+-    __unused struct client *c, __unused key_code key)
++    struct client *c, __unused key_code key)
+ {
+ 	struct window_tree_itemdata	*item = itemdata;
+-	struct session			*s;
+-	struct winlink			*wl;
+-	struct window_pane		*wp;
+-
+-	window_tree_pull_item(item, &s, &wl, &wp);
++	struct cmd_find_state fs;
++	char *target = window_tree_get_target(item, &fs);
++	const char *command = NULL;
+ 
+ 	switch (item->type) {
+ 	case WINDOW_TREE_NONE:
+ 		break;
+ 	case WINDOW_TREE_SESSION:
+-		if (s != NULL) {
+-			server_destroy_session(s);
+-			session_destroy(s, 1, __func__);
+-		}
++		command = "kill-session -t '%%'";
+ 		break;
+ 	case WINDOW_TREE_WINDOW:
+-		if (wl != NULL)
+-			server_kill_window(wl->window, 0);
++		command = "kill-window -t '%%'";
+ 		break;
+ 	case WINDOW_TREE_PANE:
+-		if (wp != NULL)
+-			server_kill_pane(wp);
++		command = "kill-pane -t '%%'";
+ 		break;
+ 	}
++	if (target != NULL && command != NULL) {
++		free(target);
++		if (item->type == WINDOW_TREE_SESSION)
++			xasprintf(&target, "$%u", fs.s->id);
++		else if (item->type == WINDOW_TREE_WINDOW)
++			xasprintf(&target, "@%u", fs.wl->window->id);
++		else
++			xasprintf(&target, "%%%u", fs.wp->id);
++		mode_tree_run_command(c, &fs, command, target);
++	}
++	free(target);
+ }

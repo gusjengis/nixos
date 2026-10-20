@@ -1,0 +1,2 @@
+# Unified-diff context lines necessarily contain a leading space before tabs.
+home/features/terminal/tmux/*.patch -whitespace
