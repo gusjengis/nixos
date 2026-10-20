@@ -38,7 +38,7 @@ let
     name = "update";
     runtimeInputs = [
       pkgs.coreutils
-      pkgs.git
+      config.programs.git.package
       pkgs.util-linux
       syncRepos
     ];

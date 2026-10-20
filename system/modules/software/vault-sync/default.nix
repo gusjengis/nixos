@@ -9,6 +9,7 @@ let
   cfg = config.vaultSync;
   home = config.users.users.${cfg.user}.home;
   root = "${home}/Documents/Obsidian";
+  sessionsRoot = "${home}/sessions";
   peers = lib.removeAttrs cfg.deviceIds [ hostName ];
   ignorePatterns = [
     ".git"
@@ -20,6 +21,28 @@ let
   ];
   initialIgnores = pkgs.writeText "vault-sync.stignore" (
     lib.concatStringsSep "\n" ignorePatterns + "\n"
+  );
+  sessionsIgnorePatterns = [
+    "#include .context-repositories.stignore"
+    ".context-repositories.stignore"
+    ".context-repositories.json"
+    "**/.git"
+    "**/.obsidian/workspace*.json"
+    "**/.cache"
+    "**/__pycache__"
+    ".stfolder"
+    ".stignore"
+    ".stversions"
+  ];
+  repositorySync = pkgs.writeShellApplication {
+    name = "context-repository-sync";
+    runtimeInputs = [ pkgs.python3 ];
+    text = ''
+      exec python3 -B ${../../../../home/features/desktop/contexts/repositories.py} "$@"
+    '';
+  };
+  initialSessionsIgnores = pkgs.writeText "sessions-sync.stignore" (
+    lib.concatStringsSep "\n" sessionsIgnorePatterns + "\n"
   );
   folder = {
     id = "obsidian-root";
@@ -35,7 +58,7 @@ let
 in
 {
   options.vaultSync = {
-    enable = lib.mkEnableOption "Syncthing for the Obsidian directory and all its vaults" // {
+    enable = lib.mkEnableOption "Syncthing for the Obsidian vaults and session directories" // {
       default = builtins.hasAttr hostName cfg.deviceIds;
     };
     user = lib.mkOption {
@@ -78,6 +101,11 @@ in
           addresses = [ "tcp://${name}:22000" ];
         }) peers;
         folders.Obsidian = folder;
+        folders.Sessions = folder // {
+          id = "sessions";
+          path = sessionsRoot;
+          ignorePatterns = sessionsIgnorePatterns;
+        };
         options = {
           listenAddresses = [ "tcp://0.0.0.0:22000" ];
           globalAnnounceEnabled = false;
@@ -99,14 +127,33 @@ in
       serviceConfig.UMask = "0077";
       preStart = ''
         mkdir -p ${lib.escapeShellArg "${root}/vault"}
+        mkdir -p ${lib.escapeShellArg sessionsRoot}
+        ${repositorySync}/bin/context-repository-sync sync --root ${lib.escapeShellArg sessionsRoot} --offline
         # Install exclusions before the first scan, not only through the REST updater.
         if [ ! -e ${lib.escapeShellArg "${root}/.stignore"} ]; then
           install -m 600 ${initialIgnores} ${lib.escapeShellArg "${root}/.stignore"}
+        fi
+        if [ ! -e ${lib.escapeShellArg "${sessionsRoot}/.stignore"} ]; then
+          install -m 600 ${initialSessionsIgnores} ${lib.escapeShellArg "${sessionsRoot}/.stignore"}
         fi
         if [ ! -e ${lib.escapeShellArg "${root}/vault/.git"} ]; then
           ${lib.getExe pkgs.git} -C ${lib.escapeShellArg "${root}/vault"} init --initial-branch=main
         fi
       '';
+    };
+    systemd.services.session-repository-sync = {
+      description = "Maintain exact Syncthing exclusions for registered context repositories";
+      wantedBy = [ "multi-user.target" ];
+      after = [ "syncthing.service" "syncthing-init.service" ];
+      wants = [ "syncthing.service" ];
+      serviceConfig = {
+        User = cfg.user;
+        Group = "users";
+        ExecStart = "${repositorySync}/bin/context-repository-sync watch --root ${sessionsRoot}";
+        Restart = "on-failure";
+        RestartSec = 2;
+        UMask = "0077";
+      };
     };
   };
 }

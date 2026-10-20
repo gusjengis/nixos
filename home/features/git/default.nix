@@ -6,6 +6,19 @@
 }:
 let
   configRoot = "${repoRoot}/home/features/git";
+  contextDir = "${repoRoot}/home/features/desktop/contexts";
+  contextGit = pkgs.symlinkJoin {
+    name = "git-context-aware";
+    paths = [ pkgs.git ];
+    nativeBuildInputs = [ pkgs.makeWrapper ];
+    meta = pkgs.git.meta;
+    postBuild = ''
+      rm "$out/bin/git"
+      makeWrapper ${pkgs.python3}/bin/python3 "$out/bin/git" \
+        --add-flags "-B ${contextDir}/context-git.py" \
+        --set CONTEXT_REAL_GIT "${pkgs.git}/bin/git"
+    '';
+  };
 
   # Path only. The token is read at runtime by shell code, never by Nix:
   # anything Nix reads is copied into the world-readable /nix/store.
@@ -19,6 +32,7 @@ in
 
   programs.git = {
     enable = true;
+    package = contextGit;
     lfs.enable = true;
     settings = {
       user = {
