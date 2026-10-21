@@ -22,12 +22,16 @@ ShellRoot {
 
     IpcHandler {
         target: "sessions"
-        function toggle(): void { sessionPicker.toggle(false); }
-        function dispensary(): void { sessionPicker.toggle(true); }
+        function toggle(): void { contextOrganizer.visible = false; sessionPicker.toggle(false); }
+        function dispensary(): void { sessionPicker.visible = false; contextOrganizer.toggle(); }
     }
 
     SessionPicker {
         id: sessionPicker
+    }
+
+    ContextOrganizer {
+        id: contextOrganizer
     }
 
     IpcHandler {

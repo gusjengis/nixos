@@ -22,7 +22,6 @@ from test_checkpoint_store import Changes, stats
 
 
 TMUX = os.environ.get("PERSISTENCE_TMUX") or shutil.which("tmux")
-RESURRECT = os.environ.get("PERSISTENCE_RESURRECT")
 
 
 class CommandCaptureTests(unittest.TestCase):
@@ -118,9 +117,8 @@ class PersistenceTests(unittest.TestCase):
     def setUp(self):
         if not TMUX or not shutil.which(TMUX):
             self.skipTest("tmux unavailable; set PERSISTENCE_TMUX")
-        if not RESURRECT:
-            self.skipTest("native capture requires explicit PERSISTENCE_RESURRECT plugin path")
-        self.assertTrue((Path(RESURRECT) / "scripts/save.sh").is_file(), "Invalid PERSISTENCE_RESURRECT")
+        if os.environ.get("PERSISTENCE_NATIVE_TESTS") != "1":
+            self.skipTest("set PERSISTENCE_NATIVE_TESTS=1 for isolated native capture")
         self.temp = tempfile.TemporaryDirectory(prefix="persistence-tests-", dir="/tmp/opencode")
         self.addCleanup(self.temp.cleanup)
         self.base = Path(self.temp.name)
@@ -131,7 +129,7 @@ class PersistenceTests(unittest.TestCase):
                "XDG_DATA_HOME": str(self.base / "data"), "XDG_CACHE_HOME": str(self.base / "cache"),
                "XDG_RUNTIME_DIR": str(self.base / "runtime"), "TMUX": "", "TMUX_TMPDIR": str(self.base),
                "HYPRLAND_INSTANCE_SIGNATURE": "", "SHELL": "/bin/sh", "TERM": "xterm-256color",
-               "PERSISTENCE_TMUX": TMUX, "PERSISTENCE_RESURRECT": RESURRECT,
+               "PERSISTENCE_TMUX": TMUX,
                "PATH": str(Path(TMUX).parent) + os.pathsep + os.environ["PATH"]}
         self.enterContext(patch.dict(os.environ, env))
         self.notices = self.enterContext(patch.object(p, "notify"))
@@ -308,6 +306,49 @@ class PersistenceTests(unittest.TestCase):
                 self.save(rapid=True)
         self.assertEqual(audit.finish(), b"", "no-op performed temporary writes/deletions")
         self.assertEqual(stats(self.base), before)
+
+    def test_successful_changed_saves_only_notify_new_distinct_warnings(self):
+        self.session("warnings", self.a)
+        capture = p.adapter_capture
+        warnings = ["Git snapshot objects not bundled"] * 20
+
+        def adapter(*args):
+            capture(*args)
+            args[-1].extend(warnings)
+
+        with patch.object(p, "adapter_capture", side_effect=adapter):
+            self.save()
+            self.notices.assert_called_once_with(["Git snapshot objects not bundled"])
+            first = self.saved()[1]["id"]
+            self.notices.reset_mock()
+            self.tm.call("rename-window", "-t", "warnings:0", "changed")
+            self.save(rapid=True)
+            self.assertNotEqual(self.saved()[1]["id"], first)
+            self.notices.assert_not_called()
+            warnings.append("New unsupported process")
+            self.save(rapid=True)
+            self.notices.assert_called_once_with(["New unsupported process"])
+
+    def test_chat_change_defers_only_periodic_saves_without_replacing_checkpoint(self):
+        self.session("chat-busy", self.a)
+        self.save()
+        previous = self.saved()[1]["id"]
+        busy = p.chats.ChatChangedDuringCheckpoint("Chat changed during checkpoint; retry capture")
+        with patch.object(p, "adapter_capture", side_effect=busy):
+            self.save(rapid=True)
+            self.assertEqual(self.saved()[1]["id"], previous)
+            self.notices.assert_not_called()
+            for reason in ("manual", "close", "shutdown", "pre-kill"):
+                with self.subTest(reason=reason), self.assertRaises(p.CheckpointError):
+                    self.save(reason, rapid=True)
+                self.assertEqual(self.saved()[1]["id"], previous)
+                self.assertIn("Chat changed", self.notices.call_args.args[0][0])
+
+        self.notices.reset_mock()
+        self.tm.call("rename-window", "-t", "chat-busy:0", "changed")
+        self.save(rapid=True)
+        self.assertNotEqual(self.saved()[1]["id"], previous)
+        self.notices.assert_not_called()
 
     def test_v1_migration_validates_then_reclaims_generations_and_raw_scratch(self):
         self.session("migrate", self.a)
@@ -593,6 +634,7 @@ class PersistenceTests(unittest.TestCase):
         p.restore_tmux(base, manifest, None, errors, self.dest)
         self.assertEqual(errors, [])
         self.assertEqual(self.dest.call("list-sessions", "-F", "#{session_name}"), "unowned")
+
         self.assertEqual(self.dest.call("list-panes", "-a", "-F", "#{pane_current_path}"), str(external))
         owned = self.session("inferred", cwd=self.a["path"])
         self.save(context=self.a)
@@ -605,6 +647,19 @@ class PersistenceTests(unittest.TestCase):
         self.assertEqual([s["name"] for s in self.saved()[2]], ["inferred"])
         self.assertEqual(self.saved()[2][0]["windows"][0]["panes"][0]["cwd"],
                          {"kind": "external", "path": str(external)})
+
+    def test_orphaned_context_is_recovered_locally_without_blocking_other_contexts(self):
+        identifier = "00000000-0000-4000-8000-000000000099"
+        self.session("context-" + identifier)
+        self.session("owned", self.a)
+        self.save()
+        base, manifest = p.latest(None)
+        sessions = ctl.read_json(base / "tmux.json")
+        self.assertEqual(len(sessions), 1)
+        self.assertEqual(sessions[0]["orphaned_context_id"], identifier)
+        self.assertTrue(any("machine-local recovery" in warning for warning in manifest["warnings"]))
+        self.assertIsNotNone(p.latest(self.a))
+        self.assertEqual(len(ctl.scan()), 2, "Recovery must not recreate a deleted context")
 
     @staticmethod
     def align_clock():

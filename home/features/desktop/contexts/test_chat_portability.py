@@ -125,6 +125,39 @@ class IsolatedChatTest(unittest.TestCase):
 @unittest.skipUnless(os.environ.get("PERSISTENCE_NATIVE_TESTS") == "1", "set PERSISTENCE_NATIVE_TESTS=1")
 @unittest.skipUnless(shutil.which("opencode"), "opencode unavailable")
 class NativeChatPortabilityTests(IsolatedChatTest):
+    def test_historical_missing_files_keep_messages_and_report_loss(self):
+        root = Path(os.environ["HOME"]) / "context"
+        root.mkdir()
+        fixture = native_fixture(root)
+        seed = self.base / "missing-files-seed.json"
+        chat._write(seed, fixture)
+        chat._cli(["import", str(seed)], str(root))
+        bundle = self.base / "missing-files-bundle"
+        manifest = chat.capture({"session_id": fixture["info"]["id"], "directory": str(root)}, bundle, str(root))
+        missing = [entry for entry in manifest["unsupported"] if entry.get("reason", "").startswith("Referenced file is missing")]
+        self.assertEqual({entry["path"] for entry in missing}, {str(root / "external.txt"), str(root / "result.txt")})
+        exported = json.loads((bundle / manifest["sessions"][0]["file"]).read_text())
+        self.assertEqual(len(exported["messages"]), len(fixture["messages"]))
+        parts = [json.loads((bundle / name).read_text()) for message in exported["messages"] for name in message["parts"]]
+        external = next(part for part in parts if part["id"] == "prt_wsd03")
+        self.assertEqual(external["url"], (root / "external.txt").as_uri())
+        self.assertEqual(external["source"]["path"], str(root / "external.txt"))
+        self.assertTrue(any(reference.get("inline") for entry in manifest["sessions"] for reference in entry["references"]))
+
+    def test_large_native_export_is_complete(self):
+        root = Path(os.environ["HOME"]) / "context"
+        root.mkdir()
+        fixture = native_fixture(root)
+        text = "Large export: 日本語 🌲\n" * 20000
+        fixture["messages"][0]["parts"][0]["text"] = text
+        seed = self.base / "large-seed.json"
+        chat._write(seed, fixture)
+        chat._cli(["import", str(seed)], str(root))
+
+        exported = chat._export(fixture["info"]["id"], str(root))
+        self.assertEqual(exported["messages"][0]["parts"][0]["text"], text)
+        self.assertEqual(len(exported["messages"]), len(fixture["messages"]))
+
     def test_changed_message_reuses_other_parts_and_attachments(self):
         import checkpoint_store as store
         from test_checkpoint_store import stats

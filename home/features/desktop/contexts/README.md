@@ -9,32 +9,121 @@ context layer rather than the reusable backend.
 
 - `Super+Z`: switch between open runtime sessions only. Enter switches; unmatched
   searches never create sessions.
-- `Super+Shift+Z`: saved-context dispensary. Enter opens/restores a saved context;
-  already-running contexts are marked and reused rather than duplicated.
-- In the dispensary, type `Research/New idea`, then `Ctrl+N`: create a nested
-  persistent context. Enter also creates when there are no matching contexts.
+- `Super+Shift+Z`: Miller-column context organizer. Browse without launching;
+  Enter opens/restores a context, reusing its existing runtime when already open.
+- In the organizer, `Ctrl+N` creates in the focused column; `Ctrl+Shift+N` creates
+  beneath the selected context. Creation does not open a runtime session.
 - `Super+N`: context notebook. First open automatically shows it.
-- `Super+T`: context terminal scratchpad; tmux starts in its working directory.
+- `Super+T`: context terminal scratchpad; new tmux sessions start Neovim and OpenCode windows in its working directory, matching the session dispensary.
 - `Super+Q`: another terminal attached to that context's tmux session.
 - `Super+F`: file manager at the context working directory.
 - `Ctrl+D` in runtime switcher: close running session, never delete saved context/notes.
 - F2 in runtime switcher: rename runtime session only, not its saved directory.
-- F2 in dispensary: rename a closed non-repository context (close descendants/windows first).
-  Repository contexts cannot yet be renamed: Git-sync paths and compatibility
-  symlinks would also need updating.
+- F2 in organizer: rename display label, including open/repository contexts.
+  Physical directories and backend runtime names are preserved.
 
 Contexts are directories under `~/sessions`, identified by `.context/context.json`.
-Nested contexts use nested directories; a parent need not itself be a context.
+Legacy nesting is inferred from directories. The organizer stores logical nesting
+independently, so a context's tree location need not match its storage location.
 Each has `.context/notes`, an independent Obsidian vault, with `Home.md` as its
 starting point. Obsidian saves edits automatically. There is no desktop Save step.
 Home is a starter note, not a required system file; it can be renamed or removed.
 
 Git checkouts are embedded as `<context>/<repository>`, beside `.context`.
-The context's `working_directory` is a contained relative path, normally `.` or
-the primary checkout's directory name. There is no reserved `work` directory.
+The context's `working_directory` can be a contained relative path, normally `.`
+or the primary checkout's directory name, or an explicit absolute path such as
+`/etc/nixos` or a mounted network job folder. There is no reserved `work` directory.
+Absolute paths reference existing work without moving it into the context or
+adding it to context synchronization or repository registrations. Context home,
+notes and checkpoint storage stay in the original local context directory.
 Notes/config stay outside the checkout and therefore outside its Git history.
-Missing checkouts fall back to the context directory; the notebook still opens.
+Missing working directories fall back to the context directory; the notebook still opens.
 All other ordinary files and folders beside checkouts are free-form synced work.
+
+## Context organizer
+
+The organizer uses Finder-style columns and the existing QuickShell macOS-like
+typography/controls. A read-only right pane shows the selected context's resolved
+configured working directory and `ls -al` output, including hidden files. Click
+the path to edit it; use `.` to reset to context home. Relative paths also show
+their full location, and unavailable targets show the fallback context folder.
+Changing this setting does not move existing terminal panes or override restored
+pane directories. Multiple contexts can share a working directory while keeping
+separate UUID-keyed tmux sessions. Listings load
+asynchronously as selection changes. Workspace and Kanban previews remain deferred.
+
+| Input | Action |
+| --- | --- |
+| Up / Down | Select sibling; Shift extends selection |
+| Right / Left | Enter children / return to parent |
+| Enter | Open selected context; directory-only groups enter children |
+| Type / Ctrl+F | Fuzzy search names and ancestor paths |
+| Right in search | Reveal selected result in columns |
+| Escape | Leave search, clear pending cut, or close menu |
+| Ctrl+N / Ctrl+Shift+N | New sibling / new child |
+| F2 | Rename display label |
+| Ctrl+M | Searchable move destination chooser |
+| Ctrl+X / Ctrl+V | Cut selection / paste into focused column |
+| Ctrl+A | Select all siblings in focused column |
+| Ctrl+Z | Undo move or rename |
+| Ctrl+D | Confirm moving selected closed contexts to system Trash |
+
+Ctrl-click toggles selection; Shift-click selects a range. Drag onto a context to
+nest beneath it, or into column space to move to that level. Hover during a drag
+reveals children. To paste beneath a selected context, first press Right to enter
+its column, then Ctrl+V. The destination chooser also includes Top level.
+
+Column width is adjustable by dragging dividers or using the header's minus/plus
+controls. Width, last selection and per-parent child selections persist locally in
+`$XDG_STATE_HOME/desktop-contexts/organizer.ini`; browsing returns to remembered rows.
+Existing directory-only groups remain navigable; **Make context** adds a notebook
+and persistent identity to that group without moving its children or repositories.
+
+`~/sessions/.context-layout.json` is the synchronized source of organizational
+labels and parent relationships, keyed by stable context UUID (deterministic IDs
+for legacy directory groups). One atomic file makes batch moves indivisible.
+Unknown IDs are retained for incoming contexts; missing-parent contexts remain
+visible at top level with a warning badge. Cycles and destination label collisions
+are rejected. Syncthing conflict files block organization until resolved.
+
+Undo retains at most 30 moves/renames locally and refuses to overwrite intervening
+layout edits from another device. Creating a context or converting a group clears
+undo history: undo never deletes a newly created notebook. Moving/renaming never
+changes working directories, checkout registrations, checkpoint IDs or live tmux
+sessions. No working-directory or mode inheritance is introduced here.
+
+**Delete… / Ctrl+D** names the selected contexts and defaults focus to Cancel.
+Explicit confirmation moves their entire directories (files, checkout, notebook,
+saved state) to system Trash via `gio trash`; the organizer never permanently
+unlinks them. Close running contexts and notebook windows first. Move logical
+children out first; deletion also refuses physical directories containing other
+contexts even when those contexts were logically reparented elsewhere. Batch
+deletion validates all targets before moving any files. Restore through the file
+manager's Trash; dormant UUID layout entries retain a restored context's label and
+parent. Deletion clears layout undo. Historical Git sync exclusions and `dev.list`
+entries remain intact; repo sync can recreate a checkout directory, but cannot
+recreate the deleted notebook/context identity.
+
+The legacy `contextctl rename` still means physical directory rename and retains
+its restrictions. Organizer commands are separate:
+
+```sh
+contextctl organize create "Hardware"
+contextctl organize create "Keyboards" --parent PARENT_UUID
+contextctl organize rename CONTEXT_UUID "New display name"
+contextctl organize move CONTEXT_UUID OTHER_UUID --parent PARENT_UUID
+contextctl organize move CONTEXT_UUID  # top level
+contextctl organize promote GROUP_ID
+contextctl organize undo
+contextctl organize delete CONTEXT_UUID --confirm
+```
+
+Organization tests: `test_organization.py`. UI/model checks (unused compositor
+signature prevents acting on the real desktop):
+
+```sh
+HYPRLAND_INSTANCE_SIGNATURE=organizer-test timeout 15 qs -p home/features/desktop/quickshell/test_context_organizer.qml
+```
 
 ## Synchronization
 
@@ -84,6 +173,61 @@ and `git worktree add` can bypass the wrapper. Do not use those to create or mov
 unregistered repositories into the synced tree. Existing-file adoption needs
 deliberate registration; it cannot retract files already synchronized.
 
+## Context-owned OpenCode history
+
+OpenCode launched from a context terminal receives its stable context UUID and
+context home independently of the pane's working directory. Several contexts can
+work in `/etc/nixos` without sharing their own chat lists or tmux sessions.
+
+- New conversations belong to the launching context. Subagents inherit their
+  conversation's owner; forks retain that owner but get a separate conversation
+  identity. Ordinary metadata updates cannot transfer ownership.
+- The native session picker, search and quick-switch list show this context plus
+  logical descendants whose **configured canonical working directory** matches.
+  Siblings and parents are not implicitly visible. Missing directories are compared
+  by configured target, not their temporary fallback. Reparenting or changing a
+  work directory updates visibility through the catalog watcher without restarting
+  OpenCode. Parent picker rows show the originating context's breadcrumb.
+- Resuming a child conversation from a parent updates the **child's** library.
+  Parent terminal checkpoints store a UUID/conversation/member reference, not a
+  second copy of the child's conversation or attachments.
+- All owned conversation families, including historical chats with no open pane,
+  are exported under `<owner>/.context/state/chats/`. This uses the same atomic,
+  chunk-addressed current-root store and divergence protection as terminal recovery.
+  Native SQLite remains a machine-local working index; it is not synchronized.
+- The existing 30-second checkpoint timer synchronizes libraries. Managed terminal
+  checkpoint/close also saves selected owned chats. Launch imports the visible
+  portable libraries, initializing a fresh native database when needed. The command
+  palette's **Sync portable context chat libraries** performs an explicit refresh.
+- Context-home paths and external work-root paths relocate independently. The
+  repository/job folder must be available at its configured local location; the
+  library carries chat records and supported attachments, not the repository itself.
+- Native IDs can change during conflict-safe import. Stable ownership and logical
+  conversation/member IDs survive that remapping. Old native copies are retained
+  but excluded from scoped lists. Native deletions publish portable tombstones.
+- Concurrent native and incoming portable edits stop library synchronization with
+  both copies retained. There is no silent merge or last-writer overwrite.
+
+Existing untagged history is not assigned by guessing from its working directory.
+Use the OpenCode command palette's **Browse unowned conversations to assign to this
+context**, or **Assign unowned conversation to this context** for the current chat.
+Assignment is explicit and includes its subagents. An already owned conversation
+cannot be moved by opening it from another context.
+
+Without context identity, OpenCode retains its ordinary global/project behavior.
+The pinned OpenCode source has a small ownership/list-filter patch; the launcher
+and portable library live in this repository. Updating the upstream pin requires
+rechecking patch applicability and the native context-session acceptance tests.
+Quit and restart existing OpenCode instances after deployment; running instances
+retain their old executable and plugins.
+
+Native acceptance (isolated fixture databases, no model calls):
+
+```sh
+PERSISTENCE_NATIVE_TESTS=1 python3 -B -m unittest discover -s home/features/desktop/contexts -p test_context_chat_library.py -v
+PERSISTENCE_NATIVE_TESTS=1 python3 -B -m unittest discover -s home/features/desktop/contexts -p test_native_context_sessions.py -v
+```
+
 ## Implementation
 
 `contextctl watch` observes the backend's atomically published JSON snapshot,
@@ -93,6 +237,9 @@ No personal policy or hooks execute inside the reusable session backend.
 
 `contextctl create NAME [--open]`, `list`, `open UUID`, `rename UUID NEW_LEAF`,
 `notes`, `terminal`, and `files` are available independently of the picker.
+`contextctl set-working-directory UUID PATH` updates the same working-directory
+setting shown in the organizer. Paths sync with context metadata; unavailable
+paths on another computer fall back to its context home.
 Launch commands can receive `--runtime ID` to bind delayed scratchpad launches
 to their originating session rather than whichever context is now active.
 
@@ -183,6 +330,10 @@ machine-local mirror of that current state. It does not create periodic history.
   transaction. The mirror protects local divergent bytes against synced deletions;
   it is never silently substituted for incomplete synced state. Unowned tmux
   sessions use `terminal/unowned/terminal/` with the same current-root policy.
+  Live tmux sessions claiming a context UUID no longer in the catalog are captured
+  there too, with `orphaned_context_id` retained and an explicit recovery warning.
+  This preserves their panes without recreating deleted contexts or blocking
+  checkpoints/closure of unrelated contexts.
 - GC deletes only known superseded objects from an acknowledged current/witness or
   a local pending transaction, after publication validation. Unknown incoming
   objects are not swept based on an older root. Out-of-order sync/deletions can
@@ -346,6 +497,22 @@ checkpoint, editor/chat adapters and placement code, with a different terminal
 attachment descriptor.
 
 ### Verification and remaining limitations
+
+Native capture regressions can be run without the retired tmux-resurrect plugin:
+
+```sh
+PERSISTENCE_NATIVE_TESTS=1 python -B -m unittest discover -s home/features/desktop/contexts -p test_persistence.py -v
+PERSISTENCE_NATIVE_TESTS=1 python -B -m unittest discover -s home/features/desktop/contexts -p test_chat_portability.py -v
+```
+
+OpenCode CLI stdout is captured through an anonymous regular file: its explicit
+exit can truncate large piped JSON exports despite returning success. Unchanged
+captures still skip the CLI. Successful saves notify only newly introduced,
+distinct warnings; existing caveats remain recorded in the checkpoint manifest.
+If a chat changes during a periodic export, the previous checkpoint remains
+untouched and the timer retries on its next tick without a failure notification.
+Manual, close, shutdown, and pre-destruction captures still fail visibly in that
+case rather than publishing an inconsistent snapshot.
 
 Automated tests live in `test_persistence.py`, `test_chat_portability.py`,
 `test_shutdown_barrier.py`, `test_desktop_persistence.py`,

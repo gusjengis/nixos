@@ -24,6 +24,7 @@ from pathlib import Path
 
 import chat_portability as chats
 import checkpoint_store as store
+import context_chat_library as chat_library
 import contextctl as ctl
 
 
@@ -76,6 +77,7 @@ def report(message):
 
 
 def notify(errors):
+    errors = sorted(set(errors))
     if errors:
         report("; ".join(errors))
         identity = hashlib.sha256("\n".join(errors).encode()).hexdigest()
@@ -399,13 +401,22 @@ def capture_tmux(tm, contexts):
     for session in sessions:
         own_panes = list({p["pane_id"]: p for p in all_panes
                           if p["session_id"] == session["session_id"]}.values())
-        context = owner(session, own_panes, contexts)
+        explicit = session.get("@persistence-context") or (
+            session["session_name"][8:] if session["session_name"].startswith("context-") else None)
+        orphaned = explicit if explicit and not any(c["id"] == explicit for c in contexts) else None
+        # A removed context must not block capture of every other session. Keep
+        # its live panes in machine-local recovery, retaining claimed identity;
+        # never infer ownership from a different checkout or recreate its vault.
+        context = None if orphaned else owner(session, own_panes, contexts)
         if context:
             tm.call("set-option", "-t", session["session_id"], "@persistence-context", context["id"])
             tm.call("set-environment", "-t", session["session_id"], "CONTEXT_DIRECTORY", context["path"])
+            tm.call("set-environment", "-t", session["session_id"], "CONTEXT_ID", context["id"])
         value = {"id": tm.identity(session["session_id"], []), "observed_id": session["session_id"],
                  "name": session["session_name"], "group": session["session_group"], "windows": [],
-                 "server": {"id": server_id, "default": Path(tm.socket).name == "default"}}
+                  "server": {"id": server_id, "default": Path(tm.socket).name == "default"}}
+        if orphaned:
+            value["orphaned_context_id"] = orphaned
         for window in (w for w in windows if w["session_id"] == session["session_id"]):
             saved = {"id": tm.identity(window["window_id"], ["-w"]), "index": int(window["window_index"]),
                      "name": window["window_name"], "layout": window["window_layout"],
@@ -514,8 +525,15 @@ def adapter_capture(tm, pane, destination, context, errors):
         if not chat:
             raise CheckpointError("OpenCode TUI adapter absent; restart OpenCode before protected destruction")
         selection = chats.read_selection(Path(chat), int(local["pane_pid"]), tm.socket, local["pane_id"])
+        reference = chat_library.reference(selection)
+        if reference:
+            pane["chat_library"] = reference
+            pane.pop("chat", None)
+            pane["chat_cwd"] = encode_path(selection["directory"], context)
+            return
         if context:
             selection["context_root"] = context["path"]
+            selection["work_root"] = context["working_directory_path"]
         directory = destination / "opencode" / pane["id"]
         data = chats.capture(selection, directory, cwd)
         pane["chat"] = f"opencode/{pane['id']}"
@@ -642,6 +660,13 @@ def checkpoint(reason="periodic", context_id=None, socket_path=None, operation=N
     if context_id:
         owners = {context_id}
     errors = []
+    library_errors = []
+    chat_library.sync_all(contexts, hydrate=True, only=None if reason == "periodic" else owners, errors=library_errors)
+    for identifier, error in library_errors:
+        if reason == "periodic" and isinstance(error, chats.ChatChangedDuringCheckpoint):
+            report(f"{identifier}: {error}; library save deferred, previous library retained")
+        else:
+            errors.append(f"{identifier}: {error}")
     for identifier in owners:
         context = next((c for c in contexts if c["id"] == identifier), None)
         try:
@@ -660,7 +685,9 @@ def checkpoint(reason="periodic", context_id=None, socket_path=None, operation=N
             # skipped when read-only source fingerprints and dependencies match.
             if previous:
                 tree.copy_from(previous[0])
-            warnings, pane_adapters = [], {}
+            warnings = [f"Context {value['orphaned_context_id']} is unavailable; session {value['name']} saved in machine-local recovery"
+                        for _tm, value in selected if value.get("orphaned_context_id")]
+            pane_adapters = {}
             for tm, session in selected:
                 for window in session["windows"]:
                     for pane in window["panes"]:
@@ -670,7 +697,7 @@ def checkpoint(reason="periodic", context_id=None, socket_path=None, operation=N
                             pane.update(copy.deepcopy(pane_adapters[key]))
                         else:
                             adapter_capture(tm, pane, destination, context, warnings)
-                            pane_adapters[key] = {k: copy.deepcopy(pane[k]) for k in ("editor", "chat", "chat_cwd", "arguments") if k in pane}
+                            pane_adapters[key] = {k: copy.deepcopy(pane[k]) for k in ("editor", "chat", "chat_library", "chat_cwd", "arguments") if k in pane}
             desktop = inventory(context, selected)
             warnings.extend(desktop.pop("warnings"))
             retained_path = local_root() / f"retained-{identifier or 'local'}.json"
@@ -729,7 +756,15 @@ def checkpoint(reason="periodic", context_id=None, socket_path=None, operation=N
             if changed:
                 print(f"context-checkpoint: Published {identifier or 'machine-local'} {manifest['id']} ({reason})", file=sys.stderr)
             if warnings and changed:
-                notify(warnings)
+                known = set(previous[1].get("warnings", [])) if previous else set()
+                new_warnings = sorted(set(warnings) - known)
+                if new_warnings:
+                    notify(new_warnings)
+        except chats.ChatChangedDuringCheckpoint as exc:
+            if reason == "periodic":
+                report(f"{identifier or 'machine-local'}: {exc}; periodic save deferred, previous checkpoint retained")
+            else:
+                errors.append(f"{identifier or 'machine-local'}: {exc}")
         except Exception as exc:
             errors.append(f"{identifier or 'machine-local'}: {exc}")
     if errors:
@@ -741,6 +776,7 @@ def pane_command(pane, base, context, errors):
     env = {}
     if context:
         env["CONTEXT_DIRECTORY"] = context["path"]
+        env["CONTEXT_ID"] = context["id"]
     if isinstance(base, store.MemoryPath) and (pane.get("editor") or pane.get("chat")):
         kind = "nvim" if pane.get("editor") else "opencode"
         relative = f"{kind}/{pane['id']}"
@@ -756,11 +792,18 @@ def pane_command(pane, base, context, errors):
             return ["env", *(f"{k}={v}" for k, v in env.items()), "nvim"]
         except Exception as exc:
             errors.append(f"Editor {pane['id']}: {exc}")
-    if pane.get("chat"):
+    if pane.get("chat_library"):
+        try:
+            sid, directory = chat_library.restore_reference(pane["chat_library"])
+            return ["env", "-C", directory, *(f"{k}={v}" for k, v in env.items()), "opencode", "--session", sid]
+        except Exception as exc:
+            errors.append(f"Chat {pane['id']}: {exc}")
+    elif pane.get("chat"):
         try:
             directory = decode_path(pane.get("chat_cwd", pane["cwd"]), context)
             sid = chats.restore(safe(base, pane["chat"]), str(directory),
-                                context_root=context["path"] if context else None)
+                                context_root=context["path"] if context else None,
+                                work_root=context["working_directory_path"] if context else None)
             return ["env", "-C", str(directory), *(f"{k}={v}" for k, v in env.items()), "opencode", *(["--session", sid] if sid else [])]
         except Exception as exc:
             errors.append(f"Chat {pane['id']}: {exc}")
@@ -774,7 +817,7 @@ def pane_command(pane, base, context, errors):
 
 def await_program(tm, target, pane, command):
     """Process creation is not proof that editor/chat restoration succeeded."""
-    if not pane.get("editor") and not pane.get("chat"):
+    if not pane.get("editor") and not pane.get("chat") and not pane.get("chat_library"):
         # tmux returns after fork, before its child necessarily execs the launch
         # command. A scan in that gap sees "tmux" rather than the intended shell
         # or supported program; do not clear failed-restore retention yet.
@@ -969,6 +1012,7 @@ def restore_tmux(base, manifest, context, errors, tm, server_id=None):
                 if context:
                     tm.call("set-option", "-t", session_target, "@persistence-context", context["id"])
                     tm.call("set-environment", "-t", session_target, "CONTEXT_DIRECTORY", context["path"])
+                    tm.call("set-environment", "-t", session_target, "CONTEXT_ID", context["id"])
                 mapping[session["id"]] = {"socket": tm.socket, "target": session_target,
                                            "complete": len(errors) == initial_errors}
         except Exception as exc:

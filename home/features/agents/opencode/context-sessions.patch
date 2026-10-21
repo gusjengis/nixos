@@ -1,0 +1,38 @@
+--- a/packages/opencode/src/session/session.ts
++++ b/packages/opencode/src/session/session.ts
+@@ -46,1 +46,2 @@
+ import { SessionMessage } from "@opencode-ai/schema/session-message"
++import { desktopCondition, desktopMetadata } from "./context-sessions"
+@@ -532,2 +533,4 @@
+       }
++      const parent = input.parentID ? yield* get(input.parentID) : undefined
++      result.metadata = desktopMetadata(result.id, input.metadata, parent ? parent.metadata ?? {} : undefined)
+       yield* Effect.logInfo("created", result)
+@@ -556,1 +559,2 @@
+       const conditions: SQL[] = []
++      const desktop = desktopCondition(); if (desktop) conditions.push(desktop)
+@@ -761,2 +765,4 @@
+     const setMetadata = Effect.fn("Session.setMetadata")(function* (input: typeof SetMetadataInput.Type) {
++      const existing = (yield* get(input.sessionID)).metadata?.desktop_context
++      if (existing) input = { ...input, metadata: { ...input.metadata, desktop_context: existing } }
+       yield* patch(input.sessionID, { metadata: input.metadata, time: { updated: Date.now() } }).pipe(Effect.orDie)
+@@ -962,1 +968,2 @@
+   const conditions = [eq(SessionTable.project_id, input.projectID)]
++  const desktop = desktopCondition(); if (desktop) conditions.push(desktop)
+--- a/packages/tui/src/context/sync.tsx
++++ b/packages/tui/src/context/sync.tsx
+@@ -0,0 +1,1 @@
++import { desktopVisible } from "../util/desktop-context"
+@@ -285,1 +286,2 @@
+         case "session.updated": {
++          if (!desktopVisible(event.properties.info)) break
+--- a/packages/tui/src/component/dialog-session-list.tsx
++++ b/packages/tui/src/component/dialog-session-list.tsx
+@@ -0,0 +1,1 @@
++import { desktopLabel, desktopVisible } from "../util/desktop-context"
+@@ -91,1 +92,2 @@
+       .filter((session) => !deleted().has(session.id))
++      .filter(desktopVisible)
+@@ -234,1 +236,1 @@
+-        directory && directory !== project.data.project.mainDir ? Locale.truncate(path.basename(directory), 20) : ""
++        desktopLabel(x) || (directory && directory !== project.data.project.mainDir ? Locale.truncate(path.basename(directory), 20) : "")

@@ -28,6 +28,10 @@ from urllib.parse import unquote, urlsplit
 _source_database = ContextVar("checkpoint_source_database", default=None)
 
 
+class ChatChangedDuringCheckpoint(RuntimeError):
+    """A live chat changed while the nontransactional native export was read."""
+
+
 def _json(value):
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
 
@@ -37,12 +41,19 @@ def _hash(value):
 
 
 def _cli(args, cwd):
-    result = subprocess.run(["opencode", *args], cwd=cwd, text=True,
-                            capture_output=True, timeout=30, check=False,
-                            env=dict(os.environ, OPENCODE_DB=_source_database.get()) if _source_database.get() else None)
-    if result.returncode:
-        raise RuntimeError(f"opencode {args[0]} failed: {result.stderr[-2000:]}")
-    return result.stdout
+    # OpenCode exits explicitly, so large writes to a pipe can be discarded
+    # before stdout drains (observed: successful exit with 64 KiB of JSON).
+    # A regular file makes native stdout synchronous. Anonymous scratch closes
+    # on every exit path; unchanged captures still avoid invoking the CLI.
+    with tempfile.TemporaryFile(mode="w+", encoding="utf-8") as output:
+        result = subprocess.run(["opencode", *args], cwd=cwd, text=True,
+                                stdout=output, stderr=subprocess.PIPE, timeout=30, check=False,
+                                 env=dict(os.environ, OPENCODE_CONTEXT_HELPER="1",
+                                          **({"OPENCODE_DB": _source_database.get()} if _source_database.get() else {})))
+        if result.returncode:
+            raise RuntimeError(f"opencode {args[0]} failed: {result.stderr[-2000:]}")
+        output.seek(0)
+        return output.read()
 
 
 def _export(sid, cwd):
@@ -90,6 +101,16 @@ def _family_root(sid, cwd):
                 return sid
             sid = row[0]
     raise ValueError("Cyclic chat ancestry")
+
+
+def fingerprint(sid, cwd):
+    ids = _descendants(_family_root(sid, cwd), cwd)
+    with closing(_database(cwd)) as db:
+        db.execute("BEGIN")
+        placeholders = ",".join("?" for _ in ids)
+        records = {table: db.execute(f'SELECT * FROM "{table}" WHERE {column} IN ({placeholders}) ORDER BY id', ids).fetchall()
+                   for table, column in (("session", "id"), ("message", "session_id"), ("part", "session_id"))}
+    return _hash(records)
 
 
 def _walk(value, visit, trail=()):
@@ -157,7 +178,7 @@ def _capture(selection, destination, cwd):
     # A coordinator RAM tree supports the same artifact API as Path.
     if not hasattr(destination, "tree"):
         destination = Path(destination)
-    selection = {key: selection[key] for key in ("session_id", "directory", "parent_id", "context_root") if key in selection}
+    selection = {key: selection[key] for key in ("session_id", "directory", "parent_id", "context_root", "work_root") if key in selection}
     sid = selection.get("session_id")
     fingerprint = None
     if sid:
@@ -196,6 +217,8 @@ def _capture(selection, destination, cwd):
         raise ValueError("Chat destination must be empty")
     manifest = {"format": 2, "selection": selection, "root": str(Path(selection.get("context_root", cwd)).resolve()),
                 "home": str(Path.home()), "sessions": [], "files": {}, "unsupported": [], "fingerprint": fingerprint}
+    if selection.get("work_root"):
+        manifest["work_root"] = str(Path(selection["work_root"]).resolve())
     if not sid:
         _write(destination / "manifest.json", manifest)
         return manifest
@@ -209,7 +232,7 @@ def _capture(selection, destination, cwd):
                                         "parent_id": exports[sid]["info"]["parentID"]})
     # Native export is not transactional across sessions. Reject observed changes.
     if ids != _descendants(family, cwd) or any(_export(item, cwd) != exports[item] for item in ids):
-        raise RuntimeError("Chat changed during checkpoint; retry capture")
+        raise ChatChangedDuringCheckpoint("Chat changed during checkpoint; retry capture")
     (destination / "blobs").mkdir()
 
     def write(relative, value):
@@ -226,7 +249,14 @@ def _capture(selection, destination, cwd):
         resolved = source.resolve()
         if resolved.name in {"auth.json", "credentials.json", ".env"} or ".ssh" in resolved.parts:
             raise ValueError(f"Credential reference cannot be bundled: {source}")
-        content = source.read_bytes()
+        try:
+            content = source.read_bytes()
+        except FileNotFoundError:
+            # Historical chats can outlive tool-output caches and source files.
+            # Keep the original reference and record the pre-existing loss.
+            manifest["unsupported"].append({"path": str(source), "association": association,
+                                            "reason": "Referenced file is missing; original reference retained"})
+            return None
         digest = hashlib.sha256(content).hexdigest()
         relative = f"blobs/{digest}"
         (destination / relative).write_bytes(content)
@@ -252,9 +282,13 @@ def _capture(selection, destination, cwd):
                 url = urlsplit(value)
                 if url.netloc not in ("", "localhost"):
                     raise ValueError("Non-local file URL")
-                references.append(artifact(unquote(url.path), list(trail)))
+                reference = artifact(unquote(url.path), list(trail))
+                if reference:
+                    references.append(reference)
             elif key == "outputPath" or (key == "path" and "source" in trail):
-                references.append(artifact(value, list(trail)))
+                reference = artifact(value, list(trail))
+                if reference:
+                    references.append(reference)
             elif key in ("snapshot", "hash") and value and (key == "snapshot" or "parts" in trail):
                 manifest["unsupported"].append({"session_id": item, "reference": value,
                                                 "reason": "Git snapshot objects not bundled"})
@@ -296,7 +330,7 @@ def _safe(bundle, relative):
     return path
 
 
-def restore(bundle: Path, cwd: str, context_root: str | None = None) -> str | None:
+def restore(bundle: Path, cwd: str, context_root: str | None = None, work_root: str | None = None) -> str | None:
     bundle = Path(bundle)
     manifest = json.loads((bundle / "manifest.json").read_text())
     if manifest["format"] not in (1, 2):
@@ -312,7 +346,10 @@ def restore(bundle: Path, cwd: str, context_root: str | None = None) -> str | No
     def relocate(value):
         if not isinstance(value, str) or not value.startswith("/"):
             return value
-        for old, new in ((manifest["root"], root), (manifest["home"], Path.home())):
+        roots = [(manifest["root"], root), (manifest["home"], Path.home())]
+        if work_root and manifest.get("work_root"):
+            roots.insert(0, (manifest["work_root"], Path(work_root).resolve()))
+        for old, new in sorted(roots, key=lambda entry: len(entry[0]), reverse=True):
             try:
                 return str(new / Path(value).relative_to(old))
             except ValueError:
@@ -388,7 +425,8 @@ def restore(bundle: Path, cwd: str, context_root: str | None = None) -> str | No
         for revision in range(1000):
             namespace = digest if revision == 0 else _hash([digest, revision])
             mapping = {old: old + "_" + namespace[:32] for old in identifiers}
-            rewritten = {sid: _walk(item, lambda value, trail, mapping=mapping: mapping.get(value, value) if isinstance(value, str) else value)
+            rewritten = {sid: _walk(item, lambda value, trail, mapping=mapping: mapping.get(value, value)
+                                   if isinstance(value, str) and "desktop_context" not in trail else value)
                          for sid, item in data.items()}
             # A selected child whose parent was not captured must not link to
             # an unrelated local parent generation.

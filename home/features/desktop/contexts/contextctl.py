@@ -2,7 +2,7 @@
 """Persistent notebooks; compositor sessions remain disposable runtime state."""
 
 import argparse
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 import fcntl
 import json
 import os
@@ -97,8 +97,11 @@ def contained(base, path):
 
 
 def working_path(directory, value):
-    if not isinstance(value, str) or not value or Path(value).is_absolute() or ".." in value.split("/"):
+    if (not isinstance(value, str) or not value or ".." in value.split("/")
+            or any(ord(char) < 32 or ord(char) == 127 for char in value)):
         raise ContextError(f"Invalid working_directory: {value!r}")
+    if Path(value).is_absolute():
+        return Path(value)
     return contained(directory, directory / value)
 
 
@@ -135,7 +138,9 @@ def scan():
             if not vault.is_dir() or not (vault / ".obsidian").is_dir():
                 raise ContextError(f"Incomplete note vault: {vault}")
             cwd = working_path(directory, data.get("working_directory"))
-            if not cwd.is_dir():
+            configured_cwd = cwd
+            available = cwd.is_dir()
+            if not available:
                 if cwd not in missing_directories:
                     print(f"contextctl: Missing working directory {cwd}; using {directory}; notebook remains available", file=sys.stderr)
                     missing_directories.add(cwd)
@@ -143,7 +148,10 @@ def scan():
             else:
                 missing_directories.discard(cwd)
             contexts.append({"id": identifier, "name": relative, "label": relative,
-                             "path": str(directory.absolute()), "cwd": str(cwd.absolute())})
+                             "path": str(directory.absolute()), "cwd": str(cwd.absolute()),
+                             "working_directory": data["working_directory"],
+                             "working_directory_path": str(configured_cwd.absolute()),
+                             "working_directory_available": available})
         children[:] = sorted(child for child in children if not child.startswith(".")
                              and directory / child not in checkouts and not (directory / child).is_symlink())
     return sorted(contexts, key=lambda item: item["name"])
@@ -187,7 +195,9 @@ def catalog():
                     closing=bool(session.get("closing", False)) if session else False)
         if session and runtime_id == live.get("active"):
             active = item["id"]
-    return {"contexts": contexts, "active_context": active}
+    import organization
+    return {"contexts": contexts, "active_context": active,
+            "nodes": organization.resolve(contexts), "can_undo": organization.can_undo()}
 
 
 def publish(record_activation=False):
@@ -210,9 +220,20 @@ def find_context(identifier):
     raise ContextError(f"Unknown context: {identifier}")
 
 
-def create(name, working_directory="."):
+def set_working_directory(identifier, value):
+    """Caller holds mutation_lock; update configuration without moving live panes."""
+    item = find_context(identifier)
+    directory = Path(item["path"])
+    working_path(directory, value)
+    metadata = contained(directory, directory / ".context/context.json")
+    data = read_json(metadata)
+    data["working_directory"] = value
+    atomic_json(metadata, data)
+
+
+def create(name, working_directory=".", locked=False):
     """Create without launching applications. Safe for migration callers."""
-    with mutation_lock():
+    with nullcontext() if locked else mutation_lock():
         scan()  # Never mutate a conflicted or incomplete synced tree.
         directory = contained(root(), root() / relative_name(name))
         if any(directory.resolve().is_relative_to(item["path"].resolve()) for item in repositories.registered(root())):
@@ -450,9 +471,8 @@ def terminal(runtime_id=None):
         name = name.replace(".", "_").replace(":", "_")
     arguments = ["kitty", "--directory", cwd, "--hold"]
     if item:
-        arguments += ["env", f"CONTEXT_DIRECTORY={item['path']}"]
-    environment = ["-e", f"CONTEXT_DIRECTORY={item['path']}"] if item else []
-    spawn([*arguments, "tmux", "new-session", "-A", "-s", name, *environment, "-c", cwd])
+        arguments += ["env", f"CONTEXT_DIRECTORY={item['path']}", f"CONTEXT_ID={item['id']}"]
+    spawn([*arguments, "create-tmux-session", cwd, name, "--attach"])
 
 
 def close_context(runtime_id):
@@ -479,6 +499,8 @@ def watch():
                 next_scan = time.monotonic() + 1
                 with mutation_lock():
                     value = publish(record_activation=True)
+                import context_chat_library
+                context_chat_library.refresh_scopes(value["contexts"])
                 reconcile_notes(value["contexts"])
         except (ContextError, OSError, ValueError, subprocess.TimeoutExpired) as exc:
             print(f"contextctl: {exc}", file=sys.stderr)
@@ -497,16 +519,54 @@ def main(argv=None):
     command = commands.add_parser("rename")
     command.add_argument("id")
     command.add_argument("name")
+    command = commands.add_parser("set-working-directory")
+    command.add_argument("id")
+    command.add_argument("path")
     command = commands.add_parser("close")
     command.add_argument("--runtime", required=True)
     for name in ("notes", "terminal", "files"):
         command = commands.add_parser(name)
         command.add_argument("--runtime")
     commands.add_parser("watch")
+    command = commands.add_parser("organize")
+    actions = command.add_subparsers(dest="action", required=True)
+    action = actions.add_parser("create")
+    action.add_argument("name")
+    action.add_argument("--parent")
+    action = actions.add_parser("rename")
+    action.add_argument("id")
+    action.add_argument("name")
+    action = actions.add_parser("move")
+    action.add_argument("ids", nargs="+")
+    action.add_argument("--parent")
+    action = actions.add_parser("promote")
+    action.add_argument("id")
+    action = actions.add_parser("delete")
+    action.add_argument("ids", nargs="+")
+    action.add_argument("--confirm", action="store_true", required=True)
+    actions.add_parser("undo")
     args = parser.parse_args(argv)
     try:
         if args.command == "watch":
             watch()
+            return 0
+        if args.command == "organize":
+            import organization
+            with mutation_lock():
+                if args.action == "create":
+                    identifier = organization.create(args.name, args.parent)
+                elif args.action == "promote":
+                    identifier = organization.promote(args.id)
+                elif args.action == "rename":
+                    organization.change([args.id], new_label=args.name)
+                elif args.action == "move":
+                    organization.change(args.ids, parent=args.parent)
+                elif args.action == "delete":
+                    organization.trash_contexts(args.ids)
+                else:
+                    organization.undo()
+                publish()
+            print(json.dumps({"id": identifier}) if args.action in ("create", "promote") else "ok")
             return 0
         if args.command == "create":
             data = create(args.name)
@@ -523,6 +583,8 @@ def main(argv=None):
                     open_context(args.id)
                 elif args.command == "rename":
                     rename_context(args.id, args.name)
+                elif args.command == "set-working-directory":
+                    set_working_directory(args.id, args.path)
                 elif args.command == "close":
                     close_context(args.runtime)
                 elif args.command == "notes":

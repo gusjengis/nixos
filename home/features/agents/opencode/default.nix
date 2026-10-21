@@ -9,11 +9,13 @@
 }:
 let
   configRoot = "${repoRoot}/home/features/agents/opencode";
+  contextPackages = import ./package.nix { inherit pkgs inputs repoRoot; };
+  sessionPolicy = import ../../../../system/modules/session-policy/materialize.nix { inherit pkgs; };
   hyprlandPackages = inputs.hyprland.packages.${pkgs.stdenv.hostPlatform.system};
   sessionNotify = pkgs.writeShellApplication {
     name = "opencode-session-notify";
     runtimeInputs = lib.optional config.desktopEnv.enable hyprlandPackages.hyprland ++ [
-      inputs.opencode.packages.${pkgs.stdenv.hostPlatform.system}.default
+      contextPackages.launcher
       pkgs.glib
       pkgs.jq
       pkgs.kitty
@@ -52,7 +54,8 @@ in
   # Pinned to the upstream flake rather than pkgs.opencode, which trails behind.
   # The tag lives in flake.nix; bump it there.
   home.packages = [
-    inputs.opencode.packages.${pkgs.stdenv.hostPlatform.system}.default
+    contextPackages.launcher
+    contextPackages.chats
     sessionNotify
     supernoteMcp
     sessionCapture
@@ -90,10 +93,14 @@ in
       config.lib.file.mkOutOfStoreSymlink "${configRoot}/session-notify/session-notify.js";
     "opencode/plugins/tmux-status.js".source =
       config.lib.file.mkOutOfStoreSymlink "${configRoot}/plugins/tmux-status.js";
+    # This guard is intentionally immutable and rebuild-controlled.
+    "opencode/plugins/session-policy.js".source = "${sessionPolicy}/guard.js";
     "opencode/tui-plugins/tmux-theme.js".source =
       config.lib.file.mkOutOfStoreSymlink "${configRoot}/tui-plugins/tmux-theme.js";
     "opencode/tui-plugins/context-persistence.js".source =
       config.lib.file.mkOutOfStoreSymlink "${configRoot}/tui-plugins/context-persistence.js";
+    "opencode/tui-plugins/context-library.tsx".source =
+      config.lib.file.mkOutOfStoreSymlink "${configRoot}/tui-plugins/context-library.tsx";
 
     # Auto model router. The server plugin rewrites the model of every prompt
     # sent while the "Auto" entry is selected; the TUI plugin shows which model
@@ -123,6 +130,7 @@ in
       <!-- caveman-begin -->
       ${builtins.readFile "${inputs.caveman}/src/rules/caveman-activate.md"}
       <!-- caveman-end -->
+      ${builtins.readFile "${sessionPolicy}/agent-policy.md"}
     '';
   };
 

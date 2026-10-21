@@ -16,6 +16,7 @@ let
       pkgs.tmux
       pkgs.obsidian
       pkgs.thunar
+      pkgs.glib
       checkpoint
       inputs.hyprland.packages.${pkgs.stdenv.hostPlatform.system}.hyprland
     ];
@@ -37,7 +38,7 @@ let
       pkgs.libnotify
       pkgs.neovim
       pkgs.kitty
-      inputs.opencode.packages.${pkgs.stdenv.hostPlatform.system}.default
+      (import ../../agents/opencode/package.nix { inherit pkgs inputs repoRoot; }).launcher
     ]
     ++ lib.optionals config.desktopEnv.enable [
       inputs.hyprland.packages.${pkgs.stdenv.hostPlatform.system}.hyprland

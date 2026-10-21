@@ -193,7 +193,7 @@ class ContextTests(unittest.TestCase):
         self.run.assert_not_called()
 
     def test_working_directory_validation_and_fallback(self):
-        for value in ("../outside", "/tmp", "work/../../bad"):
+        for value in ("../outside", "work/../../bad", "", "bad\x00path", "bad\npath"):
             with self.subTest(value=value), self.assertRaises(ctl.ContextError):
                 ctl.create("Invalid", value)
         item = ctl.create("Repo", "work/Repo")
@@ -211,6 +211,56 @@ class ContextTests(unittest.TestCase):
         (directory / "Repo").symlink_to(self.base)
         with self.assertRaisesRegex(ctl.ContextError, "escapes"):
             ctl.scan()
+
+    def test_external_working_directory_preserves_home_and_context_identity(self):
+        first = self.mapped("First", "s1")
+        second = self.mapped("Second", "s2")
+        ctl.save_state({"mappings": {first["id"]: "s1", second["id"]: "s2"}, "last_active": None})
+        self.runtime([{"id": "s1", "name": "First"}, {"id": "s2", "name": "Second"}], "s1")
+        target = self.base / "external repo"
+        target.mkdir()
+        for item in (first, second):
+            metadata = ctl.root() / item["name"] / ".context/context.json"
+            before = ctl.read_json(metadata)
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(ctl.main(["set-working-directory", item["id"], str(target)]), 0)
+            self.assertEqual(ctl.read_json(metadata), dict(before, working_directory=str(target)))
+            resolved = ctl.find_context(item["id"])
+            self.assertEqual(resolved["path"], str(metadata.parent.parent))
+            self.assertEqual(resolved["cwd"], str(target))
+            self.assertTrue((metadata.parent / "notes/Home.md").is_file())
+            node = next(node for node in ctl.catalog()["nodes"] if node["id"] == item["id"])
+            self.assertEqual(node["working_directory"], str(target))
+            ctl.terminal("s1" if item == first else "s2")
+            args = self.spawn.call_args.args[0]
+            self.assertIn("context-" + item["id"], args)
+            self.assertEqual(args[-4:], ["create-tmux-session", str(target),
+                                        "context-" + item["id"], "--attach"])
+        self.assertFalse((target / ".context").exists())
+
+    def test_working_directory_edit_missing_target_and_reset(self):
+        item = ctl.create("Job")
+        home = ctl.root() / "Job"
+        metadata = home / ".context/context.json"
+        target = self.base / "unmounted drive/job"
+        with contextlib.redirect_stderr(io.StringIO()), contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(ctl.main(["set-working-directory", item["id"], str(target)]), 0)
+            resolved = ctl.find_context(item["id"])
+        self.assertEqual(resolved["cwd"], str(home))
+        self.assertEqual(resolved["working_directory_path"], str(target))
+        self.assertFalse(resolved["working_directory_available"])
+        self.assertFalse(target.exists())
+        target.mkdir(parents=True)
+        self.assertEqual(ctl.find_context(item["id"])["cwd"], str(target))
+        before = metadata.read_bytes()
+        with self.assertRaises(ctl.ContextError):
+            ctl.set_working_directory(item["id"], "../escape")
+        self.assertEqual(metadata.read_bytes(), before)
+        (home / "repo").mkdir()
+        ctl.set_working_directory(item["id"], "repo")
+        self.assertEqual(ctl.find_context(item["id"])["cwd"], str(home / "repo"))
+        ctl.set_working_directory(item["id"], ".")
+        self.assertEqual(ctl.find_context(item["id"])["cwd"], str(home))
 
     def test_unmanaged_notes_preserve_general_notebook_launcher(self):
         self.runtime([{"id": "s99", "name": "Runtime only"}], "s99")
@@ -428,7 +478,10 @@ class ContextTests(unittest.TestCase):
         ctl.terminal("s2")
         arguments = self.spawn.call_args.args[0]
         self.assertIn(f"context-{item['id']}", arguments)
-        self.assertEqual(arguments[-2:], ["-c", str(ctl.root() / "Projects/Alpha")])
+        self.assertEqual(arguments[-4:], ["create-tmux-session", str(ctl.root() / "Projects/Alpha"),
+                                         f"context-{item['id']}", "--attach"])
+        self.assertIn(f"CONTEXT_DIRECTORY={ctl.root() / 'Projects/Alpha'}", arguments)
+        self.assertIn(f"CONTEXT_ID={item['id']}", arguments)
         self.runtime([{"id": "s99", "name": "Runtime only"}], "s99")
         ctl.terminal("s99")
         self.assertIn("desktop-test-signature-s99", self.spawn.call_args.args[0])

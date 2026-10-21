@@ -11,13 +11,18 @@ QtObject {
     property var snapshot: ({})
     readonly property var sessions: snapshot.sessions || []
     property var contextCatalog: ({ contexts: [] })
-    readonly property var openSessions: sessions.map(session => Object.assign({}, session, { runtime_id: session.id, persistent: false }))
+    readonly property var openSessions: sessions.map(session => {
+        const node = (contextCatalog.nodes || []).find(node => node.runtime_id === session.id);
+        return Object.assign({}, session, { name: node ? node.breadcrumb : session.name, runtime_id: session.id, persistent: false });
+    })
     readonly property var savedContexts: (contextCatalog.contexts || []).map(context => Object.assign({}, context, { persistent: true }))
     readonly property string active: snapshot.active || ""
-    readonly property string activeName: (sessions.find(session => session.id === active) || {}).name || "Sessions"
+    readonly property string activeName: ((contextCatalog.nodes || []).find(node => node.runtime_id && node.runtime_id === active) || {}).label
+        || (sessions.find(session => session.id === active) || {}).name || "Sessions"
     readonly property bool busy: request.running
     property string error: ""
     property string pendingAction: ""
+    property string createdContextId: ""
     signal completed(string action)
     signal failed()
 
@@ -92,6 +97,8 @@ QtObject {
     }
 
     function create(name) { return contextCommand("create", ["create", name.trim(), "--open"]); }
+    function organize(action, args) { return contextCommand("organize-" + action, ["organize", action].concat(args || [])); }
+    function setWorkingDirectory(id, path) { return contextCommand("working-directory", ["set-working-directory", id, path]); }
     function rename(id, name) {
         return (contextCatalog.contexts || []).some(context => context.id === id)
             ? contextCommand("rename", ["rename", id, name.trim()]) : saveName("rename", id, name);
@@ -147,10 +154,18 @@ QtObject {
         onExited: (code, status) => {
             const stdout = output.text.trim();
             const stderr = errors.text.trim();
+            let valid = stdout === "ok";
+            if ((root.pendingAction === "organize-create" || root.pendingAction === "organize-promote") && code === 0) {
+                try {
+                    const value = JSON.parse(stdout);
+                    valid = typeof value.id === "string";
+                    root.createdContextId = valid ? value.id : "";
+                } catch (_) { valid = false; }
+            }
             root.stateFile.reload();
             root.contextFile.reload();
             // Eval reports errors on stdout even with exit status zero.
-            if (code !== 0 || status !== 0 || stdout !== "ok") {
+            if (code !== 0 || status !== 0 || !valid) {
                 root.report(stderr || (stdout !== "ok" ? stdout : "") || "Session command failed (" + code + ").");
             } else {
                 root.completed(root.pendingAction);

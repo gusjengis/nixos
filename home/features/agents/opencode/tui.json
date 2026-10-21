@@ -3,6 +3,7 @@
   "plugin": [
     "./tui-plugins/tmux-theme.js",
     "./tui-plugins/auto-router-status.tsx",
-    "./tui-plugins/context-persistence.js"
+    "./tui-plugins/context-persistence.js",
+    "./tui-plugins/context-library.tsx"
   ]
 }
