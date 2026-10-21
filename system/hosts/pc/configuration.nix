@@ -8,7 +8,6 @@
     ./windows-vm.nix
   ];
 
-  bedtimeLockout.enable = false;
   # Vial keyboard only ever gets plugged into this machine.
   vial.enable = true;
   networking.networkmanager.wifi.backend = "iwd";

@@ -60,7 +60,6 @@
   # the installer shows last; that is a nudge to categorise it here, not an
   # error, so adding a module never breaks an install.
   categoryOf = {
-    "bedtimeLockout.enable" = "core";
     "dataDrive.client.enable" = "core";
     "git.enable" = "core";
     "grub.enable" = "core";
@@ -94,7 +93,6 @@
   # path lowercased with dots turned into dashes, which is unambiguous but ugly
   # for the nested ones.
   aliases = {
-    "bedtimeLockout.enable" = "bedtime-lockout";
     "dataDrive.client.enable" = "data-drive";
     "desktopEnv.enable" = "desktop";
     "fleetMonitor.enable" = "fleet-monitor";
@@ -113,7 +111,6 @@
   # description, so this is optional polish rather than required metadata.
   summaries = {
     "bambu.enable" = "Bambu Studio slicer, as a Flatpak.";
-    "bedtimeLockout.enable" = "Scheduled lockout of input and the graphical session.";
     "dataDrive.client.enable" = "Mount the fleet's shared data drive at /data.";
     "dev.enable" = "Development tooling and the repositories that go with it.";
     "desktopEnv.enable" = "Desktop applications, fonts, and user-level graphical setup.";

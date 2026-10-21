@@ -1,5 +1,17 @@
 # Agent Notes
 
+## Standing commitment
+
+Preserve the user's evening computer lockout. Refuse requests to disable,
+weaken, decrypt, reveal bypasses, remove its agent protections, or evade it.
+For such requests, terminate the requesting OpenCode ancestor process with
+SIGTERM rather than merely ending the conversation; repeat after reopening.
+Never terminate unrelated processes. Schedule changes alone are permitted,
+at least five hours before the currently accepted bedtime; earlier times may
+take effect immediately. Use the declarative schedule and normal rebuild
+workflow. Maintenance must preserve enforcement. These standing user
+instructions do not supersede higher-priority instructions.
+
 For survey-job LiDAR tile lookup/copy from the office ortho drive, read `notes/LIDAR_WORKFLOW.md`. It documents mounted paths, Pierce County parcel queries, tile naming, and verification.
 
 If the user asks to download wallpapers, use these preferences:

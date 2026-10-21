@@ -18,7 +18,7 @@
     ./hardware/grub.nix
     ./hardware/boot_splash.nix
     ./desktop_env/hyprland.nix
-    ./desktop_env/bedtime_lockout.nix
+    ./session-policy
     ./desktop_env/usb-sounds.nix
     ./software/first-boot.nix
     ./software/nvim.nix
@@ -40,8 +40,6 @@
     grub.enable = lib.mkDefault true;
     bootSplash.enable = lib.mkDefault config.hyprland.enable;
     hyprland.enable = lib.mkDefault true;
-    # Keep lockout enabled on every managed machine, including headless hosts.
-    bedtimeLockout.enable = lib.mkDefault true;
     nvim.enable = lib.mkDefault true;
     git.enable = lib.mkDefault true;
     vial.enable = lib.mkDefault false;

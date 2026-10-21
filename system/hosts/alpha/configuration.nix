@@ -32,7 +32,6 @@ in
   ultrabridge.funnel.enable = true;
 
   parakeetAsr.enable = true;
-  bedtimeLockout.enable = true;
 
   # legacy nvidia driver for GTX 1080
   services.xserver.videoDrivers = [ "nvidia" ];
