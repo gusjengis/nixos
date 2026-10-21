@@ -15,7 +15,7 @@ local workspaces = {
 	{ name = "gpt", key = "G", description = "ChatGPT", command = vars.gpt },
 	{ name = "gis", key = "G", description = "GIS", command = vars.gis, shift = true },
 	{ name = "db", key = "D", description = "DB", command = vars.db, shift = true },
-	{ name = "slack", key = "S", description = "Slack", command = vars.slack },
+	-- { name = "slack", key = "S", description = "Slack", command = vars.slack },
 	{ name = "discord", key = "D", description = "Discord", command = vars.discord },
 	{
 		name = "notes", key = "N", description = "Context Notes",

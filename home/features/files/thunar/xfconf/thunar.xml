@@ -6,7 +6,7 @@
   <property name="last-icon-view-zoom-level" type="string" value="THUNAR_ZOOM_LEVEL_100_PERCENT"/>
   <property name="last-window-maximized" type="bool" value="true"/>
   <property name="last-details-view-zoom-level" type="string" value="THUNAR_ZOOM_LEVEL_25_PERCENT"/>
-  <property name="last-details-view-column-widths" type="string" value="50,50,114,50,50,83,50,50,3308,50,50,72,50,145"/>
+  <property name="last-details-view-column-widths" type="string" value="50,50,114,50,50,83,50,50,626,50,50,72,50,155"/>
   <property name="last-separator-position" type="int" value="196"/>
   <property name="misc-symbolic-icons-in-sidepane" type="bool" value="true"/>
   <property name="misc-symbolic-icons-in-toolbar" type="bool" value="true"/>
@@ -17,8 +17,8 @@
   <property name="hidden-bookmarks" type="array">
     <value type="string" value="network:///"/>
   </property>
-  <property name="last-show-hidden" type="bool" value="false"/>
-  <property name="last-sort-column" type="string" value="THUNAR_COLUMN_DATE_MODIFIED"/>
+  <property name="last-show-hidden" type="bool" value="true"/>
+  <property name="last-sort-column" type="string" value="THUNAR_COLUMN_NAME"/>
   <property name="last-sort-order" type="string" value="GTK_SORT_DESCENDING"/>
   <property name="last-window-width" type="int" value="1173"/>
   <property name="last-window-height" type="int" value="1706"/>

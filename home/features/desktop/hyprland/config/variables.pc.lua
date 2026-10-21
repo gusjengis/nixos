@@ -1,6 +1,6 @@
 local vars = require("variables")
 
-vars.discord = "discordcanary"
-vars.slack = "slack"
+vars.discord = vars.desktopLauncher .. " webapp-discord"
+vars.slack = vars.desktopLauncher .. " webapp-slack"
 
 return vars
