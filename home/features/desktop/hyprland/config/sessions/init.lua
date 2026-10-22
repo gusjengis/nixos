@@ -217,9 +217,10 @@ local function focus_remaining(item)
 	end
 end
 
-function M.state()
+function M.state(id)
 	capture_pins()
-	local active = session(state.active)
+	-- Optional target exposes workspace addresses without activating that session.
+	local active = session(id or state.active)
 	local snapshot = { active = state.active, previous = state.previous, sessions = {}, workspaces = {}, specials = {} }
 	for _, item in ipairs(state.sessions) do
 		snapshot.sessions[#snapshot.sessions + 1] = {

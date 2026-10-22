@@ -89,7 +89,7 @@ def runtime_operation(runtime_id):
         try:
             fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
-            raise ContextError("This session is already being saved for closure") from None
+            raise ContextError("This session is already being restored or saved for closure") from None
         yield
 
 
@@ -349,16 +349,40 @@ def reconcile_notes(contexts):
             route_note(client, item)
 
 
-def open_context(identifier):
+def open_context(identifier, background=False):
+    with mutation_lock():
+        item, runtime_id, created = prepare_open(identifier)
+        publish()
+    import persistence
+    # Lifecycle bookkeeping uses only the short publication lock. Application
+    # startup must never run while holding the global catalog/launcher lock.
+    persistence.set_lifecycle(item, "open")
+    if created:
+        if background:
+            spawn([sys.executable, "-B", str(Path(__file__).absolute()), "restore-runtime", identifier, runtime_id])
+        else:
+            restore_context(identifier, runtime_id)
+
+
+def restore_context(identifier, runtime_id):
+    import persistence
+    with runtime_operation(runtime_id):
+        with mutation_lock():
+            item = launch_context(runtime_id)
+            if item is None or item["id"] != identifier:
+                raise ContextError("Context/runtime mapping changed before restoration")
+        persistence.restore(item, runtime_id)
+
+
+def prepare_open(identifier):
+    """Create/switch runtime and save mapping; caller holds mutation_lock."""
     item = find_context(identifier)
     local, live = local_state(), snapshot()
     runtime_id = local["mappings"].get(identifier)
     session = next((entry for entry in live["sessions"] if entry["id"] == runtime_id), None)
     if session:
         evaluate(f"require('sessions').switch({lua_string(runtime_id)})")
-        import persistence
-        persistence.set_lifecycle(item, "open")
-        return
+        return item, runtime_id, False
     if any(entry["name"] == item["name"] for entry in live["sessions"]):
         raise ContextError(f"Unmapped runtime session already named {item['name']!r}; refusing to claim it")
     evaluate(f"require('sessions').create({lua_string(item['name'])})")
@@ -378,9 +402,7 @@ def open_context(identifier):
     if snapshot().get("active") != runtime_id:
         raise ContextError("Active runtime changed before opening notes; mapping saved")
     evaluate("require('sessions').show_special('notes')")
-    import persistence
-    persistence.set_lifecycle(item, "open")
-    persistence.restore(item, runtime_id)
+    return item, runtime_id, True
 
 
 def rename_context(identifier, new_name):
@@ -535,8 +557,13 @@ def main(argv=None):
     command = commands.add_parser("create")
     command.add_argument("name")
     command.add_argument("--open", action="store_true")
+    command.add_argument("--background", action="store_true", help="Restore applications in a detached worker")
     command = commands.add_parser("open")
     command.add_argument("id")
+    command.add_argument("--background", action="store_true", help="Restore applications in a detached worker")
+    command = commands.add_parser("restore-runtime", help=argparse.SUPPRESS)
+    command.add_argument("id")
+    command.add_argument("runtime")
     command = commands.add_parser("rename")
     command.add_argument("id")
     command.add_argument("name")
@@ -575,6 +602,14 @@ def main(argv=None):
             close_context(args.runtime)
             print("ok")
             return 0
+        if args.command == "open":
+            open_context(args.id, background=args.background)
+            print("ok")
+            return 0
+        if args.command == "restore-runtime":
+            restore_context(args.id, args.runtime)
+            print("ok")
+            return 0
         if args.command == "organize":
             import organization
             with mutation_lock():
@@ -595,18 +630,17 @@ def main(argv=None):
             return 0
         if args.command == "create":
             data = create(args.name)
-            with mutation_lock():
-                if args.open:
-                    open_context(data["id"])
-                publish()
+            if args.open:
+                open_context(data["id"], background=args.background)
+            else:
+                with mutation_lock():
+                    publish()
         else:
             with mutation_lock():
                 if args.command == "list":
                     print(json.dumps(publish()))
                     return 0
-                if args.command == "open":
-                    open_context(args.id)
-                elif args.command == "rename":
+                if args.command == "rename":
                     rename_context(args.id, args.name)
                 elif args.command == "set-working-directory":
                     set_working_directory(args.id, args.path)
@@ -622,6 +656,9 @@ def main(argv=None):
         return 0
     except (ContextError, repositories.RepositoryError, OSError, ValueError, subprocess.TimeoutExpired) as exc:
         print(f"contextctl: {exc}", file=sys.stderr)
+        if args.command == "restore-runtime":
+            import persistence
+            persistence.notify([f"Context restoration: {exc}"])
         return 1
 
 

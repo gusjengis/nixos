@@ -6,10 +6,13 @@ import os
 from pathlib import Path
 import subprocess
 import tempfile
+import time
 import unittest
 from unittest.mock import patch, Mock
 
 import contextctl as ctl
+
+POPEN = subprocess.Popen
 
 
 class ContextTests(unittest.TestCase):
@@ -211,6 +214,141 @@ class ContextTests(unittest.TestCase):
                 self.assertRaisesRegex(ctl.ContextError, "has closed"):
             ctl.close_context("s2")
         self.run.assert_not_called()
+
+    def test_slow_restore_leaves_other_context_commands_available(self):
+        import persistence
+        other = self.mapped("Other", "s3")
+        opening = ctl.create("Opening")
+        processes = multiprocessing.get_context("fork")
+        entered, release = processes.Event(), processes.Event()
+        result, sender = processes.Pipe(duplex=False)
+        saved = self.base / "checkpoint"
+        saved.mkdir()
+        ctl.atomic_json(saved / "tmux.json", [{"id": "saved-session"}])
+        real_restore = persistence.restore
+
+        def adapter(*_args):
+            entered.set()
+            if not release.wait(10):
+                raise RuntimeError("Test restore was not released")
+            return {}
+
+        def evaluate(statement):
+            if ".create(" in statement:
+                self.runtime([{"id": "s3", "name": "Other"}, {"id": "s4", "name": "Opening"}], "s4")
+
+        def restoring():
+            with patch.object(ctl, "evaluate", side_effect=evaluate), \
+                    patch.object(persistence, "latest", return_value=(saved, {"warnings": []})), \
+                    patch.object(persistence, "validate"), patch.object(persistence, "restore_tmux", side_effect=adapter), \
+                    patch.object(persistence, "restore", side_effect=lambda context, runtime: real_restore(
+                        context, runtime, tm=persistence.Tmux(self.base / "unused.sock"), windows=False)), \
+                    contextlib.redirect_stdout(io.StringIO()):
+                ctl.main(["open", opening["id"]])
+
+        def unrelated():
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()), \
+                    patch.object(ctl, "evaluate"):
+                sender.send([ctl.main(args) for args in (["list"], ["terminal", "--runtime", "s3"],
+                    ["files", "--runtime", "s3"], ["notes", "--runtime", "s3"], ["open", other["id"]],
+                    ["open", opening["id"]], ["close", "--runtime", "s4"])])
+
+        restore = processes.Process(target=restoring)
+        probe = processes.Process(target=unrelated)
+        restore.start()
+        try:
+            self.assertTrue(entered.wait(3), "restore never reached application startup")
+            probe.start()
+            self.assertTrue(result.poll(2), "restore blocks catalog, launchers or switching through global locks")
+            self.assertEqual(result.recv(), [0, 0, 0, 0, 0, 0, 1])
+        finally:
+            release.set()
+            restore.join(5)
+            if probe.pid:
+                probe.join(5)
+            for process in (restore, probe):
+                if process.pid and process.is_alive():
+                    process.terminate()
+                    process.join()
+            result.close()
+            sender.close()
+        self.assertEqual(restore.exitcode, 0)
+        self.assertEqual(probe.exitcode, 0)
+
+    def test_background_open_returns_before_worker_and_reuses_mapping(self):
+        item = ctl.create("Opening")
+        started, release = self.base / "started", self.base / "release"
+        worker = self.base / "worker.py"
+        worker.write_text(
+            "import sys,time\nfrom pathlib import Path\n"
+            + "sys.path.insert(0," + repr(str(Path(ctl.__file__).parent)) + ")\n"
+            + "import contextctl as ctl, persistence as p\n"
+            + "def restore(*args):\n"
+            + "    Path(" + repr(str(started)) + ").touch()\n"
+            + "    deadline=time.monotonic()+10\n"
+            + "    while not Path(" + repr(str(release)) + ").exists():\n"
+            + "        if time.monotonic()>deadline: raise ctl.ContextError('worker deadline')\n"
+            + "        time.sleep(.01)\n"
+            + "p.restore=restore\nsys.exit(ctl.main(sys.argv[1:]))\n")
+        children = []
+
+        def launch(arguments):
+            children.append(POPEN(arguments, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
+
+        def backend(arguments, **_kwargs):
+            if ".create(" in arguments[2]:
+                self.runtime([{"id": "s4", "name": "Opening"}], "s4")
+            return Mock(returncode=0, stdout="ok", stderr="")
+
+        self.run.side_effect = backend
+        try:
+            with patch.object(ctl, "__file__", str(worker)), patch.object(ctl, "spawn", side_effect=launch), \
+                    contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(ctl.main(["open", item["id"], "--background"]), 0)
+                deadline = time.monotonic() + 3
+                while not started.exists() and time.monotonic() < deadline:
+                    time.sleep(.01)
+                self.assertTrue(started.exists(), "detached worker did not start")
+                self.assertIsNone(children[0].poll(), "open waited for application restoration")
+                self.assertEqual(ctl.local_state()["mappings"][item["id"]], "s4")
+                self.assertEqual(ctl.main(["open", item["id"], "--background"]), 0)
+                self.assertEqual(len(children), 1, "reopening must not start duplicate reconstruction")
+                self.assertEqual(ctl.main(["close", "--runtime", "s4"]), 1, "close must reject in-flight restoration")
+        finally:
+            release.touch()
+            for child in children:
+                try:
+                    child.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    child.terminate()
+                    child.wait()
+        self.assertEqual(children[0].returncode, 0)
+
+    def test_detached_restore_rejects_stale_mapping_and_reports_failure(self):
+        import persistence
+        item = self.mapped()
+        self.runtime([])
+        with patch.object(persistence, "restore") as restore, patch.object(persistence, "notify") as notify, \
+                contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(ctl.main(["restore-runtime", item["id"], "s2"]), 1)
+        restore.assert_not_called()
+        self.assertIn("has closed", notify.call_args.args[0][0])
+
+    def test_create_and_open_background_uses_same_restore_worker(self):
+        import persistence
+
+        def backend(arguments, **_kwargs):
+            if ".create(" in arguments[2]:
+                self.runtime([{"id": "s4", "name": "New"}], "s4")
+            return Mock(returncode=0, stdout="ok", stderr="")
+
+        self.run.side_effect = backend
+        with patch.object(persistence, "restore") as restore, contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(ctl.main(["create", "New", "--open", "--background"]), 0)
+        item = ctl.scan()[0]
+        self.assertEqual(self.spawn.call_args.args[0][-3:], ["restore-runtime", item["id"], "s4"])
+        self.assertEqual(ctl.local_state()["mappings"][item["id"]], "s4")
+        restore.assert_not_called()
 
     def test_create_runtime_mapping_saved_before_notes(self):
         item = ctl.create('Projects/Quote " and \\ unicode é')

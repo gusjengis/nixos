@@ -411,6 +411,31 @@ save-before-close and artifact validation; catalog took 0.076s and switching 0.1
 while closure was deliberately held pending. T480s passed all 52 context tests and
 was updated with `rehome t480s`; its unresponsive compositor prevented live UI tests.
 
+Restore startup also runs outside the global context mutation lock. The picker uses
+`contextctl open UUID --background` (or `create NAME --open --background`): success
+means the runtime/mapping is ready and a detached application-restore worker has
+been launched, not that every application has finished loading. Synchronous CLI
+opening remains available by omitting `--background`. Worker failures are logged
+and notified through the existing terminal-recovery reporting path.
+
+Long reconstruction holds a context-specific persistence lock, shared with that
+context's checkpoint publication, instead of the global checkpoint/lifecycle lock.
+A runtime operation guard prevents managed closure during reconstruction; reopening
+the same mapped context only switches to it, without another restore. Unrelated
+contexts can update their catalog, launch applications, and switch while an adapter
+is waiting. Window placement can inspect `sessions.state(runtime_id)` without
+activating that runtime. Saved view/focus is applied only if it is still active,
+so late background restoration does not explicitly switch the user back.
+
+Restore-blocking regression was reproduced before the fix on Mac using isolated
+processes and a paused application adapter. Afterward Mac passed 83 context,
+organization and checkpoint-store tests; T480s passed 62 native persistence tests.
+A detached-worker test proves early return, mapping reuse, and close exclusion;
+headless QML covers background open/create requests. Lua engine/placement tests
+cover hidden-session workspace inspection and focus preservation. Live compositor
+testing was unavailable during this verification; these are isolated/headless and
+native-tmux results, not a live desktop acceptance claim.
+
 Restoration waits for new shells/supported programs to execute before acknowledging
 success and clearing failed-restore retention. A forked tmux child is not yet proof
 that the requested process started. Missing/failed process acknowledgement remains

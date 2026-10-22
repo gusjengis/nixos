@@ -45,14 +45,7 @@ local function output(name)
 end
 
 local function snapshot(id)
-	local engine = require("sessions")
-	local state = engine.state()
-	if state.active ~= id then
-		engine.switch(id)
-		state = engine.state()
-	end
-	assert(state.active == id, "Runtime session is not active")
-	return state
+	return require("sessions").state(id)
 end
 
 local function workspace(state, monitor, slot, role)
@@ -146,6 +139,10 @@ function M.place(runtime_id, placement)
 end
 
 function M.view(runtime_id, view)
+	-- Background restoration must not reclaim focus after the user switches away.
+	if require("sessions").state().active ~= runtime_id then
+		return false
+	end
 	-- Validate all output references before switching. No implicit monitor fallback.
 	local targets, seen = {}, {}
 	for _, item in ipairs(view) do

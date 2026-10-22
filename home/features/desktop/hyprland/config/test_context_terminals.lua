@@ -203,10 +203,25 @@ test("view restores per-output slots, hides old specials, shows roles without la
 	equal(#operations, 0)
 end)
 
-test("view activates requested runtime and respects global special addresses", function()
+test("background placement does not activate requested runtime", function()
 	state.active = "s1"
+	module.place("s2", placement())
+	equal(state.active, "s1")
+	equal(#switches, 0)
+	equal(operations[3].args.workspace, "name:session-s2-44502d31-2")
+end)
+
+test("view leaves another active session untouched", function()
+	state.active = "s1"
+	equal(module.view("s2", { { monitor = "DP-2", slot = 2, role = "player" } }), false)
+	equal(#switches, 0)
+	equal(#views, 0)
+	equal(#launches, 0)
+end)
+
+test("active view respects global special addresses", function()
 	module.view("s2", { { monitor = "DP-2", slot = 2, role = "player" } })
-	equal(switches[1], "s2")
+	equal(#switches, 0)
 	equal(views[2].regular, "name:other")
 	equal(views[3].special, "player")
 	equal(#launches, 0)

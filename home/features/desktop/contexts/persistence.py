@@ -93,9 +93,9 @@ def notify(errors):
 
 
 @contextmanager
-def lock():
+def file_lock(name):
     local_root().mkdir(parents=True, exist_ok=True, mode=0o700)
-    with (local_root() / "checkpoint.lock").open("a") as stream:
+    with (local_root() / (name + ".lock")).open("a") as stream:
         deadline = time.monotonic() + 60
         while True:
             try:
@@ -106,6 +106,15 @@ def lock():
                     raise CheckpointError("Checkpoint busy for 60 seconds")
                 time.sleep(.1)
         yield
+
+
+def lock():
+    return file_lock("checkpoint")
+
+
+def context_lock(context):
+    key = uuid.UUID(context["id"]).hex if context else "local"
+    return file_lock("context-" + key)
 
 
 def encode_path(path, context):
@@ -761,7 +770,7 @@ def checkpoint(reason="periodic", context_id=None, socket_path=None, operation=N
             write_json(destination / "tmux.json", values)
             write_json(destination / "desktop.json", desktop)
             storage = checkpoint_store(context)
-            with lock():
+            with context_lock(context), lock():
                 now = latest(context)
                 if (now[1] if now else None) != (previous[1] if previous else None):
                     raise CheckpointError("Checkpoint changed during capture; retry")
@@ -1048,7 +1057,9 @@ def restore_tmux(base, manifest, context, errors, tm, server_id=None):
 
 
 def restore(context, runtime_id=None, tm=None, windows=True):
-    with lock():
+    # Serialize reconstruction against publication for this context only. Other
+    # contexts' lifecycle updates must not wait for editor/chat/window startup.
+    with context_lock(context):
         errors, warnings = [], []
         try:
             selected = latest(context)
@@ -1136,7 +1147,8 @@ def restore_windows(desktop, mapping, context, runtime_id, errors, warnings=None
     if any(not w["floating"] for w in desktop["windows"]):
         warnings.append("Tiled terminal order/size approximated: compositor exposes no native tiling-tree snapshot API")
     if focused:
-        ctl.evaluate("assert(hl.dispatch(hl.dsp.focus({window=" + ctl.lua_string("address:" + focused) + "})).ok)")
+        ctl.evaluate("if require('sessions').state().active == " + ctl.lua_string(runtime_id)
+                     + " then assert(hl.dispatch(hl.dsp.focus({window=" + ctl.lua_string("address:" + focused) + "})).ok) end")
     return failed
 
 

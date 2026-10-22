@@ -82,7 +82,7 @@ QtObject {
 
     function switchSession(id) {
         return (contextCatalog.contexts || []).some(context => context.id === id)
-            ? contextCommand("open", ["open", id]) : run("switch", [luaString(id)]);
+            ? contextCommand("open", ["open", id, "--background"]) : run("switch", [luaString(id)]);
     }
     function closeSession(id) {
         if (!available || busy)
@@ -111,7 +111,7 @@ QtObject {
         return run(action, action === "rename" ? [luaString(id), luaString(name)] : [luaString(name)]);
     }
 
-    function create(name) { return contextCommand("create", ["create", name.trim(), "--open"]); }
+    function create(name) { return contextCommand("create", ["create", name.trim(), "--open", "--background"]); }
     function organize(action, args) { return contextCommand("organize-" + action, ["organize", action].concat(args || [])); }
     function setWorkingDirectory(id, path) { return contextCommand("working-directory", ["set-working-directory", id, path]); }
     function rename(id, name) {
