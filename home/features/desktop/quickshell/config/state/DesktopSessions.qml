@@ -13,7 +13,8 @@ QtObject {
     property var contextCatalog: ({ contexts: [] })
     readonly property var openSessions: sessions.map(session => {
         const node = (contextCatalog.nodes || []).find(node => node.runtime_id === session.id);
-        return Object.assign({}, session, { name: node ? node.breadcrumb : session.name, runtime_id: session.id, persistent: false });
+        return Object.assign({}, session, { name: node ? node.breadcrumb : session.name, runtime_id: session.id, persistent: false,
+            closing: session.closing || (closeRequest.running && session.id === root.closingRuntime) });
     })
     readonly property var savedContexts: (contextCatalog.contexts || []).map(context => Object.assign({}, context, { persistent: true }))
     readonly property string active: snapshot.active || ""
@@ -23,6 +24,7 @@ QtObject {
     property string error: ""
     property string pendingAction: ""
     property string createdContextId: ""
+    property string closingRuntime: ""
     signal completed(string action)
     signal failed()
 
@@ -82,7 +84,20 @@ QtObject {
         return (contextCatalog.contexts || []).some(context => context.id === id)
             ? contextCommand("open", ["open", id]) : run("switch", [luaString(id)]);
     }
-    function closeSession(id) { return contextCommand("close", ["close", "--runtime", id]); }
+    function closeSession(id) {
+        if (!available || busy)
+            return false;
+        if (closeRequest.running) {
+            report("A session is already being saved for closure. Other sessions remain available.");
+            return false;
+        }
+        error = "";
+        closingRuntime = id;
+        closeRequest.didStart = false;
+        closeRequest.command = ["contextctl", "close", "--runtime", id];
+        closeRequest.running = true;
+        return true;
+    }
     function previous() { return run("previous", []); }
     function selectWorkspace(slot, monitorName) { return run("select_workspace", [String(slot), luaString(monitorName)]); }
     function toggleSpecial(role, monitorName) { return run("toggle_special", [luaString(role), luaString(monitorName)]); }
@@ -137,6 +152,29 @@ QtObject {
             } catch (error) {
                 root.report("Cannot read sessions: " + error.message);
             }
+        }
+    }
+
+    // Saving may wait for application adapters. Keep the foreground request slot
+    // available for switching, opening the picker, and other context commands.
+    property var closeRequest: Process {
+        id: closeRequest
+        property bool didStart: false
+        onStarted: didStart = true
+        onRunningChanged: {
+            if (!running && !didStart)
+                Qt.callLater(() => root.error = "Cannot start contextctl for session closure.");
+        }
+        stdout: StdioCollector { id: closeOutput }
+        stderr: StdioCollector { id: closeErrors }
+        onExited: (code, status) => {
+            root.stateFile.reload();
+            root.contextFile.reload();
+            const stdout = closeOutput.text.trim();
+            if (code !== 0 || status !== 0 || stdout !== "ok")
+                root.error = closeErrors.text.trim() || stdout || "Session close failed (" + code + ").";
+            // No foreground completion/failure signal: another action may now be waiting.
+            root.closingRuntime = "";
         }
     }
 

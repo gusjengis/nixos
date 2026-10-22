@@ -1,6 +1,7 @@
 import contextlib
 import io
 import json
+import multiprocessing
 import os
 from pathlib import Path
 import subprocess
@@ -153,6 +154,63 @@ class ContextTests(unittest.TestCase):
                 ctl.close_context("s2")
         self.run.assert_not_called()
         self.assertEqual(ctl.read_json(persistence.local_root() / "lifecycle.json")[item["id"]], "open")
+
+    def test_slow_close_does_not_block_other_context_commands(self):
+        import persistence
+        item = self.mapped()
+        other = ctl.create("Other")
+        ctl.save_state({"mappings": {item["id"]: "s2", other["id"]: "s3"}, "last_active": None})
+        self.runtime([{"id": "s2", "name": item["name"]}, {"id": "s3", "name": "Other"}], "s3")
+        processes = multiprocessing.get_context("fork")
+        entered, release = processes.Event(), processes.Event()
+        result, sender = processes.Pipe(duplex=False)
+
+        def checkpoint(*_args):
+            entered.set()
+            if not release.wait(10):
+                raise RuntimeError("Test checkpoint was not released")
+
+        def closing():
+            with patch.object(persistence, "checkpoint", side_effect=checkpoint), patch.object(ctl, "evaluate"), \
+                    contextlib.redirect_stdout(io.StringIO()):
+                ctl.main(["close", "--runtime", "s2"])
+
+        def unrelated():
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()), \
+                    patch.object(ctl, "evaluate"):
+                sender.send([ctl.main(args) for args in (["list"], ["terminal", "--runtime", "s3"],
+                                                        ["files", "--runtime", "s3"], ["notes", "--runtime", "s3"],
+                                                        ["open", other["id"]], ["close", "--runtime", "s2"])])
+
+        close = processes.Process(target=closing)
+        probe = processes.Process(target=unrelated)
+        close.start()
+        try:
+            self.assertTrue(entered.wait(3), "close never reached checkpoint")
+            probe.start()
+            self.assertTrue(result.poll(2), "slow checkpoint holds global context lock; unrelated launches are blocked")
+            self.assertEqual(result.recv(), [0, 0, 0, 0, 0, 1], "duplicate close must fail promptly without another checkpoint")
+        finally:
+            release.set()
+            close.join(5)
+            if probe.pid:
+                probe.join(5)
+            for process in (close, probe):
+                if process.pid and process.is_alive():
+                    process.terminate()
+                    process.join()
+            result.close()
+            sender.close()
+        self.assertEqual(close.exitcode, 0)
+        self.assertEqual(probe.exitcode, 0)
+
+    def test_close_does_not_target_runtime_that_disappeared_during_save(self):
+        import persistence
+        self.mapped()
+        with patch.object(persistence, "checkpoint", side_effect=lambda *_args: self.runtime([])), \
+                self.assertRaisesRegex(ctl.ContextError, "has closed"):
+            ctl.close_context("s2")
+        self.run.assert_not_called()
 
     def test_create_runtime_mapping_saved_before_notes(self):
         item = ctl.create('Projects/Quote " and \\ unicode é')

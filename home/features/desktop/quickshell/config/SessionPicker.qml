@@ -94,7 +94,11 @@ PanelWindow {
             DesktopSessions.error = "Session no longer exists. Select a session again.";
             return;
         }
-        awaiting = DesktopSessions.closeSession(closeTarget.id);
+        if (DesktopSessions.closeSession(closeTarget.id)) {
+            closeTarget = null;
+            awaiting = false;
+            visible = false;
+        }
     }
 
     HyprlandFocusGrab {

@@ -81,6 +81,18 @@ def mutation_lock():
         yield
 
 
+@contextmanager
+def runtime_operation(runtime_id):
+    state_root().mkdir(parents=True, exist_ok=True)
+    key = uuid.uuid5(uuid.NAMESPACE_URL, runtime_id).hex
+    with (state_root() / f"close-{key}.lock").open("a") as stream:
+        try:
+            fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise ContextError("This session is already being saved for closure") from None
+        yield
+
+
 def relative_name(value, leaf=False):
     parts = value.split("/")
     if (not value or value != value.strip() or (leaf and len(parts) != 1)
@@ -477,11 +489,20 @@ def terminal(runtime_id=None):
 
 def close_context(runtime_id):
     import persistence
-    item = launch_context(runtime_id)
-    # Barrier completes before compositor receives any close request.
-    persistence.checkpoint("close", item["id"] if item else None)
-    persistence.set_lifecycle(item, "closed")
-    evaluate("require('context-terminals').close_checkpointed(" + lua_string(runtime_id) + ")")
+    # Serialize retries for this runtime, not every context command. Capturing
+    # applications may take seconds and must not block the catalog or launchers.
+    with runtime_operation(runtime_id):
+        with mutation_lock():
+            item = launch_context(runtime_id)
+        # Barrier still completes before compositor receives any close request.
+        persistence.checkpoint("close", item["id"] if item else None)
+        persistence.set_lifecycle(item, "closed")
+        with mutation_lock():
+            # Runtime IDs are never reused. Do not close another session if the
+            # original disappeared while its applications were being captured.
+            launch_context(runtime_id)
+            evaluate("require('context-terminals').close_checkpointed(" + lua_string(runtime_id) + ")")
+            publish()
 
 
 def watch():
@@ -550,6 +571,10 @@ def main(argv=None):
         if args.command == "watch":
             watch()
             return 0
+        if args.command == "close":
+            close_context(args.runtime)
+            print("ok")
+            return 0
         if args.command == "organize":
             import organization
             with mutation_lock():
@@ -585,8 +610,6 @@ def main(argv=None):
                     rename_context(args.id, args.name)
                 elif args.command == "set-working-directory":
                     set_working_directory(args.id, args.path)
-                elif args.command == "close":
-                    close_context(args.runtime)
                 elif args.command == "notes":
                     notes(args.runtime)
                 elif args.command == "terminal":

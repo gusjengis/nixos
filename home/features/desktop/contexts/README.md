@@ -392,6 +392,25 @@ contexts retain their checkpoint until reopened. Pre-kill and partially failed
 restores retain missing objects so later periodic scans cannot erase recovery data.
 If retained removed panes coexist with newly added panes, a coherent stacked
 recovery arrangement is published with an explicit approximation warning.
+
+Managed close captures application state outside the global context mutation lock.
+A nonblocking runtime-specific lock rejects duplicate close attempts. The picker
+runs closure in a separate background process and releases its foreground action
+slot immediately; the session remains marked closing while capture runs. Catalog
+updates, other context switches, and terminal/file/note launches remain available.
+Windows are still closed only after a successful checkpoint; capture failure leaves
+the runtime intact. This fixes close-induced launcher freezes, not restore latency
+or the time required by individual capture adapters.
+
+Regression proof: `test_contextctl.py` holds a checkpoint pending in a separate
+process while catalog, terminal/file/note launches and another context switch finish;
+duplicate close is rejected. `../quickshell/test_session_close.qml` uses an isolated
+slow command fixture to verify picker reopening and independent foreground switching.
+On 2026-10-21, a disposable Mac runtime with a real isolated tmux server passed
+save-before-close and artifact validation; catalog took 0.076s and switching 0.126s
+while closure was deliberately held pending. T480s passed all 52 context tests and
+was updated with `rehome t480s`; its unresponsive compositor prevented live UI tests.
+
 Restoration waits for new shells/supported programs to execute before acknowledging
 success and clearing failed-restore retention. A forked tmux child is not yet proof
 that the requested process started. Missing/failed process acknowledgement remains
