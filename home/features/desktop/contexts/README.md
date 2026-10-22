@@ -422,6 +422,21 @@ tagged `X`. The originating queue waits while the event loop answers helper
 queries. Actual flags/targets select affected contexts, including linked windows.
 Failure, timeout, concurrent/recursive destruction, replacement targets, and a
 changed server topology cancel destruction. The helper has a 90-second limit.
+
+Tmux inventory reads stable session/window/pane IDs directly in its three list
+formats. Missing IDs and ownership environment updates are sent in batches of at
+most 64 commands, with physical IDs deduplicated for grouped/linked windows and
+panes. Every batch must succeed before capture returns; checkpoint publication and
+the native pre-destruction barrier are unchanged.
+
+Measured on 2026-10-21 with 48 shell-only sessions on an isolated server, a repeated
+targeted pre-kill checkpoint went from 436 tmux subprocesses to 7. Mac elapsed time
+fell from 0.698s to 0.034s; T480s from 1.162s to 0.047s. These measure inventory-heavy
+fixtures, not editor/chat-heavy sessions or compositor timeouts. T480s passed all
+62 persistence tests; Mac passed 13 native barrier tests, including actual keyboard
+input in another attached client while a checkpoint was held pending. Restoration,
+failure/timeout cancellation, grouped/linked identity preservation, and native
+kill-session/window/pane paths are covered by those suites.
 Native tmux records provide topology directly; raw server-wide resurrect captures
 are no longer created. Existing raw captures are reclaimed after validated v2
 publication. Supported program arguments are captured deliberately; `btop` is added.

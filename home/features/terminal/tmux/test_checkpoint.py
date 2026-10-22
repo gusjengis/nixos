@@ -144,6 +144,33 @@ class NativeCheckpointTests(unittest.TestCase):
         self.assertTrue(all(row.startswith("anchor|") for row in self.panes()))
         self.assertEqual(self.tmux("show-options", "-gqv", "@after").stdout.strip(), "yes")
 
+    def test_other_attached_client_accepts_input_while_checkpoint_waits(self):
+        self.tmux("respawn-pane", "-k", "-t", "anchor:0", "/bin/sh")
+        master, slave = pty.openpty()
+        client = subprocess.Popen(self.base + ["attach-session", "-t", "anchor"],
+                                  env=self.env, stdin=slave, stdout=slave, stderr=slave)
+        os.close(slave)
+        self.children.append(client)
+        try:
+            deadline = time.monotonic() + 3
+            while not self.tmux("list-clients", "-F", "#{client_session}").stdout.strip():
+                self.assertLess(time.monotonic(), deadline, "terminal client failed to attach")
+                time.sleep(.01)
+            self.configure()
+            child = self.start("kill-session", "-t", "victim")
+            self.assert_held(child, self.panes())
+            marker = self.root / "interactive"
+            os.write(master, ("printf ready > " + shlex.quote(str(marker)) + "\r").encode())
+            deadline = time.monotonic() + 3
+            while not marker.exists():
+                self.assertLess(time.monotonic(), deadline, "other attached client stopped accepting input")
+                time.sleep(.01)
+            self.assertEqual(marker.read_text(), "ready")
+            self.assertIsNone(child.poll(), "test must exercise input before checkpoint finishes")
+            self.finish(child)
+        finally:
+            os.close(master)
+
     def test_kill_session_all_other(self):
         self.tmux("new-session", "-d", "-s", "other", "sleep 60")
         before = self.panes()

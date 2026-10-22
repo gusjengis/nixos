@@ -247,6 +247,29 @@ class PersistenceTests(unittest.TestCase):
         self.save()
         self.recover()
 
+    def test_native_inventory_batches_metadata_without_per_pane_processes(self):
+        for index in range(8):
+            pane = self.session(f"inventory-{index}", self.a if index == 0 else self.b)
+            self.tm.call("split-window", "-d", "-t", pane, "/bin/sh")
+            self.tm.call("split-window", "-d", "-t", pane, "/bin/sh")
+        for pane in self.tm.rows("list-panes", ["pane_id"], "-a"):
+            self.wait_command(self.tm, pane["pane_id"], "sh")
+        contexts = ctl.scan()
+        captures = []
+        for _attempt in range(2):
+            with patch.object(self.tm, "call", wraps=self.tm.call) as native:
+                captures.append(p.capture_tmux(self.tm, contexts))
+            self.assertLessEqual(native.call_count, 8,
+                                 "inventory must not launch tmux for each session/window/pane option")
+        self.assertEqual(self.topology([s for _, _, s in captures[0]]),
+                         self.topology([s for _, _, s in captures[1]]))
+        # Generated identities must reach the server before adapters or deletion.
+        for context, _tm, session in captures[1]:
+            self.assertEqual(self.tm.call("show-options", "-v", "-t", session["name"],
+                                          "@persistence-session-id"), session["id"])
+            self.assertEqual(self.tm.call("show-environment", "-t", session["name"], "CONTEXT_ID"),
+                             "CONTEXT_ID=" + context["id"])
+
     def test_stale_dead_socket_does_not_prevent_crash_reconstruction(self):
         self.session("stale socket recovery", self.a)
         self.save()

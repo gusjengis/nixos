@@ -390,13 +390,31 @@ def capture_tmux(tm, contexts):
         server_id = str(uuid.uuid4())
         tm.call("set-option", "-s", "@persistence-server-id", server_id)
     uuid.UUID(server_id)
-    sessions = tm.rows("list-sessions", ["session_id", "session_name", "session_group", "@persistence-context"])
+    sessions = tm.rows("list-sessions", ["session_id", "session_name", "session_group", "@persistence-context",
+                                         "@persistence-session-id"])
     all_panes = tm.rows("list-panes", ["session_id", "window_id", "pane_id", "pane_index", "pane_pid",
                       "pane_current_path", "pane_current_command", "pane_active", "pane_title",
                       "@persistence-editor", "@persistence-editor-socket", "@persistence-chat-socket",
-                      "@persistence-recovery-pending"], "-a")
+                      "@persistence-recovery-pending", "@persistence-id"], "-a")
     windows = tm.rows("list-windows", ["session_id", "window_id", "window_index", "window_name",
-                     "window_layout", "window_active", "window_zoomed_flag"], "-a")
+                      "window_layout", "window_active", "window_zoomed_flag", "@persistence-window-id"], "-a")
+    # Read IDs in the inventory formats, not with two extra tmux processes per
+    # object. Queue missing IDs and ownership metadata in bounded command batches.
+    # Physical windows/panes can occur in several sessions or linked indices.
+    identities, updates = {}, []
+
+    def identity(row, target_key, option, scope=()):
+        target = row[target_key]
+        key = (option, target)
+        if key not in identities:
+            value = row[option]
+            if not value:
+                value = str(uuid.uuid4())
+                updates.append(["set-option", *scope, "-t", target, option, value])
+            uuid.UUID(value)
+            identities[key] = value
+        return identities[key]
+
     result = []
     for session in sessions:
         own_panes = list({p["pane_id"]: p for p in all_panes
@@ -409,26 +427,35 @@ def capture_tmux(tm, contexts):
         # never infer ownership from a different checkout or recreate its vault.
         context = None if orphaned else owner(session, own_panes, contexts)
         if context:
-            tm.call("set-option", "-t", session["session_id"], "@persistence-context", context["id"])
-            tm.call("set-environment", "-t", session["session_id"], "CONTEXT_DIRECTORY", context["path"])
-            tm.call("set-environment", "-t", session["session_id"], "CONTEXT_ID", context["id"])
-        value = {"id": tm.identity(session["session_id"], []), "observed_id": session["session_id"],
+            updates.extend([
+                ["set-option", "-t", session["session_id"], "@persistence-context", context["id"]],
+                ["set-environment", "-t", session["session_id"], "CONTEXT_DIRECTORY", context["path"]],
+                ["set-environment", "-t", session["session_id"], "CONTEXT_ID", context["id"]],
+            ])
+        value = {"id": identity(session, "session_id", "@persistence-session-id"), "observed_id": session["session_id"],
                  "name": session["session_name"], "group": session["session_group"], "windows": [],
                   "server": {"id": server_id, "default": Path(tm.socket).name == "default"}}
         if orphaned:
             value["orphaned_context_id"] = orphaned
         for window in (w for w in windows if w["session_id"] == session["session_id"]):
-            saved = {"id": tm.identity(window["window_id"], ["-w"]), "index": int(window["window_index"]),
+            saved = {"id": identity(window, "window_id", "@persistence-window-id", ("-w",)), "index": int(window["window_index"]),
                      "name": window["window_name"], "layout": window["window_layout"],
                      "active": window["window_active"] == "1", "zoom": window["window_zoomed_flag"] == "1", "panes": []}
             for pane in (p for p in own_panes if p["window_id"] == window["window_id"]):
-                saved["panes"].append({"id": tm.identity(pane["pane_id"], ["-p"]),
+                saved["panes"].append({"id": identity(pane, "pane_id", "@persistence-id", ("-p",)),
                     "index": int(pane["pane_index"]), "observed_id": pane["pane_id"],
                     "cwd": encode_path(pane["pane_current_path"], context),
                     "active": pane["pane_active"] == "1", "title": pane["pane_title"],
                     "command": pane["pane_current_command"], "local": pane})
             value["windows"].append(saved)
         result.append((context, tm, value))
+    for offset in range(0, len(updates), 64):
+        arguments = []
+        for command in updates[offset:offset + 64]:
+            if arguments:
+                arguments.append(";")
+            arguments.extend(command)
+        tm.call(*arguments)
     return result
 
 
