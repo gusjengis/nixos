@@ -3,6 +3,8 @@
 
   inputs = {
     nixpkgs.url = "nixpkgs/nixpkgs-unstable";
+    # Update Obsidian independently: nix flake update nixpkgs-obsidian && rehome
+    nixpkgs-obsidian.url = "nixpkgs/nixpkgs-unstable";
     # Keep system and Home Manager package sets independent during migration.
     nixpkgs-system.url = "github:NixOS/nixpkgs/nixos-unstable";
     disko = {
@@ -83,7 +85,13 @@
           inherit system;
           overlays = [
             # Make the flake inputs reachable from any module through `pkgs`.
-            (final: prev: { inputs = inputs; })
+            (final: prev: {
+              inputs = inputs;
+              obsidian = (import inputs.nixpkgs-obsidian {
+                inherit system;
+                config.allowUnfree = true;
+              }).obsidian;
+            })
           ];
           config.allowUnfree = true;
         };

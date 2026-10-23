@@ -675,6 +675,20 @@
         "type": "github"
       }
     },
+    "nixpkgs-obsidian": {
+      "locked": {
+        "lastModified": 1792506237,
+        "narHash": "sha256-hVMDyAXU0kxRuG3GygbZkzf5x+aBNEC0NYEJ6KwHtD4=",
+        "rev": "5adc50831c259f87faeb09ddf930d43597197473",
+        "type": "tarball",
+        "url": "https://releases.nixos.org/nixpkgs/nixpkgs-26.11pre1097770.5adc50831c25/nixexprs.tar.zst"
+      },
+      "original": {
+        "id": "nixpkgs",
+        "ref": "nixpkgs-unstable",
+        "type": "indirect"
+      }
+    },
     "nixpkgs-system": {
       "locked": {
         "lastModified": 1788179007,
@@ -947,6 +961,7 @@
         "hyprpicker": "hyprpicker",
         "nix-flatpak": "nix-flatpak",
         "nixpkgs": "nixpkgs_5",
+        "nixpkgs-obsidian": "nixpkgs-obsidian",
         "nixpkgs-system": "nixpkgs-system",
         "opencode": "opencode",
         "rmatrix": "rmatrix",
