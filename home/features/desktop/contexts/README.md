@@ -195,10 +195,17 @@ work in `/etc/nixos` without sharing their own chat lists or tmux sessions.
   are exported under `<owner>/.context/state/chats/`. This uses the same atomic,
   chunk-addressed current-root store and divergence protection as terminal recovery.
   Native SQLite remains a machine-local working index; it is not synchronized.
-- The existing 30-second checkpoint timer synchronizes libraries. Managed terminal
-  checkpoint/close also saves selected owned chats. Launch imports the visible
+- The checkpoint timer runs 30 seconds after the previous run finishes and exports
+  local library changes; it does not import historical libraries in the background.
+  Background checkpoint work is limited to 25% of one CPU, with a 15-minute overall
+  deadline. Managed terminal checkpoint/close also saves selected owned chats
+  independently of that background CPU limit. Launch imports the visible
   portable libraries, initializing a fresh native database when needed. The command
   palette's **Sync portable context chat libraries** performs an explicit refresh.
+- Library checks read the archive index before accessing conversation history.
+  Unchanged history stays lazy; accessed objects and archive publication still
+  receive integrity checks. Successful library checks are reused only within one
+  checkpoint, and verified imports persist progress per conversation.
 - Context-home paths and external work-root paths relocate independently. The
   repository/job folder must be available at its configured local location; the
   library carries chat records and supported attachments, not the repository itself.

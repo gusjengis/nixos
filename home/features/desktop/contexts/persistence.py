@@ -682,6 +682,7 @@ def affected_owners(captured, socket_path, operation, target_session, target_win
     return {c["id"] if c else None for c, _, _ in selected}
 
 
+@chat_library.sync_batch()
 def checkpoint(reason="periodic", context_id=None, socket_path=None, operation=None,
                target_session=None, target_window=None, all_targets=False, group=False):
     # Gather application state before taking any publication lock. An exiting
@@ -697,7 +698,10 @@ def checkpoint(reason="periodic", context_id=None, socket_path=None, operation=N
         owners = {context_id}
     errors = []
     library_errors = []
-    chat_library.sync_all(contexts, hydrate=True, only=None if reason == "periodic" else owners, errors=library_errors)
+    # Background saving exports local changes; opening/restoring a context owns
+    # importing its history. Never make saving live terminals wait for importing
+    # every historical conversation on every machine.
+    chat_library.sync_all(contexts, hydrate=False, only=None if reason == "periodic" else owners, errors=library_errors)
     for identifier, error in library_errors:
         if reason == "periodic" and isinstance(error, chats.ChatChangedDuringCheckpoint):
             report(f"{identifier}: {error}; library save deferred, previous library retained")

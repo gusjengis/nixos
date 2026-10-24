@@ -41,6 +41,12 @@ def sha(data):
     return hashlib.sha256(data).hexdigest()
 
 
+def object_key(key):
+    if not isinstance(key, str) or len(key) != 64 or any(c not in "0123456789abcdef" for c in key):
+        raise ValueError("Invalid object hash")
+    return key
+
+
 def fsync_dir(path):
     fd = os.open(path, os.O_RDONLY | os.O_DIRECTORY)
     try:
@@ -167,8 +173,7 @@ class Store:
         self.directory, self.local = Path(directory), Path(local)
 
     def object(self, key):
-        if len(key) != 64 or any(c not in "0123456789abcdef" for c in key):
-            raise ValueError("Invalid object hash")
+        object_key(key)
         path = self.directory / "objects" / key
         if path.is_symlink() or not path.resolve().is_relative_to(self.directory.resolve()):
             raise ValueError("Object escapes checkpoint")
@@ -199,11 +204,11 @@ class Store:
             for name, info in manifest["artifacts"].items():
                 if not name or relative(name) != name or not isinstance(info["size"], int) or info["size"] < 0:
                     raise ValueError("Invalid artifact index")
-                self.object(info["sha256"])
+                object_key(info["sha256"])
                 if not isinstance(info["chunks"], list) or not info["chunks"]:
                     raise ValueError("Invalid artifact chunks")
                 for key in info["chunks"]:
-                    self.object(key)
+                    object_key(key)
             return manifest
         except (OSError, ValueError, KeyError, TypeError) as exc:
             raise ValueError(f"Latest checkpoint manifest missing/corrupt; no older fallback: {exc}") from exc

@@ -76,6 +76,75 @@ class ScopeTests(IsolatedChatTest):
         with library.library_lock(), patch.object(library, "publish_scopes", side_effect=AssertionError("Watcher must defer")):
             library.refresh_scopes(contexts)
 
+    def test_unchanged_library_reads_index_without_loading_conversation_history(self):
+        context = ctl.find_context(self.child["id"])
+        database = self.base / "fixture.db"
+        database.touch()
+        archive = library.storage(context)
+        origin = "ses_lazyhistory"
+        fingerprint = "unchanged"
+        tree = library.store.Tree({
+            "index.json": library.store.canonical({"version": 1, "chats": {
+                origin: {"fingerprint": fingerprint, "deleted": False}}}),
+            "conversations/" + origin + "/history.json": b"historical conversation" * 1000,
+        })
+        archive.publish(tree, {"device": "source", "context_id": context["id"], "warnings": []}, None)
+        library.write_json(library.ledger_path(context, database), {"chats": {origin: {
+            "local_id": origin, "source": fingerprint, "native": fingerprint}}})
+        rows = {origin: {"id": origin, "owner": context["id"], "parent": None,
+                         "chat": origin, "directory": str(self.work), "updated": 1}}
+        original = library.store.Store.view
+        accessed = []
+
+        def index_only(storage, manifest):
+            view = original(storage, manifest)
+            loader = view.tree.loader
+
+            def read(name):
+                accessed.append(name)
+                if name != "index.json":
+                    raise AssertionError("Unchanged history must stay lazy")
+                return loader(name)
+            view.tree.loader = read
+            return view
+
+        with patch.object(library, "native_rows", return_value=rows), \
+                patch.object(library.chats, "fingerprint", return_value=fingerprint), \
+                patch.object(library.store.Store, "view", index_only), \
+                patch.object(library.store.Store, "validate", side_effect=AssertionError("eager validation")), \
+                patch.object(library.store.Store, "publish", side_effect=AssertionError("no-op publication")):
+            library.sync_context(context, database)
+        self.assertEqual(accessed, ["index.json"])
+
+    def test_checkpoint_batch_reuses_successful_sync_but_not_failures_or_future_saves(self):
+        database = self.base / "fixture.db"
+        database.touch()
+        contexts = [ctl.find_context(self.child["id"])]
+        with patch.object(library, "sync_context") as sync, patch.object(library, "publish_scopes"):
+            with library.sync_batch():
+                library.sync_all(contexts, database)
+                library.sync_all(contexts, database)
+            self.assertEqual(sync.call_count, 1)
+            with library.sync_batch():
+                library.sync_all(contexts, database)
+            self.assertEqual(sync.call_count, 2)
+            with library.sync_batch():
+                sync.side_effect = library.chats.ChatChangedDuringCheckpoint("busy")
+                errors = []
+                library.sync_all(contexts, database, errors=errors)
+                sync.side_effect = None
+                library.sync_all(contexts, database)
+            self.assertEqual(len(errors), 1)
+            self.assertEqual(sync.call_count, 4)
+
+    def test_periodic_checkpoint_does_not_import_archived_history(self):
+        with patch.object(ctl, "scan", return_value=[]), \
+                patch.object(persistence, "sockets", return_value=[]), \
+                patch.object(library, "sync_all") as sync:
+            persistence.checkpoint(reason="periodic")
+        self.assertFalse(sync.call_args.kwargs["hydrate"])
+        self.assertIsNone(sync.call_args.kwargs["only"], "Closed chats must still be saved")
+
     @unittest.skipUnless(shutil.which("tmux"), "tmux unavailable")
     def test_launcher_uses_tmux_owner_despite_shared_cwd_and_stale_environment(self):
         tmux_socket = self.base / "identity.sock"

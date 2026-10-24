@@ -76,7 +76,12 @@ in
       Service = {
         Type = "oneshot";
         ExecStart = "${checkpoint}/bin/context-checkpoint save --reason periodic";
-        TimeoutStartSec = 95;
+        # Bound background heat without killing legitimate larger exports before
+        # they can complete. Foreground close/shutdown captures are independent.
+        Nice = 10;
+        CPUWeight = 20;
+        CPUQuota = "25%";
+        TimeoutStartSec = "15min";
         UMask = "0077";
       };
     };

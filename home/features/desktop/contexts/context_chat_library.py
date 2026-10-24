@@ -12,12 +12,26 @@ import subprocess
 import sys
 import time
 from contextlib import closing, contextmanager
+from contextvars import ContextVar
 from pathlib import Path
 
 import chat_portability as chats
 import checkpoint_store as store
 import contextctl as ctl
 import organization
+
+
+_batch = ContextVar("chat_library_sync_batch", default=None)
+
+
+@contextmanager
+def sync_batch():
+    """Reuse successful library syncs within one checkpoint, never across saves."""
+    token = _batch.set(set())
+    try:
+        yield
+    finally:
+        _batch.reset(token)
 
 
 def local_root():
@@ -112,10 +126,10 @@ def sync_context(context, database, hydrate=False):
     current = archive.load()
     if current and current.get("context_id") != context["id"]:
         raise ValueError("Portable chat library belongs to a different context")
-    tree = store.Tree()
-    if current:
-        archive.validate(current)
-        tree.copy_from(archive.view(current))
+    # Keep untouched conversation bytes lazy. Reading the small index is enough
+    # to decide which conversations need work; accessed objects and publication
+    # still receive the store's full integrity/conflict checks.
+    tree = archive.view(current).tree if current else store.Tree()
     index = json.loads(tree.read("index.json")) if "index.json" in tree.files else {"version": 1, "chats": {}}
     ledger_file = ledger_path(context, database)
     ledger = ctl.read_json(ledger_file, {"chats": {}})
@@ -174,6 +188,9 @@ def sync_context(context, database, hydrate=False):
                     fingerprint = chats.fingerprint(sid, native["directory"])
                     record = {"local_id": sid, "source": entry["fingerprint"], "native": fingerprint}
                     ledger["chats"][origin] = record
+                    # Imports are durable individually. A later timeout must not
+                    # discard progress and repeatedly restore earlier histories.
+                    write_json(ledger_file, ledger)
                     # Hydrated bytes have new machine-local IDs/paths. Do not republish them until edited.
                     continue
             if not native or (record and fingerprint == record["native"]):
@@ -255,8 +272,14 @@ def sync_all(contexts=None, database=None, hydrate=False, only=None, errors=None
                 continue
             for context in contexts:
                 if only is None or context["id"] in only:
+                    key = (str(path), context["id"], hydrate)
+                    completed = _batch.get()
+                    if completed is not None and key in completed:
+                        continue
                     try:
                         sync_context(context, path, hydrate=hydrate)
+                        if completed is not None:
+                            completed.add(key)
                     except (ValueError, KeyError, OSError, RuntimeError, sqlite3.Error, subprocess.SubprocessError) as exc:
                         if errors is None:
                             raise
