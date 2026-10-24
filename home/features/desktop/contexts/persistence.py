@@ -32,6 +32,10 @@ class CheckpointError(ctl.ContextError):
     pass
 
 
+class EditorInputBlocked(CheckpointError):
+    pass
+
+
 def run(args, timeout=15, **kwargs):
     # These are captured, noninteractive commands. In particular Neovim routes
     # remote-expr output to stderr (with terminal output on stdout) if it inherits
@@ -492,6 +496,38 @@ def process_arguments(pane_pid, command):
     raise CheckpointError(f"Cannot capture foreground arguments for {command}")
 
 
+def editor_ready(endpoint):
+    """Fast API works even while normal RPC evaluation waits for user input."""
+    import msgpack
+
+    deadline = time.monotonic() + 3
+    with socket.socket(socket.AF_UNIX) as connection:
+        connection.settimeout(3)
+        connection.connect(endpoint)
+        connection.sendall(msgpack.packb([0, 1, "nvim_get_mode", []], use_bin_type=True))
+        replies = msgpack.Unpacker(raw=False, max_buffer_size=65536)
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise CheckpointError("Neovim readiness RPC timed out")
+            connection.settimeout(remaining)
+            data = connection.recv(4096)
+            if not data:
+                raise CheckpointError("Neovim readiness RPC disconnected")
+            replies.feed(data)
+            for reply in replies:
+                if not isinstance(reply, list) or len(reply) != 4 or reply[:2] != [1, 1]:
+                    raise CheckpointError("Neovim readiness RPC invalid reply")
+                _, _, error, mode = reply
+                if error is not None:
+                    raise CheckpointError(f"Neovim readiness RPC failed: {error}")
+                if not isinstance(mode, dict) or type(mode.get("blocking")) is not bool:
+                    raise CheckpointError("Neovim readiness RPC invalid mode")
+                if mode["blocking"]:
+                    raise EditorInputBlocked("Neovim waiting for input")
+                return
+
+
 def editor_snapshot(endpoint):
     """A zero CLI exit status is not proof of a complete RPC reply.
 
@@ -499,6 +535,7 @@ def editor_snapshot(endpoint):
     mismatches remain explicit failures. All attempts share the capture deadline
     and collect only in RAM, before any checkpoint/publication writes or locks.
     """
+    editor_ready(endpoint)
     expression = 'luaeval("require(\'context_persistence\').snapshot()")'
     args = ["nvim", "--server", endpoint, "--remote-expr", expression]
     deadline = time.monotonic() + 15
@@ -800,7 +837,7 @@ def checkpoint(reason="periodic", context_id=None, socket_path=None, operation=N
                 new_warnings = sorted(set(warnings) - known)
                 if new_warnings:
                     notify(new_warnings)
-        except chats.ChatChangedDuringCheckpoint as exc:
+        except (chats.ChatChangedDuringCheckpoint, EditorInputBlocked) as exc:
             if reason == "periodic":
                 report(f"{identifier or 'machine-local'}: {exc}; periodic save deferred, previous checkpoint retained")
             else:

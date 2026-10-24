@@ -8,10 +8,11 @@
 }:
 let
   featureDir = "${repoRoot}/home/features/desktop/contexts";
+  python = pkgs.python3.withPackages (p: [ p.msgpack ]);
   contextctl = pkgs.writeShellApplication {
     name = "contextctl";
     runtimeInputs = [
-      pkgs.python3
+      python
       pkgs.kitty
       pkgs.tmux
       pkgs.obsidian
@@ -27,7 +28,7 @@ let
   checkpoint = pkgs.writeShellApplication {
     name = "context-checkpoint";
     runtimeInputs = [
-      pkgs.python3
+      python
       pkgs.tmux
       pkgs.bash
       pkgs.coreutils

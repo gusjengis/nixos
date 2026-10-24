@@ -46,6 +46,9 @@ class CommandCaptureTests(unittest.TestCase):
 
 
 class EditorRpcTests(unittest.TestCase):
+    def setUp(self):
+        self.ready = self.enterContext(patch.object(p, "editor_ready"))
+
     @staticmethod
     def snapshot():
         return {"version": 2, "editor_id": "editor-id", "contents_encoding": "base64", "contents": {}}
@@ -91,6 +94,32 @@ class EditorRpcTests(unittest.TestCase):
                 self.assertRaisesRegex(p.CheckpointError, "timed out"):
             p.editor_snapshot("/fixture/editor.sock")
         self.assertEqual(rpc.call_count, 1)
+
+
+class EditorReadinessTests(unittest.TestCase):
+    def probe(self, reply):
+        import msgpack
+
+        connection = Mock()
+        data = msgpack.packb(reply, use_bin_type=True)
+        connection.recv.side_effect = [data[:2], data[2:]]
+        with patch.object(p.socket, "socket") as factory:
+            factory.return_value.__enter__.return_value = connection
+            p.editor_ready("/fixture/editor.sock")
+        request = msgpack.unpackb(connection.sendall.call_args.args[0], raw=False)
+        self.assertEqual(request, [0, 1, "nvim_get_mode", []])
+
+    def test_fragmented_fast_api_response_accepts_ready_editor(self):
+        self.probe([1, 1, None, {"mode": "n", "blocking": False}])
+
+    def test_only_explicit_input_block_is_deferrable(self):
+        with self.assertRaises(p.EditorInputBlocked):
+            self.probe([1, 1, None, {"mode": "n", "blocking": True}])
+        for reply in ([1, 1, None, {}], [1, 1, None, {"blocking": "false"}],
+                      [1, 1, [0, "failure"], None], [1, 2, None, {"blocking": True}]):
+            with self.subTest(reply=reply), self.assertRaises(p.CheckpointError) as error:
+                self.probe(reply)
+            self.assertNotIsInstance(error.exception, p.EditorInputBlocked)
 
 
 class ProgramReadinessTests(unittest.TestCase):
@@ -357,15 +386,17 @@ class PersistenceTests(unittest.TestCase):
         self.save()
         previous = self.saved()[1]["id"]
         busy = p.chats.ChatChangedDuringCheckpoint("Chat changed during checkpoint; retry capture")
-        with patch.object(p, "adapter_capture", side_effect=busy):
-            self.save(rapid=True)
-            self.assertEqual(self.saved()[1]["id"], previous)
-            self.notices.assert_not_called()
-            for reason in ("manual", "close", "shutdown", "pre-kill"):
-                with self.subTest(reason=reason), self.assertRaises(p.CheckpointError):
-                    self.save(reason, rapid=True)
+        for error in (busy, p.EditorInputBlocked("Neovim waiting for input")):
+            self.notices.reset_mock()
+            with self.subTest(error=error), patch.object(p, "adapter_capture", side_effect=error):
+                self.save(rapid=True)
                 self.assertEqual(self.saved()[1]["id"], previous)
-                self.assertIn("Chat changed", self.notices.call_args.args[0][0])
+                self.notices.assert_not_called()
+                for reason in ("manual", "close", "shutdown", "pre-kill"):
+                    with self.subTest(reason=reason), self.assertRaises(p.CheckpointError):
+                        self.save(reason, rapid=True)
+                    self.assertEqual(self.saved()[1]["id"], previous)
+                    self.assertIn(str(error), self.notices.call_args.args[0][0])
 
         self.notices.reset_mock()
         self.tm.call("rename-window", "-t", "chat-busy:0", "changed")
@@ -482,7 +513,7 @@ class PersistenceTests(unittest.TestCase):
                 return subprocess.CompletedProcess(args, 0, "", "native reply omitted")
             return original_run(args, **kwargs)
 
-        with patch.object(p, "capture_tmux", side_effect=editor), \
+        with patch.object(p, "capture_tmux", side_effect=editor), patch.object(p, "editor_ready"), \
                 patch.object(p.subprocess, "run", side_effect=transport), self.assertRaises(p.CheckpointError):
             self.save(rapid=True)
         self.assertEqual(len(attempts), 3)
@@ -524,6 +555,36 @@ class PersistenceTests(unittest.TestCase):
             with patch.object(p, "lock", side_effect=publication_lock):
                 self.save()
         _, first, _ = self.saved()
+        # A normal-mode key prefix blocks ordinary RPCs, but the fast mode API
+        # must detect it without consuming input or publishing a partial save.
+        def input_keys(keys):
+            import msgpack
+
+            with socket.socket(socket.AF_UNIX) as connection:
+                connection.settimeout(3)
+                connection.connect(endpoint)
+                connection.sendall(msgpack.packb([0, 1, "nvim_input", [keys]], use_bin_type=True))
+                self.assertTrue(connection.recv(4096))
+
+        input_keys("g")
+        deadline = time.monotonic() + 3
+        while True:
+            try:
+                p.editor_ready(endpoint)
+            except p.EditorInputBlocked:
+                break
+            self.assertLess(time.monotonic(), deadline, "editor never entered input wait")
+            time.sleep(.03)
+        self.notices.reset_mock()
+        self.save(rapid=True)
+        self.assertEqual(self.saved()[1], first)
+        self.notices.assert_not_called()
+        with self.assertRaises(p.CheckpointError):
+            self.save("shutdown", rapid=True)
+        self.assertEqual(self.saved()[1], first)
+        input_keys("<Esc>")
+        rpc("true")
+        self.notices.reset_mock()
         before = stats(p.state_dir(self.a))
         audit = Changes(p.state_dir(self.a))
         self.save(rapid=True)

@@ -325,7 +325,11 @@ machine-local mirror of that current state. It does not create periodic history.
   disconnect inherited terminal stdin: otherwise Neovim can put its response on
   stderr and terminal control output on stdout. Empty/truncated JSON replies get
   at most three RAM-only attempts within one 15-second deadline; normal capture
-  uses one RPC.
+  uses one snapshot RPC. A bounded fast `nvim_get_mode` RPC checks readiness first,
+  even when a pending key sequence blocks ordinary evaluation. An input-blocked
+  editor defers its context's periodic save without a failure popup, retaining the
+  previous checkpoint; the next scan retries automatically. Explicit saves and
+  managed close/shutdown still report failure while input remains blocked.
   Persistent malformed replies, native errors and schema/identity mismatches retain
   the previous checkpoint and cancel managed destruction.
 - New chunks are flushed before atomic root replacement. A machine-local pending
