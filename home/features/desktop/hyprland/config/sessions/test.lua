@@ -816,6 +816,31 @@ assert(
 	not find_session(pin_session) and sessions.state().active == away,
 	"pinned session retires only after window exits"
 )
+-- Remote-controlled terminals already received intentional close requests.
+-- Their asynchronous exit must not reveal or re-close an inactive session.
+local remote_session = sessions.create("Remote terminal close")
+local remote_workspace = focused.active_workspace
+remote_workspace.windows = 1
+windows["address:0xremote"] = { address = "0xremote", workspace = remote_workspace }
+sessions.switch(away)
+local saved_focus, saved_workspace = focused_window, focused.active_workspace
+local prior_requests = #close_requests
+assert(find_session(remote_session).windows[1] == "0xremote", "publish exact owned window addresses")
+sessions.close(remote_session, { ["0xremote"] = true })
+drain_cleanup()
+assert(sessions.state().active == away and focused_window == saved_focus, "remote close preserves background focus")
+assert(focused.active_workspace == saved_workspace, "remote close never switches workspace")
+assert(#close_requests == prior_requests, "remote-handled terminal never receives compositor close confirmation")
+complete_close("address:0xremote")
+assert(not find_session(remote_session) and sessions.state().active == away, "remote exit retires background session")
+local active_remote = sessions.create("Active remote terminal close")
+local active_workspace = focused.active_workspace
+active_workspace.windows = 1
+windows["address:0xactive"] = { address = "0xactive", workspace = active_workspace }
+sessions.close(active_remote, { ["0xactive"] = true })
+complete_close("address:0xactive")
+assert(sessions.state().active == away, "active remote close returns to surviving session")
+assert(#close_requests == prior_requests, "active remote close also skips compositor confirmation")
 os.remove(base .. ".lua")
 os.remove(base .. ".json")
 print("sessions: scratchpads, session-local pins, reload, focus, hotplug, session closure, and default fallback passed")

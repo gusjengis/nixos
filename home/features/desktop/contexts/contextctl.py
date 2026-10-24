@@ -509,6 +509,53 @@ def terminal(runtime_id=None):
     spawn([*arguments, "create-tmux-session", cwd, name, "--attach"])
 
 
+def close_kitty_windows(runtime_id):
+    """Close only this runtime's Kitty OS windows, without interactive prompts.
+
+    A shared Kitty process can host OS windows in several desktop contexts. Only
+    use the socket when Kitty reports exactly one OS window and the compositor
+    agrees; ambiguous instances and older processes keep normal close handling.
+    """
+    runtime = next((s for s in snapshot()["sessions"] if s["id"] == runtime_id), {})
+    addresses = set(runtime.get("windows", []))
+    if not addresses:
+        return []
+    windows = clients()
+    handled = []
+    for window in windows:
+        address, pid = window.get("address"), window.get("pid")
+        if address not in addresses or type(pid) is not int or pid <= 0:
+            continue
+        cls = window.get("initialClass") or window.get("class", "")
+        if not cls.lower().startswith(("kitty", "context-terminal-")):
+            continue
+        if sum(w.get("pid") == pid for w in windows) != 1:
+            continue
+        endpoint = Path(os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")) / f"kitty-context-{pid}"
+        if not endpoint.is_socket():
+            continue
+        command = ["kitty", "@", "--to", f"unix:{endpoint}", "--use-password", "never"]
+        try:
+            result = subprocess.run([*command, "ls"], capture_output=True, text=True, timeout=3)
+            if result.returncode:
+                continue
+            tree = json.loads(result.stdout)
+            if not isinstance(tree, list) or len(tree) != 1:
+                continue
+            ids = [w["id"] for tab in tree[0]["tabs"] for w in tab["windows"]]
+            if not ids or any(type(identifier) is not int or identifier <= 0 for identifier in ids):
+                continue
+            match = " or ".join(f"id:{identifier}" for identifier in ids)
+            result = subprocess.run([*command, "close-window", "--match", match],
+                                    capture_output=True, text=True, timeout=3)
+            if result.returncode == 0:
+                handled.append(address)
+        except (OSError, subprocess.TimeoutExpired, ValueError, KeyError, TypeError):
+            # No force-kill fallback. Normal compositor closure remains available.
+            continue
+    return handled
+
+
 def close_context(runtime_id):
     import persistence
     # Serialize retries for this runtime, not every context command. Capturing
@@ -518,12 +565,14 @@ def close_context(runtime_id):
             item = launch_context(runtime_id)
         # Barrier still completes before compositor receives any close request.
         persistence.checkpoint("close", item["id"] if item else None)
-        persistence.set_lifecycle(item, "closed")
         with mutation_lock():
             # Runtime IDs are never reused. Do not close another session if the
             # original disappeared while its applications were being captured.
             launch_context(runtime_id)
-            evaluate("require('context-terminals').close_checkpointed(" + lua_string(runtime_id) + ")")
+            handled = close_kitty_windows(runtime_id)
+            persistence.set_lifecycle(item, "closed")
+            addresses = "{" + ",".join("[" + lua_string(address) + "]=true" for address in handled) + "}"
+            evaluate("require('context-terminals').close_checkpointed(" + lua_string(runtime_id) + "," + addresses + ")")
             publish()
 
 

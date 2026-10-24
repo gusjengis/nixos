@@ -37,6 +37,15 @@ A populated session and its remaining window are focused so you can handle save 
 Kitty's in-window close confirmation on a previously hidden workspace. It stays listed as `Closing...` until all
 its local windows exit. Enter returns to it, and Ctrl+D can retry closure after
 a canceled dialog. Once finished, the prior surviving session is selected.
+
+The personal context coordinator checkpoints first, then uses Kitty's local
+remote-control socket to close terminal windows without confirmation. It passes
+those window addresses to `close(id, handled)` so the session layer neither sends
+another compositor close request nor reveals an inactive terminal-only session.
+Interactive Kitty closure still confirms. Older Kitty processes without sockets,
+ambiguous shared-process OS windows, and other applications retain normal closure
+and dialog focus behavior. New Kitty processes acquire sockets automatically;
+reloading Kitty configuration cannot add a socket to an existing process.
 `default` is an ordinary session and can be closed while named sessions remain.
 Closing the final session creates one fresh, empty `default` with a new ID;
 closing several sessions at once does not create a fallback before the last

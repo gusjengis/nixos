@@ -27,9 +27,9 @@ function M.setup()
 	end
 end
 
-function M.close_checkpointed(id)
+function M.close_checkpointed(id, handled)
 	assert(original_close, "context-terminals.setup must run first")
-	return original_close(id)
+	return original_close(id, handled)
 end
 
 local function dispatch(operation)

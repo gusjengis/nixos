@@ -223,11 +223,16 @@ function M.state(id)
 	local active = session(id or state.active)
 	local snapshot = { active = state.active, previous = state.previous, sessions = {}, workspaces = {}, specials = {} }
 	for _, item in ipairs(state.sessions) do
+		local windows = {}
+		for _, window in ipairs(session_windows(item)) do
+			windows[#windows + 1] = window.address
+		end
 		snapshot.sessions[#snapshot.sessions + 1] = {
 			id = item.id,
 			name = item.name,
 			closing = item.closing or false,
-			window_count = #session_windows(item),
+			window_count = #windows,
+			windows = windows,
 			-- Logical remembered view is useful to any runtime-state consumer,
 			-- including when this session is not currently visible.
 			slots = item.slots,
@@ -607,20 +612,29 @@ local function schedule_cleanup()
 	end, { timeout = 25, type = "oneshot" })
 end
 
-function M.close(id)
+function M.close(id, handled)
 	local item = session(id)
 	local windows = session_windows(item)
-	if #windows > 0 then
+	handled = handled or {}
+	local needs_attention = false
+	for _, window in ipairs(windows) do
+		if not handled[window.address] then
+			needs_attention = true
+		end
+	end
+	if needs_attention then
 		-- Bring save dialogs into view, then return to the prior session on exit.
 		M.switch(id)
 	end
 	item.closing = true
 	publish()
 	for _, window in ipairs(windows) do
-		hl.dispatch(hl.dsp.window.close({ window = "address:" .. window.address }))
+		if not handled[window.address] then
+			hl.dispatch(hl.dsp.window.close({ window = "address:" .. window.address }))
+		end
 	end
 	-- A confirmation can be inside an existing terminal on a hidden workspace.
-	if #windows > 0 then
+	if needs_attention then
 		focus_remaining(item)
 	end
 	finish_closing()

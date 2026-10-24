@@ -5,6 +5,7 @@ import multiprocessing
 import os
 from pathlib import Path
 import subprocess
+import socket
 import tempfile
 import time
 import unittest
@@ -157,6 +158,56 @@ class ContextTests(unittest.TestCase):
                 ctl.close_context("s2")
         self.run.assert_not_called()
         self.assertEqual(ctl.read_json(persistence.local_root() / "lifecycle.json")[item["id"]], "open")
+
+    def test_kitty_close_targets_only_owned_unambiguous_instances(self):
+        self.runtime([{"id": "s2", "name": "Target", "windows": ["0xa", "0xb", "0xc"]}])
+        windows = [
+            {"address": "0xa", "pid": 101, "class": "kitty"},
+            {"address": "0xb", "pid": 102, "class": "context-terminal-example"},
+            {"address": "0xc", "pid": 103, "class": "kitty"},
+            {"address": "0xd", "pid": 103, "class": "kitty"},
+            {"address": "0xe", "pid": 104, "class": "kitty"},
+        ]
+        for pid in (101, 102, 103, 104):
+            endpoint = self.enterContext(socket.socket(socket.AF_UNIX))
+            endpoint.bind(str(self.base / f"kitty-context-{pid}"))
+        single = [{"tabs": [{"windows": [{"id": 7}, {"id": 8}]}]}]
+        multiple = [*single, *single]
+        self.run.side_effect = [Mock(returncode=0, stdout=json.dumps(single)),
+                                Mock(returncode=0), Mock(returncode=0, stdout=json.dumps(multiple))]
+        with patch.object(ctl, "clients", return_value=windows):
+            self.assertEqual(ctl.close_kitty_windows("s2"), ["0xa"])
+        self.assertEqual(self.run.call_count, 3)
+        calls = [call.args[0] for call in self.run.call_args_list]
+        self.assertEqual(calls[1][-3:], ["close-window", "--match", "id:7 or id:8"])
+        self.assertTrue(all("kitty-context-103" not in str(call) and "kitty-context-104" not in str(call)
+                            for call in calls))
+
+    def test_kitty_close_failure_and_missing_socket_keep_normal_close(self):
+        self.runtime([{"id": "s2", "name": "Target", "windows": ["0xa"]}])
+        window = {"address": "0xa", "pid": 101, "class": "kitty"}
+        with patch.object(ctl, "clients", return_value=[window]):
+            self.assertEqual(ctl.close_kitty_windows("s2"), [])
+            self.run.assert_not_called()
+            endpoint = self.enterContext(socket.socket(socket.AF_UNIX))
+            endpoint.bind(str(self.base / "kitty-context-101"))
+            for result in (Mock(returncode=1), Mock(returncode=0, stdout="invalid"),
+                           subprocess.TimeoutExpired("kitty", 3)):
+                self.run.side_effect = [result]
+                self.assertEqual(ctl.close_kitty_windows("s2"), [])
+
+    def test_kitty_close_runs_after_checkpoint_and_passes_handled_windows(self):
+        import persistence
+
+        self.mapped()
+        order = []
+        with patch.object(persistence, "checkpoint", side_effect=lambda *_: order.append("save")), \
+                patch.object(ctl, "close_kitty_windows", side_effect=lambda _: order.append("kitty") or ["0xa"]), \
+                patch.object(ctl, "evaluate", side_effect=lambda code: order.append(code)):
+            ctl.close_context("s2")
+        self.assertEqual(order[:2], ["save", "kitty"])
+        self.assertIn("close_checkpointed", order[2])
+        self.assertIn("[" + ctl.lua_string("0xa") + "]=true", order[2])
 
     def test_slow_close_does_not_block_other_context_commands(self):
         import persistence

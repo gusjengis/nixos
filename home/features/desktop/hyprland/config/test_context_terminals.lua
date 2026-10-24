@@ -37,7 +37,7 @@ local function reset()
 		specials = { terminal = "special:session-s2-terminal", player = "special:player" },
 	}
 	engine = {
-		close = function(id) closes[#closes + 1] = id; return "closed" end,
+		close = function(id, handled) closes[#closes + 1] = id; closes.handled = handled; return "closed" end,
 		state = function() return state end,
 		switch = function(id) switches[#switches + 1] = id; state.active = id end,
 	}
@@ -94,8 +94,10 @@ test("close barrier, quoting, idempotence, legacy alias", function()
 	engine.kill("s2")
 	equal(#launches, 2)
 	equal(#closes, 0) -- no coordinator callback, including checkpoint failure
-	equal(module.close_checkpointed("s2"), "closed")
+	local handled = { ["0x123"] = true }
+	equal(module.close_checkpointed("s2", handled), "closed")
 	equal(closes[1], "s2")
+	equal(closes.handled, handled)
 	equal(#launches, 2)
 end)
 
