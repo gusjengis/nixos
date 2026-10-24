@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Google Photos
+Comment=Open Google Photos as a web app
+Exec=chromium --app=https://photos.google.com/
+Icon=webapp-google-photos
+Terminal=false
+Categories=Graphics;Photography;
+Keywords=photos;google-photos;chrome-photos.google.com__-Default;
+StartupNotify=true
+StartupWMClass=chrome-photos.google.com__-Default
