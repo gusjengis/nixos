@@ -31,6 +31,9 @@ PanelWindow {
 
     ShaderEffectSource {
         id: wallpaperStrip
+        // Texture input only; displaying it would put an opaque wallpaper copy
+        // beneath the translucent contrast correction.
+        visible: false
         width: scrim.width
         height: scrim.height
         sourceItem: wallpaper

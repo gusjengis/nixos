@@ -31,6 +31,13 @@ void main() {
     // Mac's underbelly is flat for about 20px and vanishes at about 172px.
     float t = clamp((qt_TexCoord0.y * stripHeight - 1.0) / 190.0, 0.0, 1.0);
     float fade = 1.0 - t * t * t * (t * (6.0 * t - 15.0) + 10.0);
-    vec3 result = clamp(wallpaper + (darkContent > 0.5 ? lift : -darken) * fade, 0.0, 1.0);
-    fragColor = vec4(result, 1.0) * qt_Opacity;
+    // Sample the image only to choose correction strength. Let the compositor
+    // blend over the live wallpaper so independent image loads cannot expose
+    // an opaque seam during wallpaper changes.
+    bool lighten = darkContent > 0.5;
+    float adjustment = lighten ? lift : darken;
+    float headroom = lighten ? 1.0 - luma : luma;
+    float alpha = clamp(adjustment * fade / max(headroom, 0.00001), 0.0, 1.0);
+    // Qt Quick expects premultiplied alpha.
+    fragColor = vec4(lighten ? vec3(alpha) : vec3(0.0), alpha) * qt_Opacity;
 }
