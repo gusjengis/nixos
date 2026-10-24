@@ -188,6 +188,22 @@ PanelWindow {
         noticeTimer.restart();
     }
 
+    function copySelectedSource() {
+        const entry = selected;
+        if (!entry || sourceCopy.running)
+            return;
+        if (!entry.sourceUrl) {
+            notice = "No Peapix source link for this wallpaper";
+            noticeTimer.restart();
+            return;
+        }
+        sourceCopy.imagePath = entry.path;
+        sourceCopy.imageTitle = entry.title || entry.name;
+        sourceCopy.sourceUrl = entry.sourceUrl;
+        sourceCopy.command = ["wl-copy", "--type", "text/plain", "--", entry.sourceUrl];
+        sourceCopy.running = true;
+    }
+
     function toggleFavoriteSelected() {
         const entry = selected;
         if (!entry || favoriteEdit.running)
@@ -375,6 +391,7 @@ PanelWindow {
                 "hidden": !!hiddenFiles[item.file],
                 "favorite": !!favoriteFiles[item.file],
                 "title": title,
+                "sourceUrl": record && record.url ? record.url : "",
                 "headline": headline,
                 "date": date,
                 "tags": tags,
@@ -558,6 +575,23 @@ PanelWindow {
         printErrors: false
         onFileChanged: reload()
         onLoaded: overlay.loadMetadata()
+    }
+
+    Process {
+        id: sourceCopy
+        property string imagePath: ""
+        property string imageTitle: ""
+        property string sourceUrl: ""
+        onExited: (code, status) => {
+            if (code !== 0 || status !== 0) {
+                overlay.notice = "Could not copy source link";
+                noticeTimer.restart();
+                return;
+            }
+            Quickshell.execDetached(["notify-send", "--app-name", "Wallpaper picker",
+                "--icon", "preferences-desktop-wallpaper", "--hint", "string:image-path:" + imagePath,
+                "--", "Copied " + imageTitle + " link to clipboard.", sourceUrl]);
+        }
     }
 
     Process {
@@ -789,6 +823,10 @@ PanelWindow {
                             else
                                 overlay.toggleFavoriteSelected();
                         }
+                        event.accepted = true;
+                    } else if (event.key === Qt.Key_S && (event.modifiers & Qt.ControlModifier)) {
+                        if (!event.isAutoRepeat)
+                            overlay.copySelectedSource();
                         event.accepted = true;
                     } else if (event.key === Qt.Key_T && (event.modifiers & Qt.ControlModifier)) {
                         overlay.openPhasePanel();

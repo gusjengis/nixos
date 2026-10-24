@@ -217,6 +217,8 @@ in
     # Waypipe starts its remote server before the metadata helper's wrapper runs.
     home.packages = [
       pkgs.quickshell
+      pkgs.wl-clipboard
+      pkgs.libnotify
       sfPro
       remoteApps
       wallpaperctl
