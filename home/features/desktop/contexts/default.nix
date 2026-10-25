@@ -9,10 +9,18 @@
 let
   featureDir = "${repoRoot}/home/features/desktop/contexts";
   python = pkgs.python3.withPackages (p: [ p.msgpack ]);
+  notebookPython = pkgs.python3.withPackages (p: [ p.msgpack p.pyyaml p.plyvel ]);
+  contextNotes = pkgs.writeShellApplication {
+    name = "context-notes";
+    runtimeInputs = [ notebookPython ];
+    text = ''
+      exec python3 -B "${featureDir}/context_notes.py" "$@"
+    '';
+  };
   contextctl = pkgs.writeShellApplication {
     name = "contextctl";
     runtimeInputs = [
-      python
+      notebookPython
       pkgs.kitty
       pkgs.tmux
       pkgs.obsidian
@@ -65,6 +73,7 @@ in
     home.packages = [
       checkpoint
       shutdownBarrier
+      contextNotes
     ]
     ++ lib.optionals config.desktopEnv.enable [ contextctl ];
     home.activation.createSessionsDirectory = lib.mkIf config.desktopEnv.enable (

@@ -1,0 +1,9 @@
+{
+  "id": "context-notebook",
+  "name": "Context Notebook",
+  "version": "1.0.0",
+  "minAppVersion": "1.14.0",
+  "description": "Shared context Kanban defaults, phase history, and board-first startup.",
+  "author": "gusjengis",
+  "isDesktopOnly": false
+}

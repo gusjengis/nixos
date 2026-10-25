@@ -25,9 +25,9 @@ context layer rather than the reusable backend.
 Contexts are directories under `~/sessions`, identified by `.context/context.json`.
 Legacy nesting is inferred from directories. The organizer stores logical nesting
 independently, so a context's tree location need not match its storage location.
-Each has `.context/notes`, an independent Obsidian vault, with `Home.md` as its
-starting point. Obsidian saves edits automatically. There is no desktop Save step.
-Home is a starter note, not a required system file; it can be renamed or removed.
+Each has `.context/notes`, an independent Obsidian vault. Its default opening view
+is `Kanban.base`: **Thoughts → Todo → In-Progress → Done**. Obsidian saves edits
+automatically. There is no desktop Save step or generated Home dashboard.
 
 Git checkouts are embedded as `<context>/<repository>`, beside `.context`.
 The context's `working_directory` can be a contained relative path, normally `.`
@@ -235,6 +235,89 @@ PERSISTENCE_NATIVE_TESTS=1 python3 -B -m unittest discover -s home/features/desk
 PERSISTENCE_NATIVE_TESTS=1 python3 -B -m unittest discover -s home/features/desktop/contexts -p test_native_context_sessions.py -v
 ```
 
+## Notebook Kanban
+
+New contexts receive the shared `notebook/Kanban.base` view and the repository-owned
+Context Notebook plugin. Ordinary Markdown notes anywhere in the vault are cards;
+new notes are created at the vault root with `status: Thoughts`. Dragging cards uses
+native Bases to update `status`. `Templates/`, `Attachments/`, hidden paths, and notes
+with `kanban: false` are excluded. Obsidian 1.14 or later is required.
+
+Each card stores `created` and append-only `kanban-history` entries containing
+`status`, UTC ISO-8601 `at`, and `event`. Live creation and transitions use `entered`;
+initial migration uses `observed`, since historical phase-entry times are unknown.
+Returning to a phase appends another entry. Existing creation dates are preserved;
+filesystem-derived dates have an explicit `created-source` estimate marker.
+
+`contextctl setup-notebooks` retrofits existing context vaults. It merges required
+settings, preserves existing custom views and card bodies, and links the plugin
+directory to editable repository code. Empty Home scaffolding moves to vault Trash;
+Home notes with real content become ordinary `Notebook Notes` cards. New contexts
+and previously unconfigured vaults use the same setup automatically. The context
+launcher enables the installed plugin in its own closed local profile; an already
+open notebook needs one close/reopen after initial deployment.
+
+The plugin opens Kanban on every cold startup and provides **Open context Kanban**
+in the command palette. Ordinary notebook scratchpad toggles keep the current view.
+It records metadata while Obsidian is running and catches up on incoming notes at
+startup; intermediate edits made entirely outside a running notebook are not a
+historical audit log. Shared content/status/history sync; Electron profiles stay local.
+
+### Agent-assisted notebook
+
+OpenCode's `context-notebook` skill and server plugin live beside its owning module
+at `home/features/agents/opencode/notebook/`. Home Manager links them into the global
+OpenCode configuration. Quit/restart OpenCode after deploying or changing them.
+
+The bootstrap resolves `session.metadata.desktop_context.id`, never cwd or desktop
+focus. It loads the workflow and notebook identity; the agent then obtains a
+permission-checked bounded briefing through `notebook_read` before its first reply.
+Note bodies stay out of the bootstrap and are retrieved only when relevant. The
+briefing is a tool result in chat history, not a full-vault prompt dump. A user turn
+after a 30-minute gap requests fresh orientation; no background refresh/model calls.
+
+`notebook_read` offers brief/list/search/read, with pagination. `notebook_write`
+offers create/update for recognizable conversation-derived thoughts and meaningful
+work. It uses normal external-directory/edit permissions; plan and delegated agents
+cannot write. Unowned/unavailable contexts have no notebook fallback. Internal
+title/compaction prompts do not receive the notebook bootstrap.
+
+Both tools call `context-notes --context UUID COMMAND`, a JSON-stdin/stdout helper.
+Writes work with Obsidian closed. Updates require the SHA-256 revision from a fresh
+read, use a machine-local writer lock, and check again immediately before atomic
+publication. This is optimistic edit protection, not a cross-device lock. Existing
+note bodies and unrelated YAML are preserved; a delimited Work state section holds
+brief decisions, current state and next action. Phase/history update together;
+Obsidian observes an already-recorded transition without duplicating it.
+
+Example CLI read (the tools handle this automatically):
+
+```sh
+context-notes --context CONTEXT_UUID brief </dev/null
+```
+
+Focused integration checks:
+
+```sh
+python3 -B -m unittest test_context_notes test_notebook -q
+node ../../agents/opencode/notebook/runtime.test.mjs
+NOTEBOOK_NATIVE_TESTS=1 python3 -B -m unittest test_notebook_native -v
+NOTEBOOK_OPENCODE_NATIVE=1 NOTEBOOK_OPENCODE_BINARY=/path/to/native/opencode python3 -B -m unittest test_notebook_opencode -v
+```
+
+Native OpenCode acceptance uses a local scripted OpenAI-compatible endpoint, not
+remote inference. It checks real hook injection, tool schemas/execution and plan
+write rejection. Skill conversation scenarios are in `notebook/evals/evals.json`
+beside the OpenCode skill; those are human-review scenarios, not scored model results.
+
+Focused checks:
+
+```sh
+python3 -B -m unittest test_notebook test_contextctl test_organization -q
+node notebook/test_plugin.cjs
+NOTEBOOK_NATIVE_TESTS=1 python3 -B -m unittest test_notebook_native -v
+```
+
 ## Implementation
 
 `contextctl watch` observes the backend's atomically published JSON snapshot,
@@ -252,8 +335,8 @@ to their originating session rather than whichever context is now active.
 
 Each notebook uses a local, UUID-keyed Electron profile. Window ownership follows
 the process profile (native Wayland ignores the requested custom class), not
-ambiguous titles. A native workspace opens Home on first use; subsequent opens
-preserve Obsidian's saved workspace. No startup URI is needed, avoiding a vault
+ambiguous titles. The notebook plugin opens Kanban after native workspace loading,
+preserving the remaining saved workspace. No startup URI is needed, avoiding a vault
 loading race observed during testing. Existing global Obsidian settings stay
 untouched. Profiles are not synced. Extra processes use more memory than multiple
 vault windows sharing one process.

@@ -261,9 +261,8 @@ def create(name, working_directory=".", locked=False):
             path = notes / ".obsidian" / filename
             if not path.exists():
                 atomic_json(path, value)
-        with (notes / "Home.md").open("x") as stream:
-            stream.write(f"# {directory.name}\n\n## Now\n\n\n## Next\n\n- [ ] \n\n"
-                         "## Working Notes\n\n\n## Return Point\n\n")
+        import notebook
+        notebook.setup(notes)
         data = {"version": 1, "id": str(uuid.uuid4()), "name": directory.name,
                 "working_directory": working_directory, "repositories": []}
         atomic_json(metadata, data)
@@ -455,19 +454,8 @@ def notes(runtime_id=None):
     vault = contained(Path(item["path"]), Path(item["path"]) / ".context/notes")
     if not vault.is_dir():
         raise ContextError(f"Incomplete note vault: {vault}")
-    workspace_file = vault / ".obsidian/workspace.json"
-    if not workspace_file.exists():
-        # Start from native workspace state; startup URI handling races vault loading.
-        initial_note = "Home.md" if (vault / "Home.md").is_file() else None
-        initial_state = ({"type": "markdown", "state": {"file": initial_note, "mode": "source", "source": False}}
-                         if initial_note else {"type": "empty", "state": {}})
-        atomic_json(workspace_file, {
-            "main": {"id": "context-main", "type": "split", "direction": "vertical", "children": [
-                {"id": "context-tabs", "type": "tabs", "children": [
-                    {"id": "context-home", "type": "leaf", "state": initial_state}
-                ]}
-            ]}, "active": "context-home"
-        })
+    import notebook
+    notebook.setup(vault)
     window_class = f"context-notes-{item['id']}"
     for client in clients():
         if note_context(client, [item]) is not None:
@@ -488,6 +476,7 @@ def notes(runtime_id=None):
     vault_state = profile / f"{vault_id}.json"
     if not vault_state.exists():
         atomic_json(vault_state, {})
+    notebook.enable_profile(profile, vault_id)
     spawn(["obsidian", f"--user-data-dir={profile}", f"--class={window_class}"])
 
 
@@ -625,6 +614,7 @@ def main(argv=None):
         command = commands.add_parser(name)
         command.add_argument("--runtime")
     commands.add_parser("watch")
+    commands.add_parser("setup-notebooks")
     command = commands.add_parser("organize")
     actions = command.add_subparsers(dest="action", required=True)
     action = actions.add_parser("create")
@@ -646,6 +636,12 @@ def main(argv=None):
     try:
         if args.command == "watch":
             watch()
+            return 0
+        if args.command == "setup-notebooks":
+            import notebook
+            with mutation_lock():
+                for item in scan():
+                    print(json.dumps(notebook.setup(Path(item["path"]) / ".context/notes", force=True)))
             return 0
         if args.command == "close":
             close_context(args.runtime)

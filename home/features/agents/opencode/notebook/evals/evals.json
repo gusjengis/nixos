@@ -1,0 +1,23 @@
+{
+  "skill_name": "context-notebook",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Let's continue the context-aware dictation work. What did we decide?",
+      "expected_output": "Read bounded briefing and relevant existing dictation note without being asked; explain decisions/next action briefly. No new duplicate card or phase change merely for discussing it.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Go ahead and build the desktop In-Progress widget. It belongs behind application windows, and should switch with the context.",
+      "expected_output": "Reuse matching note or create one recognizable outcome card, move to In-Progress during authorized execution, retain broad scope, and mark Done only after verifying requested behavior. Leave concise return point if incomplete.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "We could eventually show the In-Progress cards in the context organizer too. I'm not asking you to implement that yet. Also I moved dictation back to Thoughts myself.",
+      "expected_output": "Capture distinct agreed preview idea under Thoughts if not already present; preserve user's manual dictation phase; do not promote ideas to tasks or produce an implementation journal. In plan mode perform no writes.",
+      "files": []
+    }
+  ]
+}

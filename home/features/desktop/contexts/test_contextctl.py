@@ -475,7 +475,7 @@ class ContextTests(unittest.TestCase):
             resolved = ctl.find_context(item["id"])
             self.assertEqual(resolved["path"], str(metadata.parent.parent))
             self.assertEqual(resolved["cwd"], str(target))
-            self.assertTrue((metadata.parent / "notes/Home.md").is_file())
+            self.assertTrue((metadata.parent / "notes/Kanban.base").is_file())
             node = next(node for node in ctl.catalog()["nodes"] if node["id"] == item["id"])
             self.assertEqual(node["working_directory"], str(target))
             ctl.terminal("s1" if item == first else "s2")
@@ -514,9 +514,9 @@ class ContextTests(unittest.TestCase):
         ctl.notes("s99")
         self.assertEqual(self.spawn.call_args.args[0], ["obsidian"])
 
-    def test_notes_profile_preserved_and_home_not_overwritten(self):
+    def test_notes_profile_preserved_and_user_note_not_overwritten(self):
         item = self.mapped()
-        note = ctl.root() / "Projects/Alpha/.context/notes/Home.md"
+        note = ctl.root() / "Projects/Alpha/.context/notes/My notes.md"
         note.write_text("User notes\n")
         vault_config = note.parent / ".obsidian/app.json"
         ctl.atomic_json(vault_config, {"user_setting": True})
@@ -534,8 +534,8 @@ class ContextTests(unittest.TestCase):
         self.assertEqual(arguments[-1], f"--class=context-notes-{item['id']}")
         self.assertEqual(note.read_text(), "User notes\n")
         self.assertEqual(ctl.read_json(vault_config), {"user_setting": True})
-        workspace = ctl.read_json(note.parent / ".obsidian/workspace.json")
-        self.assertEqual(workspace["main"]["children"][0]["children"][0]["state"]["state"]["file"], "Home.md")
+        self.assertTrue((note.parent / "Kanban.base").is_file())
+        self.assertIn("context-notebook", ctl.read_json(note.parent / ".obsidian/community-plugins.json"))
         with self.assertRaises(ctl.ContextError):
             ctl.create("Projects/Alpha")
         self.assertEqual(note.read_text(), "User notes\n")
@@ -772,7 +772,7 @@ class ContextTests(unittest.TestCase):
         ctl.rename_context(item["id"], "Beta")
         renamed = ctl.find_context(item["id"])
         self.assertEqual(renamed["name"], "Projects/Beta")
-        self.assertTrue((Path(renamed["path"]) / ".context/notes/Home.md").read_text().startswith("# Alpha\n"))
+        self.assertTrue((Path(renamed["path"]) / ".context/notes/Kanban.base").is_file())
 
     def test_rename_rejects_live_or_descendant_vault(self):
         item = self.mapped()
@@ -810,14 +810,14 @@ class ContextTests(unittest.TestCase):
         with self.assertRaisesRegex(ctl.ContextError, "evaluation failed"):
             ctl.open_context(item["id"])
 
-    def test_renamed_home_does_not_disable_other_contexts(self):
+    def test_renamed_board_does_not_disable_other_contexts(self):
         item = self.mapped("Alpha")
         ctl.create("Beta")
-        home = ctl.root() / "Alpha/.context/notes/Home.md"
-        home.rename(home.with_name("My notes.md"))
+        home = ctl.root() / "Alpha/.context/notes/Kanban.base"
+        home.rename(home.with_name("My board.base"))
         self.assertEqual(len(ctl.publish()["contexts"]), 2)
         ctl.notes("s2")
-        self.assertTrue(home.with_name("My notes.md").exists())
+        self.assertTrue(home.with_name("My board.base").exists())
         self.assertFalse(home.exists())
         self.assertEqual(ctl.find_context(item["id"])["name"], "Alpha")
 

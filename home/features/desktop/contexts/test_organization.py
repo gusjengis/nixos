@@ -84,7 +84,7 @@ class OrganizationTests(unittest.TestCase):
         node = self.nodes()[identifier]
         self.assertEqual(node["breadcrumb"], "Projects / Alpha / Beta")
         self.assertNotEqual(node["path"], str(ctl.root() / "Beta"))
-        self.assertTrue((Path(node["path"]) / ".context/notes/Home.md").exists())
+        self.assertTrue((Path(node["path"]) / ".context/notes/Kanban.base").exists())
         self.assertFalse(ctl.local_state()["mappings"])
 
     def test_missing_parent_is_visible_and_remote_edit_blocks_undo(self):

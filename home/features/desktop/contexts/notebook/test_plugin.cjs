@@ -1,0 +1,30 @@
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const vm = require("node:vm");
+const context = { module: { exports: {} }, require: () => ({ Plugin: class {} }) };
+vm.runInNewContext(fs.readFileSync(`${__dirname}/plugin/main.js`, "utf8"), context);
+const { update, eligible } = context.module.exports.model;
+const facts = now => ({ now, created: "2026-10-24T10:00:00Z", isNew: true });
+const note = {};
+assert.equal(update(note, facts("2026-10-24T10:00:00Z")), true);
+assert.equal(note.status, "Thoughts");
+assert.equal(note.created, "2026-10-24T10:00:00Z");
+assert.equal(note["kanban-history"][0].event, "entered");
+assert.equal(update(note, facts("2026-10-24T10:01:00Z")), false);
+for (const [status, at] of [["Todo", "11:00"], ["In-Progress", "12:00"], ["Todo", "13:00"], ["Done", "14:00"]]) {
+    note.status = status;
+    update(note, facts(`2026-10-24T${at}:00Z`));
+}
+assert.equal(JSON.stringify(note["kanban-history"].map(event => event.status)), JSON.stringify(["Thoughts", "Todo", "In-Progress", "Todo", "Done"]));
+assert.equal(note["kanban-history"][3].at, "2026-10-24T13:00:00Z");
+assert.equal(note.created, "2026-10-24T10:00:00Z");
+const existing = { status: "Outstanding Questions" };
+update(existing, { ...facts("2026-10-24T15:00:00Z"), isNew: false });
+assert.equal(existing.status, "Thoughts");
+assert.equal(existing["kanban-history"][0].event, "observed");
+assert.equal(eligible("Templates/Raw.md"), false);
+assert.equal(eligible(".trash/Old.md"), false);
+assert.equal(eligible("Support.md", { kanban: false }), false);
+assert.equal(eligible("Nested/Card.md"), true);
+assert.throws(() => update({ status: "Unknown" }, facts("now")), /Unknown Kanban/);
+console.log("Plugin defaults, exclusions, repeated transitions, and timestamps passed.");

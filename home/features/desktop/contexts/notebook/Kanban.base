@@ -1,0 +1,25 @@
+filters:
+  and:
+    - file.ext == "md"
+    - '!file.inFolder("Templates")'
+    - '!file.inFolder("Attachments")'
+    - 'kanban != false'
+properties:
+  note.status:
+    displayName: Phase
+  note.created:
+    displayName: Created
+views:
+  - type: kanban
+    name: Kanban
+    groupBy:
+      property: status
+      direction: ASC
+    groupOrder:
+      - Thoughts
+      - Todo
+      - In-Progress
+      - Done
+    order:
+      - file.name
+    columnWidth: 280

@@ -93,6 +93,10 @@ in
       config.lib.file.mkOutOfStoreSymlink "${configRoot}/session-notify/session-notify.js";
     "opencode/plugins/tmux-status.js".source =
       config.lib.file.mkOutOfStoreSymlink "${configRoot}/plugins/tmux-status.js";
+    "opencode/plugins/context-notebook.js".source =
+      config.lib.file.mkOutOfStoreSymlink "${configRoot}/notebook/plugin.js";
+    "opencode/skills/context-notebook".source =
+      config.lib.file.mkOutOfStoreSymlink "${configRoot}/notebook";
     # This guard is intentionally immutable and rebuild-controlled.
     "opencode/plugins/session-policy.js".source = "${sessionPolicy}/guard.js";
     "opencode/tui-plugins/tmux-theme.js".source =
