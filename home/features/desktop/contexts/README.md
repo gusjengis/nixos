@@ -290,6 +290,25 @@ note bodies and unrelated YAML are preserved; a delimited Work state section hol
 brief decisions, current state and next action. Phase/history update together;
 Obsidian observes an already-recorded transition without duplicating it.
 
+The right-side QuickShell desktop widget displays the active saved context's
+In-Progress cards followed by Todo cards, refreshing every five seconds.
+`Super+Shift+K` toggles it; visibility survives QuickShell reloads. It lives on the bottom layer,
+reserves no workspace space, and can be covered by applications or fullscreen.
+Long lists scroll; runtime-only sessions show no widget. Ownership comes from
+`DesktopSessions.contextCatalog.active_context`, never the working directory.
+Card clicks use `context-notes --context UUID open` with a JSON `path`, targeting
+that context's isolated Obsidian profile and revealing its notes workspace.
+Stale clicks after a context switch are rejected. Appearance and reader live in
+`quickshell/config/InProgressWidget.qml` and `InProgressModel.qml`; native reader
+acceptance is `python3 -B -m unittest test_in_progress -q` from `quickshell/`,
+using a Python environment with PyYAML.
+
+The compositor's general `no_workspace_blur` layer rule exempts this widget from
+both workspace and special-workspace blur. Config feature-detects support so
+older running compositors can reload safely; a new compositor binary takes
+effect after restarting Hyprland. The feature branch is
+`feat/layer-workspace-blur-exemption`, merged into the fork's `personal` branch.
+
 Example CLI read (the tools handle this automatically):
 
 ```sh

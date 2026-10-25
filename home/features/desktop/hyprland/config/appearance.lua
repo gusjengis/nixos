@@ -86,6 +86,15 @@ hl.layer_rule({
 	animation = "fade",
 })
 
+-- Older running compositors can reload this config before the new binary starts.
+if hl.supports_layer_rule_effect and hl.supports_layer_rule_effect("no_workspace_blur") then
+	hl.layer_rule({
+		name = "context-work-widget-sharp",
+		match = { namespace = "^quickshell-in-progress$" },
+		no_workspace_blur = true,
+	})
+end
+
 hl.layer_rule({
 	name = "quickshell-popup-blur",
 	match = { namespace = "^quickshell-bar$" },

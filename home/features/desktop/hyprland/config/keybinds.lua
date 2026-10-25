@@ -42,6 +42,7 @@ bind("SUPER + F", hl.dsp.exec_cmd("contextctl files"), "Launch Context File Mana
 bind("SUPER + V", hl.dsp.window.float(), "Toggle Floating")
 bind("SUPER + W", hl.dsp.exec_cmd("qs ipc call wallpaper toggle"), "Wallpaper Picker")
 bind("SUPER + R", hl.dsp.exec_cmd("qs ipc call bar toggle"), "Toggle Status Bar")
+bind("SUPER + SHIFT + K", hl.dsp.exec_cmd("qs ipc call contextWork toggle"), "Toggle Context Work Widget")
 bind("SUPER + J", hl.dsp.layout("togglesplit"), "Rotate Split")
 
 -- Every dictation release also tells the capture popup recording has stopped
@@ -105,9 +106,21 @@ for workspace = 1, 10 do
 	end, "Move to Workspace " .. workspace)
 end
 
-bind("SUPER + CTRL + ALT + SHIFT + E", hl.dsp.exec_cmd("context-checkpoint save --reason compositor-exit && hyprctl dispatch exit"), "Exit Hyprland")
-bind("SUPER + CTRL + ALT + SHIFT + S", hl.dsp.exec_cmd("context-checkpoint save --reason shutdown && alga power off && systemctl poweroff"), "Shutdown")
-bind("SUPER + CTRL + ALT + SHIFT + R", hl.dsp.exec_cmd("context-checkpoint save --reason shutdown && systemctl reboot"), "Restart")
+bind(
+	"SUPER + CTRL + ALT + SHIFT + E",
+	hl.dsp.exec_cmd("context-checkpoint save --reason compositor-exit && hyprctl dispatch exit"),
+	"Exit Hyprland"
+)
+bind(
+	"SUPER + CTRL + ALT + SHIFT + S",
+	hl.dsp.exec_cmd("context-checkpoint save --reason shutdown && alga power off && systemctl poweroff"),
+	"Shutdown"
+)
+bind(
+	"SUPER + CTRL + ALT + SHIFT + R",
+	hl.dsp.exec_cmd("context-checkpoint save --reason shutdown && systemctl reboot"),
+	"Restart"
+)
 
 bind("SUPER + mouse:272", hl.dsp.window.drag(), "Move Window", { mouse = true })
 bind("SUPER + mouse:273", hl.dsp.window.resize(), "Resize Window", { mouse = true })

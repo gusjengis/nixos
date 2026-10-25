@@ -20,6 +20,8 @@ ShellRoot {
         openLauncher: () => Quickshell.execDetached(["vicinae", "toggle"])
     }
 
+    InProgressWidget {}
+
     IpcHandler {
         target: "sessions"
         function toggle(): void { contextOrganizer.visible = false; sessionPicker.toggle(false); }
