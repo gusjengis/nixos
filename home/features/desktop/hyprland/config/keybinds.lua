@@ -17,7 +17,7 @@ end
 bind("SUPER + SPACE", hl.dsp.exec_cmd("vicinae toggle"), "App Launcher")
 bind("SUPER + CTRL + SPACE", hl.dsp.exec_cmd("qs ipc call launcher remote"), "Remote Launcher")
 bind("SUPER + SHIFT + T", hl.dsp.exec_cmd("qs ipc call launcher tools"), "Tools Launcher")
-bind("SUPER + Q", hl.dsp.exec_cmd("contextctl terminal"), "Launch Context Terminal")
+bind("SUPER + Q", hl.dsp.exec_cmd(vars.terminal), "Launch Terminal")
 bind("SUPER + B", hl.dsp.exec_cmd(vars.browser), "Launch Browser")
 bind("SUPER + Z", hl.dsp.exec_cmd("qs ipc call sessions toggle"), "Open Desktop Sessions")
 bind("SUPER + SHIFT + Z", hl.dsp.exec_cmd("qs ipc call sessions dispensary"), "Session Dispensary")
