@@ -10,7 +10,7 @@ let
   featureDir = "${repoRoot}/home/features/applications/handy";
 in
 {
-  config = lib.mkIf config.desktopEnv.enable {
+  config = lib.mkIf (config.desktopEnv.enable && config.personalDesktop.enable) {
     home.packages = [ pkgs.handy ];
 
     # Only the settings file is versioned. The rest of

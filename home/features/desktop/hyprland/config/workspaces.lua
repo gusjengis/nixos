@@ -1,4 +1,9 @@
 local vars = require("platform-variables")
+local features = require("desktop-features")
+if not features.contexts then
+	-- Plain Hyprland workspaces need no saved-context manager.
+	return
+end
 local sessions = require("sessions")
 
 local workspaces = {
@@ -18,8 +23,12 @@ local workspaces = {
 	-- { name = "slack", key = "S", description = "Slack", command = vars.slack },
 	{ name = "discord", key = "D", description = "Discord", command = vars.discord },
 	{
-		name = "notes", key = "N", description = "Context Notes",
-		command = function(id) return "contextctl notes --runtime " .. id end,
+		name = "notes",
+		key = "N",
+		description = "Context Notes",
+		command = function(id)
+			return "contextctl notes --runtime " .. id
+		end,
 	},
 	{ name = "music", key = "Q", description = "Music", command = vars.music, shift = true, global = true },
 	{

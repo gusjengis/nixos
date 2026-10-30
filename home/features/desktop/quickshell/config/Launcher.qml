@@ -229,7 +229,8 @@ PanelWindow {
             process.running = true;
             visible = false;
         } else if (result.kind === "app") {
-            Quickshell.execDetached(["quickshell-search", "record-app", result.usageKey]);
+            if (DesktopFeatures.development)
+                Quickshell.execDetached(["quickshell-search", "record-app", result.usageKey]);
             result.target.execute();
             visible = false;
         } else if (result.kind === "project") {
@@ -239,7 +240,10 @@ PanelWindow {
             Quickshell.execDetached(command);
             visible = false;
         } else if (result.kind === "web") {
-            Quickshell.execDetached(["quickshell-search", "web", result.query]);
+            if (DesktopFeatures.contexts && DesktopFeatures.development)
+                Quickshell.execDetached(["quickshell-search", "web", result.query]);
+            else
+                Quickshell.execDetached(["chromium", "--new-tab", "https://www.google.com/search?q=" + encodeURIComponent(result.query)]);
             visible = false;
         } else if (result.kind === "tool") {
             if (result.target.instantClose) {
@@ -263,7 +267,7 @@ PanelWindow {
         projectResults = [];
         pendingProjectResults = [];
         providerError = "";
-        if (!visible || mode !== "local")
+        if (!DesktopFeatures.development || !DesktopFeatures.contexts || !visible || mode !== "local")
             return;
         projectSearch = searchProcessComponent.createObject(launcher, {
             "launcher": launcher,

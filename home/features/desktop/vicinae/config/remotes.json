@@ -1,0 +1,6 @@
+{
+  "escape_key_behavior": "close_window",
+  "pop_on_backspace": false,
+  "input_server": { "enabled": false },
+  "global_shortcuts": { "toggle": "" }
+}

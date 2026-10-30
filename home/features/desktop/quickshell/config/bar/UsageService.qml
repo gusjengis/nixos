@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "../state"
 
 Scope {
     id: service
@@ -17,6 +18,7 @@ Scope {
     property bool refreshPending: false
 
     function refresh() {
+        if (!DesktopFeatures.development) return;
         if (!request.running) {
             request.running = true;
         } else {
@@ -25,6 +27,7 @@ Scope {
     }
 
     function account(profile, saved) {
+        if (!DesktopFeatures.development) return;
         if (accountRequest.running)
             return;
         accountError = "";
@@ -75,7 +78,7 @@ Scope {
         // restart was enough to earn HTTP 429.
         interval: 900000
         repeat: true
-        running: true
+        running: DesktopFeatures.development
         triggeredOnStart: true
         onTriggered: service.refresh()
     }

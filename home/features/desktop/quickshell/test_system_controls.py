@@ -30,6 +30,52 @@ class NmcliParsingTests(unittest.TestCase):
         self.assertEqual(networks[1]["signal"], 72)
 
 
+class ActiveNetworkTests(unittest.TestCase):
+    def test_primary_connection_selects_wired_or_wireless(self):
+        # The primary connection wins even when another device has carrier,
+        # another Wi-Fi connection is associated, or Tailscale is also active.
+        for connection_type, expected in (
+            ("802-3-ethernet", "ethernet"),
+            ("802-11-wireless", "wifi"),
+            ("tun", None),
+            ("bridge", None),
+        ):
+            with self.subTest(connection_type=connection_type), patch.object(
+                controls, "run", side_effect=[
+                    '{"type":"o","data":"/org/freedesktop/NetworkManager/ActiveConnection/7"}',
+                    controls.json.dumps({"type": "s", "data": connection_type}),
+                ],
+            ) as run:
+                self.assertEqual(controls.active_network_type(), expected)
+                self.assertEqual(run.call_args.args[0][-3:], [
+                    "/org/freedesktop/NetworkManager/ActiveConnection/7",
+                    "org.freedesktop.NetworkManager.Connection.Active", "Type",
+                ])
+
+    def test_no_primary_connection_is_disconnected(self):
+        with patch.object(controls, "run", return_value='{"type":"o","data":"/"}') as run:
+            self.assertIsNone(controls.active_network_type())
+        self.assertEqual(run.call_count, 1)
+
+    def test_wired_state_works_with_wifi_off(self):
+        with patch.object(controls, "active_network_type", return_value="ethernet"), patch.object(
+            controls, "run", return_value="disabled\n",
+        ):
+            state = controls.wifi_state()
+        self.assertEqual(state["activeType"], "ethernet")
+        self.assertFalse(state["enabled"])
+        self.assertIsNone(state["connected"])
+
+    def test_primary_lookup_failure_preserves_wifi_controls(self):
+        with patch.object(controls, "active_network_type", side_effect=RuntimeError("lookup failed")), patch.object(
+            controls, "run", side_effect=["enabled\n", "*:Office:82:WPA2\n"],
+        ):
+            state = controls.wifi_state()
+        self.assertIsNone(state["activeType"])
+        self.assertEqual(state["connected"], {"ssid": "Office", "signal": 82})
+        self.assertEqual(state["error"], "lookup failed")
+
+
 class SafetyTests(unittest.TestCase):
     def test_rejects_non_mac_bluetooth_address_without_subprocess(self):
         with patch.object(controls, "run") as run:

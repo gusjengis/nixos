@@ -90,7 +90,10 @@
         fi
 
 
-        TS_AUTHKEY="$TAILSCALE_AUTH_KEY" ${tailscale}/bin/tailscale up --reset \
+        # TS_AUTHKEY is a container entrypoint convention, not a CLI option.
+        # Read through stdin so the key never appears in argv or the Nix store.
+        printf '%s' "$TAILSCALE_AUTH_KEY" | ${tailscale}/bin/tailscale up --reset \
+          --auth-key=file:/dev/stdin --timeout=30s \
           --hostname=${lib.escapeShellArg hostName} --accept-routes=true ${lib.escapeShellArgs config.services.tailscale.extraSetFlags}
         # --ssh --accept-dns=true
       '';

@@ -1,12 +1,14 @@
 local vars = require("platform-variables")
-local sessions = require("sessions")
+local features = require("desktop-features")
+local sessions = features.contexts and require("sessions") or nil
 local home = os.getenv("HOME")
 local repo = os.getenv("NIXOS_CONFIG_ROOT") or "/etc/nixos"
+local register_bind = features.rdp_keymap and require("rdp-keybinds").bind or hl.bind
 
 local function bind(keys, dispatcher, description, flags)
 	flags = flags or {}
 	flags.description = description
-	hl.bind(keys, dispatcher, flags)
+	register_bind(keys, dispatcher, flags)
 end
 
 local function preserve_quickshell_focus(command)
@@ -14,16 +16,18 @@ local function preserve_quickshell_focus(command)
 end
 
 -- bind("SUPER + SPACE", hl.dsp.exec_cmd("qs ipc call launcher toggle"), "App Launcher")
-bind("SUPER + SPACE", hl.dsp.exec_cmd("vicinae toggle"), "App Launcher")
-bind("SUPER + CTRL + SPACE", hl.dsp.exec_cmd("qs ipc call launcher remote"), "Remote Launcher")
+bind("SUPER + SPACE", hl.dsp.exec_cmd(features.remoteLauncher and "conference-remotes" or "vicinae toggle"), "App Launcher")
+bind("SUPER + CTRL + SPACE", hl.dsp.exec_cmd(features.remoteLauncher and "conference-remotes" or "qs ipc call launcher remote"), "Remote Launcher")
 bind("SUPER + SHIFT + T", hl.dsp.exec_cmd("qs ipc call launcher tools"), "Tools Launcher")
 bind("SUPER + Q", hl.dsp.exec_cmd(vars.terminal), "Launch Terminal")
 bind("SUPER + B", hl.dsp.exec_cmd(vars.browser), "Launch Browser")
-bind("SUPER + Z", hl.dsp.exec_cmd("qs ipc call sessions toggle"), "Open Desktop Sessions")
-bind("SUPER + SHIFT + Z", hl.dsp.exec_cmd("qs ipc call sessions dispensary"), "Session Dispensary")
-bind("SUPER + CTRL + grave", function()
-	sessions.previous()
-end, "Previous Desktop Session")
+if features.contexts then
+	bind("SUPER + Z", hl.dsp.exec_cmd("qs ipc call sessions toggle"), "Open Desktop Sessions")
+	bind("SUPER + SHIFT + Z", hl.dsp.exec_cmd("qs ipc call sessions dispensary"), "Session Dispensary")
+	bind("SUPER + CTRL + grave", function()
+		sessions.previous()
+	end, "Previous Desktop Session")
+end
 bind("ALT + F4", hl.dsp.window.close(), "Close Program")
 bind("SUPER + F11", function()
 	local window = hl.get_active_window()
@@ -38,29 +42,33 @@ bind("SUPER + F11", function()
 		hl.dispatch(hl.dsp.window.fullscreen())
 	end
 end, "Fullscreen")
-bind("SUPER + F", hl.dsp.exec_cmd("contextctl files"), "Launch Context File Manager")
+bind("SUPER + F", hl.dsp.exec_cmd(features.contexts and "contextctl files" or vars.fileManager), "Launch File Manager")
 bind("SUPER + V", hl.dsp.window.float(), "Toggle Floating")
 bind("SUPER + W", hl.dsp.exec_cmd("qs ipc call wallpaper toggle"), "Wallpaper Picker")
 bind("SUPER + R", hl.dsp.exec_cmd("qs ipc call bar toggle"), "Toggle Status Bar")
-bind("SUPER + SHIFT + K", hl.dsp.exec_cmd("qs ipc call contextWork toggle"), "Toggle Context Work Widget")
+if features.contexts then
+	bind("SUPER + SHIFT + K", hl.dsp.exec_cmd("qs ipc call contextWork toggle"), "Toggle Context Work Widget")
+end
 bind("SUPER + J", hl.dsp.layout("togglesplit"), "Rotate Split")
 
 -- Every dictation release also tells the capture popup recording has stopped
 -- (a no-op when it is closed), so letting go of CTRL before the key still
 -- completes a capture.
-local stop_dictation = "handy --toggle-transcription; qs ipc call capture released"
+if features.personal then
+	local stop_dictation = "handy --toggle-transcription; qs ipc call capture released"
 
-bind("code:202", hl.dsp.exec_cmd("handy --toggle-transcription"), "Dictate")
-hl.bind("code:202", hl.dsp.exec_cmd(stop_dictation), { release = true })
--- Hold to dictate straight into a new Obsidian note (vault Raw/ folder).
-bind(
-	"CTRL + code:202",
-	hl.dsp.exec_cmd("qs ipc call capture open & handy --toggle-transcription"),
-	"Dictate to Obsidian"
-)
-hl.bind("CTRL + code:202", hl.dsp.exec_cmd(stop_dictation), { release = true })
-bind("XF86AudioMicMute", hl.dsp.exec_cmd("handy --toggle-transcription"), "Dictate")
-hl.bind("XF86AudioMicMute", hl.dsp.exec_cmd("handy --toggle-transcription"), { release = true })
+	bind("code:202", hl.dsp.exec_cmd("handy --toggle-transcription"), "Dictate")
+	hl.bind("code:202", hl.dsp.exec_cmd(stop_dictation), { release = true })
+	-- Hold to dictate straight into a new Obsidian note (vault Raw/ folder).
+	bind(
+		"CTRL + code:202",
+		hl.dsp.exec_cmd("qs ipc call capture open & handy --toggle-transcription"),
+		"Dictate to Obsidian"
+	)
+	hl.bind("CTRL + code:202", hl.dsp.exec_cmd(stop_dictation), { release = true })
+	bind("XF86AudioMicMute", hl.dsp.exec_cmd("handy --toggle-transcription"), "Dictate")
+	hl.bind("XF86AudioMicMute", hl.dsp.exec_cmd("handy --toggle-transcription"), { release = true })
+end
 
 bind(
 	"SUPER + SHIFT + S",
@@ -94,33 +102,42 @@ for _, direction in ipairs({ "left", "right", "up", "down" }) do
 	)
 end
 
-hl.bind("SUPER + SHIFT + P", hl.dsp.window.pin({ action = "enable" }))
+register_bind("SUPER + SHIFT + P", hl.dsp.window.pin({ action = "enable" }))
 
 for workspace = 1, 10 do
 	local key = workspace % 10
 	bind("SUPER + " .. key, function()
-		sessions.select_workspace(workspace)
+		if features.contexts then
+			sessions.select_workspace(workspace)
+		else
+			hl.get_active_monitor():set_workspace(tostring(workspace))
+		end
 	end, "Workspace " .. workspace)
 	bind("SUPER + SHIFT + " .. key, function()
-		sessions.move_window(workspace)
+		if features.contexts then
+			sessions.move_window(workspace)
+		else
+			hl.dispatch(hl.dsp.window.move({ workspace = tostring(workspace) }))
+		end
 	end, "Move to Workspace " .. workspace)
 end
 
+local checkpoint = features.contexts and "context-checkpoint save --reason shutdown && " or ""
 bind(
 	"SUPER + CTRL + ALT + SHIFT + E",
-	hl.dsp.exec_cmd("context-checkpoint save --reason compositor-exit && hyprctl dispatch exit"),
+	hl.dsp.exec_cmd(
+		(features.contexts and "context-checkpoint save --reason compositor-exit && " or "") .. "hyprctl dispatch exit"
+	),
 	"Exit Hyprland"
 )
 bind(
 	"SUPER + CTRL + ALT + SHIFT + S",
-	hl.dsp.exec_cmd("context-checkpoint save --reason shutdown && alga power off && systemctl poweroff"),
+	hl.dsp.exec_cmd(
+		features.contexts and (checkpoint .. "alga power off && systemctl poweroff") or "systemctl poweroff"
+	),
 	"Shutdown"
 )
-bind(
-	"SUPER + CTRL + ALT + SHIFT + R",
-	hl.dsp.exec_cmd("context-checkpoint save --reason shutdown && systemctl reboot"),
-	"Restart"
-)
+bind("SUPER + CTRL + ALT + SHIFT + R", hl.dsp.exec_cmd(checkpoint .. "systemctl reboot"), "Restart")
 
 bind("SUPER + mouse:272", hl.dsp.window.drag(), "Move Window", { mouse = true })
 bind("SUPER + mouse:273", hl.dsp.window.resize(), "Resize Window", { mouse = true })

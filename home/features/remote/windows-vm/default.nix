@@ -2,11 +2,16 @@
   config,
   lib,
   pkgs,
+  repoRoot,
   ...
 }:
 
 let
   cfg = config.windowsVm;
+  # Nixpkgs leaves the MS-RDPECAM client disabled by default.
+  rdpClient = pkgs.freerdp.overrideAttrs (old: {
+    cmakeFlags = (old.cmakeFlags or [ ]) ++ [ "-DCHANNEL_RDPECAM_CLIENT=ON" ];
+  });
   windowsIcon = pkgs.runCommand "windows-logo.png" { nativeBuildInputs = [ pkgs.imagemagick ]; } ''
     magick ${./windows-logo.webp} -resize 256x256 $out
   '';
@@ -22,6 +27,7 @@ let
       "/u:${user}"
     ]
     ++ lib.optional (domain != "") "/d:${domain}"
+    ++ lib.optional cfg.fullscreen "/f"
     ++ [
       "/cert:tofu"
       "/sec:nla"
@@ -44,13 +50,14 @@ let
       user,
       domain,
       credentialsFile,
+      extraArgs ? [ ],
       extraRuntimeInputs ? [ ],
       prelude ? "",
     }:
     pkgs.writeShellApplication {
       inherit name;
       runtimeInputs = [
-        pkgs.freerdp
+        rdpClient
         pkgs.libnotify
       ]
       ++ extraRuntimeInputs;
@@ -77,20 +84,27 @@ let
 
         exec 3< <(
           printf '%s\n' ${
-            lib.escapeShellArgs (rdpArgs {
-              inherit address user domain;
-            })
+            lib.escapeShellArgs (
+              (rdpArgs {
+                inherit address user domain;
+              })
+              ++ extraArgs
+            )
           }
           printf '/p:%s\n' "$password"
         )
         unset password
-        exec ${lib.getExe' pkgs.freerdp "xfreerdp"} /args-from:fd:3
+        exec ${lib.getExe' rdpClient "xfreerdp"} /args-from:fd:3
       '';
     };
 
   windowsRdp = mkRdpLauncher {
     name = "windows-rdp";
     title = "Windows RDP";
+    extraArgs = [
+      "/dvc:rdpecam"
+      "/microphone:sys:pulse"
+    ];
     inherit (cfg)
       address
       user
@@ -162,11 +176,34 @@ let
   };
 
   launchers = [ windowsRdp ] ++ lib.optional cfg.og.enable ogRdp;
+  csvOptions = pkgs.writeText "conference-rdp-options.json" (builtins.toJSON (
+    lib.drop 2 (rdpArgs { address = ""; user = ""; domain = ""; })
+    ++ [ "/dvc:rdpecam" "/microphone:sys:pulse" ]
+  ));
+  csvRdp = pkgs.writeShellApplication {
+    name = "conference-rdp";
+    runtimeInputs = [ pkgs.python3 rdpClient pkgs.libnotify ];
+    text = ''
+      exec python3 "${repoRoot}/home/features/remote/windows-vm/csv-rdp.py" \
+        ${lib.escapeShellArg cfg.remotesFile} ${csvOptions} "$@"
+    '';
+  };
 in
 {
   options.windowsVm = {
     enable = lib.mkEnableOption "RDP launcher for the Windows VM" // {
       default = true;
+    };
+    fullscreen = lib.mkEnableOption "start RDP launchers in fullscreen";
+    displayName = lib.mkOption {
+      type = lib.types.str;
+      default = "Windows 11";
+      description = "Display name of the Windows RDP launcher";
+    };
+    remotesFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = "Runtime-only secret CSV with name, ip, domain_user, and password columns";
     };
     user = lib.mkOption {
       type = lib.types.str;
@@ -237,14 +274,15 @@ in
   };
 
   config = lib.mkIf (cfg.enable && config.desktopEnv.enable) {
-    home.packages = [ pkgs.freerdp ] ++ launchers;
+    home.packages = [ rdpClient ] ++ launchers
+      ++ lib.optional (cfg.remotesFile != null) csvRdp;
 
     xdg.dataFile."icons/hicolor/256x256/apps/windows-logo.png".source = windowsIcon;
 
     xdg.dataFile."applications/windows-vm.desktop".text = ''
       [Desktop Entry]
       Type=Application
-      Name=Windows 11
+      Name=${cfg.displayName}
       Comment=Connect to TrevorNomad over RDP
       Exec=${lib.getExe windowsRdp}
       Icon=windows-logo

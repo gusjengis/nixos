@@ -1,6 +1,7 @@
 {
   config,
   pkgs,
+  lib,
   repoRoot,
   ...
 }:
@@ -30,12 +31,14 @@ in
   nixpkgs.overlays = [ (final: prev: { tmux = import ./package.nix { pkgs = prev; }; }) ];
   home.packages = [
     pkgs.tmux
-    createTmuxSession
     taCmd
-  ];
+  ]
+  ++ lib.optional (config.dev.enable || config.desktopContexts.enable) createTmuxSession;
 
   xdg.configFile = {
-    "tmux/tmux.conf".source = config.lib.file.mkOutOfStoreSymlink "${configRoot}/tmux.conf";
+    "tmux/tmux.conf".source = config.lib.file.mkOutOfStoreSymlink (
+      if config.desktopContexts.enable then "${configRoot}/tmux.conf" else "${configRoot}/tmux-basic.conf"
+    );
     "tmux/github_dark.tmux".source =
       config.lib.file.mkOutOfStoreSymlink "${configRoot}/github_dark.tmux";
     "tmux/plugins".source = config.lib.file.mkOutOfStoreSymlink "${configRoot}/plugins";

@@ -67,7 +67,7 @@ let
 
 in
 {
-  config = lib.mkIf config.desktopEnv.enable {
+  config = lib.mkIf (config.desktopEnv.enable && config.personalDesktop.enable) {
     home.packages = [
       pkgs.obsidian
       captureNote
