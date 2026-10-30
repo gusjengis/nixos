@@ -24,6 +24,7 @@ PanelWindow {
     // (and Notification Center itself) whenever a banner came or went.
     visible: focusedScreen
     readonly property bool showing: popups.length > 0 && !notificationService.centerOpen
+        && !notificationService.doNotDisturb
     implicitWidth: 372 + overhang
     implicitHeight: cards.implicitHeight + overhang
     color: "transparent"

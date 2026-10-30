@@ -111,9 +111,17 @@ pinned Hyprland source and use that patched compositor's installed headers.
   glass islands. This eliminates independent-window Control Center presentation
   stagger. Rectangles beyond the body bounds are skipped for optional rows.
 - QuickShell reserves 80px for dropdown shadows. Main Control Center has 140x64
-  connectivity capsules, 140x140 media tile, and 292x64 slider platters at radius
+  connectivity capsules, 140x140 media tile, and 292x64 Focus/slider platters at radius
   32 on one grouped surface. Transparent controller remains excluded from glass;
   fixed detail surface avoids changing namespace on an already-mapped window.
+- Do Not Disturb uses the Golden Gate Focus control's crescent, white active
+  circle and purple accent; its active menu-bar indicator is a plain crescent.
+  References: Apple's [Control Center image](https://ipcdn-web.apple.com/assets/v2/web/a973038b-6700-4b72-8c34-87834987bdd6)
+  and [enabled Focus/menu-bar image](https://ipcdn-web.apple.com/assets/v2/web/8fa5393c-b12e-483a-b3c0-420d53c65d42)
+  from the macOS 27 guides. The toggle suppresses every notification urgency,
+  retaining non-transient history without replaying banners when disabled.
+  State survives QuickShell hot reloads; a fresh process starts with DND off.
+  Verify: `python3 -B -m unittest test_notifications -v` from `quickshell/`.
 - `mac_profile="control"` selects independent endpoint-constrained tone/blur:
   black/white interiors about 32/186 across measured tints, unlike Spotlight.
   Intermediate luma/chroma and shadows remain approximate, not complete fits.

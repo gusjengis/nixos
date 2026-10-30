@@ -14,6 +14,7 @@ Rectangle {
     id: root
 
     required property var controls
+    required property var notificationService
     required property Item popupAnchor
     readonly property bool popupVisible: popup.visible
 
@@ -89,6 +90,7 @@ Rectangle {
         property bool on
         property string symbol: ""
         property string glyph: ""
+        property color activeColor: "#007aff"
         signal toggled()
         signal opened()
 
@@ -106,14 +108,14 @@ Rectangle {
                 visible: row.symbol !== ""
                 symbol: row.symbol
                 size: 18
-                color: row.on ? "#007aff" : "#ffffff"
+                color: row.on ? row.activeColor : "#ffffff"
             }
 
             Text {
                 anchors.centerIn: parent
                 visible: row.glyph !== ""
                 text: row.glyph
-                color: row.on ? "#007aff" : "#ffffff"
+                color: row.on ? row.activeColor : "#ffffff"
                 font { family: Theme.iconFontFamily; pixelSize: 20 }
             }
 
@@ -262,7 +264,7 @@ Rectangle {
             - popupWidth - 14
         popupY: Theme.barPopupY(anchorItem) + 11
         popupWidth: 292
-        popupHeight: root.controls.brightness.available ? 292 : 216
+        popupHeight: root.controls.brightness.available ? 368 : 292
     }
 
     GuardedPopupWindow {
@@ -414,6 +416,28 @@ Rectangle {
                             }
                         }
                     }
+                }
+            }
+
+            Module {
+                id: focusModule
+                Layout.fillWidth: true
+                implicitHeight: 64
+                Accessible.role: Accessible.CheckBox
+                Accessible.name: "Do Not Disturb"
+                Accessible.checkable: true
+                Accessible.checked: root.notificationService.doNotDisturb
+                Accessible.onToggleAction: root.notificationService.doNotDisturb = !root.notificationService.doNotDisturb
+
+                ToggleRow {
+                    anchors { left: parent.left; right: parent.right; verticalCenter: parent.verticalCenter; margins: 14 }
+                    title: "Do Not Disturb"
+                    subtitle: root.notificationService.doNotDisturb ? "On" : "Off"
+                    symbol: "moon.fill"
+                    activeColor: "#7875ff"
+                    on: root.notificationService.doNotDisturb
+                    onToggled: root.notificationService.doNotDisturb = !root.notificationService.doNotDisturb
+                    onOpened: root.notificationService.doNotDisturb = !root.notificationService.doNotDisturb
                 }
             }
 

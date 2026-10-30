@@ -4,6 +4,7 @@ import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Wayland
 import "../theme"
+import "../widgets"
 import "components"
 
 PanelWindow {
@@ -147,9 +148,34 @@ PanelWindow {
             Spotlight {
                 onActivated: bar.openLauncher()
             }
+            Rectangle {
+                visible: bar.notificationService.doNotDisturb
+                implicitWidth: 30
+                implicitHeight: Theme.barItemHeight
+                radius: height / 2
+                color: dndMouse.containsMouse ? Theme.barHoverFill : "transparent"
+                Accessible.role: Accessible.Button
+                Accessible.name: "Do Not Disturb on. Turn off"
+                Accessible.onPressAction: bar.notificationService.doNotDisturb = false
+
+                SFSymbol {
+                    anchors.centerIn: parent
+                    symbol: "moon.fill"
+                    size: 16
+                    color: Theme.barText
+                }
+
+                MouseArea {
+                    id: dndMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    onClicked: bar.notificationService.doNotDisturb = false
+                }
+            }
             ControlCenter {
                 id: controlCenter
                 controls: bar.systemControls
+                notificationService: bar.notificationService
                 popupAnchor: barArea
             }
             Clock {
