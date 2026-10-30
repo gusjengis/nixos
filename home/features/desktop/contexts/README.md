@@ -5,6 +5,22 @@ runtime module owns live workspaces/windows and exposes remembered logical views
 Notebook, synchronization, checkpoint and startup policy live in the personal
 context layer rather than the reusable backend.
 
+## Module selection
+
+`desktopContexts.enable` defaults to `true`. Set it to `false` in a Home Manager
+host module to use ordinary Hyprland workspaces without this persistence layer.
+This disables context packages/services/timers, session initialization and
+shortcuts, context-aware Git, tmux checkpoint hooks, and the Quickshell session
+picker, organizer, and work widget. Quickshell does not load those surfaces or
+watch their runtime state while disabled. Hyprland and numbered workspaces stay
+enabled; existing context directories and notes are not deleted.
+
+Home Manager materializes this choice into Hyprland's `host-features.lua` and
+Quickshell's `features.json`; neither frontend chooses behavior by hostname.
+`personalDesktop.enable` independently selects personal apps/integrations, while
+`dev.enable` selects coding agents, development tools, and development repo sync.
+Neovim, lazygit, and tmux remain core utilities with development disabled.
+
 ## Use
 
 - `Super+Z`: switch between open runtime sessions only. Enter switches; unmatched

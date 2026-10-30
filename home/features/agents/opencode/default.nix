@@ -51,111 +51,113 @@ let
   };
 in
 {
-  # Pinned to the upstream flake rather than pkgs.opencode, which trails behind.
-  # The tag lives in flake.nix; bump it there.
-  home.packages = [
-    contextPackages.launcher
-    contextPackages.chats
-    sessionNotify
-    supernoteMcp
-    sessionCapture
-  ];
+  config = lib.mkIf config.dev.enable {
+    # Pinned to the upstream flake rather than pkgs.opencode, which trails behind.
+    # The tag lives in flake.nix; bump it there.
+    home.packages = [
+      contextPackages.launcher
+      contextPackages.chats
+      sessionNotify
+      supernoteMcp
+      sessionCapture
+    ];
 
-  programs.bash.shellAliases.oc = "opencode";
+    programs.bash.shellAliases.oc = "opencode";
 
-  systemd.user.services.opencode-session-capture = lib.mkIf (hostName != "omega") {
-    Unit = {
-      Description = "Pool sanitized OpenCode transcripts into Obsidian";
-      ConditionPathIsDirectory = "${config.home.homeDirectory}/Documents/Obsidian/Notes";
+    systemd.user.services.opencode-session-capture = lib.mkIf (hostName != "omega") {
+      Unit = {
+        Description = "Pool sanitized OpenCode transcripts into Obsidian";
+        ConditionPathIsDirectory = "${config.home.homeDirectory}/Documents/Obsidian/Notes";
+      };
+      Service = {
+        Type = "oneshot";
+        ExecStart = lib.getExe sessionCapture;
+        UMask = "0077";
+      };
     };
-    Service = {
-      Type = "oneshot";
-      ExecStart = lib.getExe sessionCapture;
-      UMask = "0077";
+    systemd.user.timers.opencode-session-capture = lib.mkIf (hostName != "omega") {
+      Unit.Description = "Capture OpenCode sessions periodically";
+      Timer = {
+        OnBootSec = "5min";
+        OnUnitInactiveSec = "5min";
+      };
+      Install.WantedBy = [ "timers.target" ];
     };
-  };
-  systemd.user.timers.opencode-session-capture = lib.mkIf (hostName != "omega") {
-    Unit.Description = "Capture OpenCode sessions periodically";
-    Timer = {
-      OnBootSec = "5min";
-      OnUnitInactiveSec = "5min";
+
+    # Settings and plugins are linked back into this repository so edits apply on
+    # the next OpenCode start, and so state OpenCode writes itself (recent models,
+    # UI preferences) is versioned and synced to other machines.
+    xdg.configFile = {
+      "opencode/opencode.json".source = config.lib.file.mkOutOfStoreSymlink "${configRoot}/opencode.json";
+      "opencode/tui.json".source = config.lib.file.mkOutOfStoreSymlink "${configRoot}/tui.json";
+      "opencode/plugins/session-notify.js".source =
+        config.lib.file.mkOutOfStoreSymlink "${configRoot}/session-notify/session-notify.js";
+      "opencode/plugins/tmux-status.js".source =
+        config.lib.file.mkOutOfStoreSymlink "${configRoot}/plugins/tmux-status.js";
+      "opencode/plugins/context-notebook.js".source =
+        config.lib.file.mkOutOfStoreSymlink "${configRoot}/notebook/plugin.js";
+      "opencode/skills/context-notebook".source =
+        config.lib.file.mkOutOfStoreSymlink "${configRoot}/notebook";
+      # This guard is intentionally immutable and rebuild-controlled.
+      "opencode/plugins/session-policy.js".source = "${sessionPolicy}/guard.js";
+      "opencode/tui-plugins/tmux-theme.js".source =
+        config.lib.file.mkOutOfStoreSymlink "${configRoot}/tui-plugins/tmux-theme.js";
+      "opencode/tui-plugins/context-persistence.js".source =
+        config.lib.file.mkOutOfStoreSymlink "${configRoot}/tui-plugins/context-persistence.js";
+      "opencode/tui-plugins/context-library.tsx".source =
+        config.lib.file.mkOutOfStoreSymlink "${configRoot}/tui-plugins/context-library.tsx";
+
+      # Auto model router. The server plugin rewrites the model of every prompt
+      # sent while the "Auto" entry is selected; the TUI plugin shows which model
+      # and effort it picked. Only the entrypoint is linked: module resolution
+      # follows the symlink to the repository, so the plugin's sibling modules and
+      # its auto-router.json are read from here.
+      "opencode/plugins/auto-router.js".source =
+        config.lib.file.mkOutOfStoreSymlink "${configRoot}/auto-router/auto-router.js";
+      "opencode/tui-plugins/auto-router-status.tsx".source =
+        config.lib.file.mkOutOfStoreSymlink "${configRoot}/tui-plugins/auto-router-status.tsx";
+
+      # Caveman skill suite (caveman, caveman-commit, caveman-review, ...).
+      # OpenCode scans ~/.config/opencode/skills recursively for **/SKILL.md, so
+      # linking the whole skills dir picks up every sub-skill.
+      # Update to latest: nix flake update caveman && rehome
+      "opencode/skills/caveman-suite".source = "${inputs.caveman}/skills";
+
+      # TypeSafe skill: Jev API, question types and patterns, with its reference
+      # files. The API key is exported as TYPESAFE_API_KEY by features/secrets.
+      # Update to latest: nix flake update typesafe-skills && rehome
+      "opencode/skills/typesafe-ai".source = "${inputs.typesafe-skills}/skills/typesafe-ai";
+
+      # Caveman's OpenCode installer makes Caveman default-on by adding this
+      # always-loaded rule file. Source it from the pinned flake input instead of
+      # running the installer, so the behavior is reproducible through Home Manager.
+      "opencode/AGENTS.md".text = ''
+        <!-- caveman-begin -->
+        ${builtins.readFile "${inputs.caveman}/src/rules/caveman-activate.md"}
+        <!-- caveman-end -->
+        ${builtins.readFile "${sessionPolicy}/agent-policy.md"}
+      '';
     };
-    Install.WantedBy = [ "timers.target" ];
-  };
 
-  # Settings and plugins are linked back into this repository so edits apply on
-  # the next OpenCode start, and so state OpenCode writes itself (recent models,
-  # UI preferences) is versioned and synced to other machines.
-  xdg.configFile = {
-    "opencode/opencode.json".source = config.lib.file.mkOutOfStoreSymlink "${configRoot}/opencode.json";
-    "opencode/tui.json".source = config.lib.file.mkOutOfStoreSymlink "${configRoot}/tui.json";
-    "opencode/plugins/session-notify.js".source =
-      config.lib.file.mkOutOfStoreSymlink "${configRoot}/session-notify/session-notify.js";
-    "opencode/plugins/tmux-status.js".source =
-      config.lib.file.mkOutOfStoreSymlink "${configRoot}/plugins/tmux-status.js";
-    "opencode/plugins/context-notebook.js".source =
-      config.lib.file.mkOutOfStoreSymlink "${configRoot}/notebook/plugin.js";
-    "opencode/skills/context-notebook".source =
-      config.lib.file.mkOutOfStoreSymlink "${configRoot}/notebook";
-    # This guard is intentionally immutable and rebuild-controlled.
-    "opencode/plugins/session-policy.js".source = "${sessionPolicy}/guard.js";
-    "opencode/tui-plugins/tmux-theme.js".source =
-      config.lib.file.mkOutOfStoreSymlink "${configRoot}/tui-plugins/tmux-theme.js";
-    "opencode/tui-plugins/context-persistence.js".source =
-      config.lib.file.mkOutOfStoreSymlink "${configRoot}/tui-plugins/context-persistence.js";
-    "opencode/tui-plugins/context-library.tsx".source =
-      config.lib.file.mkOutOfStoreSymlink "${configRoot}/tui-plugins/context-library.tsx";
+    # OpenCode saves state by atomically replacing files, which breaks individual
+    # symlinks. Link the directory instead; only model.json and kv.json are
+    # tracked, while locks and prompt history are ignored beside them.
+    home.file.".local/state/opencode" = {
+      source = config.lib.file.mkOutOfStoreSymlink "${configRoot}/state";
+      force = true;
+    };
 
-    # Auto model router. The server plugin rewrites the model of every prompt
-    # sent while the "Auto" entry is selected; the TUI plugin shows which model
-    # and effort it picked. Only the entrypoint is linked: module resolution
-    # follows the symlink to the repository, so the plugin's sibling modules and
-    # its auto-router.json are read from here.
-    "opencode/plugins/auto-router.js".source =
-      config.lib.file.mkOutOfStoreSymlink "${configRoot}/auto-router/auto-router.js";
-    "opencode/tui-plugins/auto-router-status.tsx".source =
-      config.lib.file.mkOutOfStoreSymlink "${configRoot}/tui-plugins/auto-router-status.tsx";
-
-    # Caveman skill suite (caveman, caveman-commit, caveman-review, ...).
-    # OpenCode scans ~/.config/opencode/skills recursively for **/SKILL.md, so
-    # linking the whole skills dir picks up every sub-skill.
-    # Update to latest: nix flake update caveman && rehome
-    "opencode/skills/caveman-suite".source = "${inputs.caveman}/skills";
-
-    # TypeSafe skill: Jev API, question types and patterns, with its reference
-    # files. The API key is exported as TYPESAFE_API_KEY by features/secrets.
-    # Update to latest: nix flake update typesafe-skills && rehome
-    "opencode/skills/typesafe-ai".source = "${inputs.typesafe-skills}/skills/typesafe-ai";
-
-    # Caveman's OpenCode installer makes Caveman default-on by adding this
-    # always-loaded rule file. Source it from the pinned flake input instead of
-    # running the installer, so the behavior is reproducible through Home Manager.
-    "opencode/AGENTS.md".text = ''
-      <!-- caveman-begin -->
-      ${builtins.readFile "${inputs.caveman}/src/rules/caveman-activate.md"}
-      <!-- caveman-end -->
-      ${builtins.readFile "${sessionPolicy}/agent-policy.md"}
+    # Home Manager cannot replace a real directory with a directory symlink.
+    # Preserve any pre-migration state, copy files not already present into the
+    # repository's state directory, then let linkGeneration create the symlink.
+    # The renamed backup stays beside the target for manual inspection/removal.
+    home.activation.opencodeMigrateState = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
+      stateTarget="$HOME/.local/state/opencode"
+      if [[ -d "$stateTarget" && ! -L "$stateTarget" ]]; then
+        stateBackup="$stateTarget.pre-home-manager-$(date +%Y%m%d%H%M%S)"
+        mv "$stateTarget" "$stateBackup"
+        cp -an "$stateBackup/." "${configRoot}/state/"
+      fi
     '';
   };
-
-  # OpenCode saves state by atomically replacing files, which breaks individual
-  # symlinks. Link the directory instead; only model.json and kv.json are
-  # tracked, while locks and prompt history are ignored beside them.
-  home.file.".local/state/opencode" = {
-    source = config.lib.file.mkOutOfStoreSymlink "${configRoot}/state";
-    force = true;
-  };
-
-  # Home Manager cannot replace a real directory with a directory symlink.
-  # Preserve any pre-migration state, copy files not already present into the
-  # repository's state directory, then let linkGeneration create the symlink.
-  # The renamed backup stays beside the target for manual inspection/removal.
-  home.activation.opencodeMigrateState = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
-    stateTarget="$HOME/.local/state/opencode"
-    if [[ -d "$stateTarget" && ! -L "$stateTarget" ]]; then
-      stateBackup="$stateTarget.pre-home-manager-$(date +%Y%m%d%H%M%S)"
-      mv "$stateTarget" "$stateBackup"
-      cp -an "$stateBackup/." "${configRoot}/state/"
-    fi
-  '';
 }

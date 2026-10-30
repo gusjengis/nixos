@@ -17,10 +17,10 @@
     ++ lib.optionals config.desktopEnv.enable [
       wtype
       xdotool
-      gource
     ]
     ++ lib.optionals (config.dev.enable && config.desktopEnv.enable) [
       oxker
+      gource
       posting
       android-tools
       zulu17

@@ -1,0 +1,17 @@
+// Logitech K350 scan 786850 emits Linux evdev 580, hence XKB keycode 588.
+// Keep Caps Lock and both Windows keys unchanged. Mod3 is compositor-local.
+xkb_keymap {
+    xkb_keycodes { include "evdev+aliases(qwerty)" };
+    xkb_types { include "complete" };
+    xkb_compat { include "complete" };
+    xkb_symbols {
+        include "pc+us+inet(evdev)"
+        replace key <I588> {
+            type = "ONE_LEVEL",
+            symbols[Group1] = [ Hyper_L ],
+            actions[Group1] = [ SetMods(modifiers=Mod3) ],
+            repeat = No
+        };
+        modifier_map Mod3 { <I588> };
+    };
+};

@@ -20,20 +20,9 @@ ShellRoot {
         openLauncher: () => Quickshell.execDetached(["vicinae", "toggle"])
     }
 
-    InProgressWidget {}
-
-    IpcHandler {
-        target: "sessions"
-        function toggle(): void { contextOrganizer.visible = false; sessionPicker.toggle(false); }
-        function dispensary(): void { sessionPicker.visible = false; contextOrganizer.toggle(); }
-    }
-
-    SessionPicker {
-        id: sessionPicker
-    }
-
-    ContextOrganizer {
-        id: contextOrganizer
+    LazyLoader {
+        active: DesktopFeatures.contexts
+        source: "DesktopContexts.qml"
     }
 
     IpcHandler {
@@ -78,9 +67,9 @@ ShellRoot {
     // CTRL + dictation key: see Capture.qml and hyprland/config/keybinds.lua.
     IpcHandler {
         target: "capture"
-        function open(): void { capture.open(); }
-        function released(): void { capture.released(); }
-        function cancel(): void { capture.cancel(); }
+        function open(): void { if (capture.item) capture.item.open(); }
+        function released(): void { if (capture.item) capture.item.released(); }
+        function cancel(): void { if (capture.item) capture.item.cancel(); }
     }
 
     Component.onCompleted: Quickshell.execDetached(["wallpaperctl", "restore"])
@@ -124,7 +113,9 @@ ShellRoot {
         id: wallpaperOverlay
     }
 
-    Capture {
+    LazyLoader {
         id: capture
+        active: DesktopFeatures.personal
+        source: "Capture.qml"
     }
 }

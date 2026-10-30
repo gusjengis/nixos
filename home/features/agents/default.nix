@@ -1,4 +1,9 @@
-{ pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 {
   imports = [
@@ -7,7 +12,7 @@
   ];
 
   # Python is broadly useful to coding agents for inspection and automation.
-  home.packages = [
+  home.packages = lib.optionals config.dev.enable [
     pkgs.python314
   ];
 }

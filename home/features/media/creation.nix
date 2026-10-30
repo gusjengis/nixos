@@ -7,7 +7,7 @@
 
 {
   config = lib.mkMerge [
-    (lib.mkIf config.desktopEnv.enable {
+    (lib.mkIf (config.desktopEnv.enable && config.personalDesktop.enable) {
       home.packages = with pkgs; [
         obs-studio
       ];

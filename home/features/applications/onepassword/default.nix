@@ -6,7 +6,7 @@
 }:
 
 {
-  config = lib.mkIf config.desktopEnv.enable {
+  config = lib.mkIf (config.desktopEnv.enable && config.personalDesktop.enable) {
     home.packages = [
       pkgs._1password-gui
       pkgs._1password-cli

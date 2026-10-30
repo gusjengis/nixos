@@ -32,6 +32,10 @@
       default = true;
     };
 
+    personalDesktop.enable = lib.mkEnableOption "personal workstation apps and integrations" // {
+      default = true;
+    };
+
     mediaEditing.enable = lib.mkEnableOption "media creation/editing tools (Audacity, Kdenlive, GIMP)";
 
     laptop.enable = lib.mkEnableOption "is a laptop" // {

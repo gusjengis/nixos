@@ -1,3 +1,4 @@
 module State
 singleton FocusGuard 1.0 FocusGuard.qml
 singleton DesktopSessions 1.0 DesktopSessions.qml
+singleton DesktopFeatures 1.0 DesktopFeatures.qml

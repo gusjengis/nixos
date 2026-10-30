@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ config, pkgs, ... }:
 
 {
   home.packages = with pkgs; [
@@ -13,9 +13,9 @@
   };
 
   programs.direnv = {
-    enable = true;
-    enableBashIntegration = true;
-    nix-direnv.enable = true;
+    enable = config.dev.enable;
+    enableBashIntegration = config.dev.enable;
+    nix-direnv.enable = config.dev.enable;
     config.global.log_filter = "^$";
   };
 

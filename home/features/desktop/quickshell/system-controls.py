@@ -109,9 +109,29 @@ def parse_wifi_networks(output):
     return sorted(networks.values(), key=lambda item: (not item["connected"], -item["signal"], item["ssid"].lower()))
 
 
+def active_network_type():
+    """Report NetworkManager's primary connection, not carrier or VPN devices."""
+    service = "org.freedesktop.NetworkManager"
+    primary = json.loads(run([
+        "busctl", "--json=short", "get-property", service,
+        "/org/freedesktop/NetworkManager", service, "PrimaryConnection",
+    ]))["data"]
+    if primary == "/":
+        return None
+    connection_type = json.loads(run([
+        "busctl", "--json=short", "get-property", service, primary,
+        service + ".Connection.Active", "Type",
+    ]))["data"]
+    return {"802-3-ethernet": "ethernet", "802-11-wireless": "wifi"}.get(connection_type)
+
+
 def wifi_state():
-    state = {"enabled": False, "connected": None, "networks": []}
+    state = {"enabled": False, "connected": None, "networks": [], "activeType": None}
     errors = []
+    try:
+        state["activeType"] = active_network_type()
+    except (RuntimeError, ValueError, KeyError, TypeError) as error:
+        errors.append(str(error))
     try:
         state["enabled"] = run(["nmcli", "-t", "-f", "WIFI", "general"]).strip() == "enabled"
     except RuntimeError as error:

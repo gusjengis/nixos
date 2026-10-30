@@ -6,9 +6,12 @@
 {
   # Desktop
   desktopEnv.enable = true;
+  personalDesktop.enable = false;
+  desktopContexts.enable = false;
+  desktopLauncher.remoteOnly = true;
 
   # Development
-  dev.enable = true;
+  dev.enable = false;
 
   # Gaming
   gaming.enable = false;
@@ -18,6 +21,9 @@
 
   # Remote access
   windowsVm.enable = true;
+  windowsVm.displayName = "Anthony Green";
+  windowsVm.remotesFile = "/home/gusjengis/.config/secrets/logins/rdp-remotes.csv";
+  windowsVm.fullscreen = true;
   windowsVm.og.enable = false;
 
   # Other

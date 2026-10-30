@@ -56,9 +56,9 @@ index 3faaf95..f685c20 100644
 @@ -1,4 +1,5 @@
  #include "Renderer.hpp"
 +#include "LayerRenderCallback.hpp"
+ #include "WorkspaceBlurExclusion.hpp"
  #include "../Compositor.hpp"
  #include "../helpers/math/Math.hpp"
- #include <algorithm>
 @@ -935,7 +936,46 @@ SP<ITexture> IHyprRenderer::createTexture(const SP<Aquamarine::IBuffer> buffer,
      return tex;
  }
@@ -110,11 +110,11 @@ diff --git a/src/render/Renderer.hpp b/src/render/Renderer.hpp
 index 739d122..b65d4b0 100644
 --- a/src/render/Renderer.hpp
 +++ b/src/render/Renderer.hpp
-@@ -272,6 +272,7 @@ namespace Render {
-         void renderAllClientsForWorkspace(PHLMONITOR pMonitor, PHLWORKSPACE pWorkspace, const Time::steady_tp& now, const Vector2D& translate = {0, 0}, const float& scale = 1.f);
-         void renderWindow(PHLWINDOW, PHLMONITOR, const Time::steady_tp&, bool, eRenderPassMode, bool ignorePosition = false, bool standalone = false);
-         void renderLayer(PHLLS, PHLMONITOR, const Time::steady_tp&, bool popups = false, bool lockscreen = false);
-+        void renderLayerOriginal(PHLLS, PHLMONITOR, const Time::steady_tp&, bool popups, bool lockscreen);
-         void renderSessionLockSurface(WP<SSessionLockSurface>, PHLMONITOR, const Time::steady_tp&);
-         void renderDragIcon(PHLMONITOR, const Time::steady_tp&);
-         void renderIMEPopup(CInputPopup*, PHLMONITOR, const Time::steady_tp&);
+@@ -274,6 +274,7 @@ namespace Render {
+         void                              renderWindow(PHLWINDOW, PHLMONITOR, const Time::steady_tp&, bool, eRenderPassMode, bool ignorePosition = false, bool standalone = false);
+         void                              renderLayer(PHLLS, PHLMONITOR, const Time::steady_tp&, bool popups = false, bool lockscreen = false);
++        void                              renderLayerOriginal(PHLLS, PHLMONITOR, const Time::steady_tp&, bool popups, bool lockscreen);
+         void                              renderSessionLockSurface(WP<SSessionLockSurface>, PHLMONITOR, const Time::steady_tp&);
+         void                              renderDragIcon(PHLMONITOR, const Time::steady_tp&);
+         void                              renderIMEPopup(CInputPopup*, PHLMONITOR, const Time::steady_tp&);
+         void                              renderSessionLockPrimer(PHLMONITOR pMonitor);

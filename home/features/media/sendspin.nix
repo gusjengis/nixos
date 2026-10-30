@@ -103,7 +103,7 @@ let
   massSendspinUrl = "ws://t470.tail29bd65.ts.net:8927/sendspin";
 in
 {
-  config = lib.mkIf config.desktopEnv.enable {
+  config = lib.mkIf (config.desktopEnv.enable && config.personalDesktop.enable) {
     home.packages = [ sendspinPkg ];
 
     # Turns this machine into a real Sendspin playback target for Music

@@ -76,6 +76,7 @@ RowLayout {
         }
     ]
     readonly property var occupiedSpecialWorkspaces: specialWorkspaces.filter(entry => {
+        if (!DesktopFeatures.contexts) return false;
         const workspace = root.specialWorkspace(entry.name);
         return workspace && root.monitor && workspace.monitor === root.monitor.name && workspace.windows > 0;
     })
@@ -160,7 +161,7 @@ RowLayout {
     }
 
     Connections {
-        target: DesktopSessions
+        target: DesktopFeatures.contexts ? DesktopSessions : null
         function onSnapshotChanged() {
             root.updateWorkspaceSlots();
             root.refreshState();
@@ -168,6 +169,7 @@ RowLayout {
     }
 
     Rectangle {
+        visible: DesktopFeatures.contexts
         implicitWidth: Math.min(110, sessionLabel.implicitWidth + 16)
         implicitHeight: 26
         radius: Theme.radius

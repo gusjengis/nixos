@@ -32,7 +32,7 @@ in
 
   programs.git = {
     enable = true;
-    package = contextGit;
+    package = if config.desktopContexts.enable then contextGit else pkgs.git;
     lfs.enable = true;
     settings = {
       user = {

@@ -1,4 +1,5 @@
 local vars = require("platform-variables")
+local features = require("desktop-features")
 require("appearance")
 require("autostart")
 require("workspaces")
@@ -15,6 +16,10 @@ if not file_present then
 end
 
 hl.config({
+	cursor = {
+		inactive_timeout = 3,
+	},
+
 	misc = {
 		force_default_wallpaper = 0,
 		disable_hyprland_logo = true, -- If true disables the random hyprland logo / anime girl background. :(
@@ -31,6 +36,7 @@ hl.config({
 		kb_model = "",
 		kb_options = "",
 		kb_rules = "",
+		kb_file = features.rdp_keymap or "",
 
 		repeat_delay = 190,
 		repeat_rate = 50,
@@ -76,7 +82,7 @@ hl.gesture({
 			swipe_distance = swipe_distance + event.delta.x
 		end,
 		finish = function(event)
-			if not event.cancelled and math.abs(swipe_distance) >= 80 then
+			if features.contexts and not event.cancelled and math.abs(swipe_distance) >= 80 then
 				require("sessions").cycle(swipe_distance < 0 and 1 or -1)
 			end
 		end,
