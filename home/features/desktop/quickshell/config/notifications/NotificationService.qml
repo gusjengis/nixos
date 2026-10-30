@@ -13,6 +13,24 @@ Scope {
     property var popups: []
     // Set by Notification Center; banners stay hidden while it is open.
     property bool centerOpen: false
+    property alias doNotDisturb: preferences.doNotDisturb
+
+    PersistentProperties {
+        id: preferences
+        reloadableId: "notification-preferences"
+        property bool doNotDisturb: false
+    }
+
+    onDoNotDisturbChanged: {
+        if (doNotDisturb) {
+            const hidden = popups;
+            popups = [];
+            for (const entry of hidden) {
+                if (entry.notification && entry.notification.transient)
+                    entry.notification.expire();
+            }
+        }
+    }
 
     function forget(key) {
         const entry = entries.find(item => item.key === key);
@@ -58,6 +76,8 @@ Scope {
     }
 
     function addPopup(entry) {
+        if (doNotDisturb)
+            return;
         const nextPopups = [entry].concat(popups.filter(item => item.key !== entry.key));
         const hidden = nextPopups.slice(popupLimit);
         popups = nextPopups.slice(0, popupLimit);
@@ -107,7 +127,7 @@ Scope {
         keepOnReload: true
 
         onNotification: notification => {
-            if (notification.lastGeneration && notification.transient) {
+            if (notification.transient && (notification.lastGeneration || root.doNotDisturb)) {
                 notification.expire();
                 return;
             }
@@ -121,11 +141,9 @@ Scope {
             });
             root.entries = root.entries.concat([entry]);
 
-            if (!notification.transient)
-                root.addToHistory(entry);
-
             if (!notification.lastGeneration)
                 root.addPopup(entry);
+            root.syncPersistence(entry);
         }
     }
 }
