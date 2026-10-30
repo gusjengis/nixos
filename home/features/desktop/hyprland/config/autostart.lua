@@ -1,3 +1,5 @@
+local features = require("desktop-features")
+
 hl.on("hyprland.start", function()
 	hl.exec_cmd("finish-boot-splash")
 	hl.exec_cmd("xset r rate 190 50")
@@ -5,7 +7,11 @@ hl.on("hyprland.start", function()
 	-- Refreshes the systemd/D-Bus copies of WAYLAND_DISPLAY and friends before
 	-- starting the services that need them. Without this, thunar.service
 	-- inherits the previous compositor's dead socket and crash-loops.
-	hl.exec_cmd("session-env-sync thunar.service tailscale-tray.service desktop-contexts.service context-shutdown-barrier.service")
+	local services = "session-env-sync thunar.service tailscale-tray.service"
+	if features.contexts then
+		services = services .. " desktop-contexts.service context-shutdown-barrier.service"
+	end
+	hl.exec_cmd(services)
 	hl.exec_cmd("hyprsunset")
 	hl.exec_cmd("hypridle")
 	hl.exec_cmd("hyprpaper")
@@ -14,17 +20,21 @@ hl.on("hyprland.start", function()
 	-- hand with `cargo install` into ~/.cargo/bin, so they only run where that
 	-- has been done. Deliberate for now; hyprlog is being rewritten and will be
 	-- packaged in packages/ when it is.
-	hl.exec_cmd("hyprlogd snitch")
-	hl.exec_cmd("timeline-hyprfocusd-snitch")
+	if features.development then
+		hl.exec_cmd("hyprlogd snitch")
+		hl.exec_cmd("timeline-hyprfocusd-snitch")
+	end
 
 	-- hl.exec_cmd("alga power on")
 
 	-- Low-battery warnings are a systemd user timer now, on laptops only.
 	-- See features/hardware/battery.
 
-	hl.exec_cmd("kdeconnect-indicator")
 	hl.exec_cmd("qs -d -n")
-	hl.exec_cmd("handy --start-hidden")
 	hl.exec_cmd("vicinae-with-glass server")
-	hl.exec_cmd("mailspring-after-tray")
+	if features.personal then
+		hl.exec_cmd("kdeconnect-indicator")
+		hl.exec_cmd("handy --start-hidden")
+		hl.exec_cmd("mailspring-after-tray")
+	end
 end)

@@ -7,7 +7,7 @@ import Quickshell.Io
 QtObject {
     id: root
 
-    readonly property bool available: !!Quickshell.env("HYPRLAND_INSTANCE_SIGNATURE") && !!Quickshell.env("XDG_RUNTIME_DIR")
+    readonly property bool available: DesktopFeatures.contexts && !!Quickshell.env("HYPRLAND_INSTANCE_SIGNATURE") && !!Quickshell.env("XDG_RUNTIME_DIR")
     property var snapshot: ({})
     readonly property var sessions: snapshot.sessions || []
     property var contextCatalog: ({ contexts: [] })
@@ -38,6 +38,8 @@ QtObject {
     }
 
     function workspaceName(slot, monitorName) {
+        if (!DesktopFeatures.contexts)
+            return String(slot);
         return ((snapshot.workspaces || {})[monitorName] || [])[slot - 1] || "";
     }
 
@@ -99,7 +101,13 @@ QtObject {
         return true;
     }
     function previous() { return run("previous", []); }
-    function selectWorkspace(slot, monitorName) { return run("select_workspace", [String(slot), luaString(monitorName)]); }
+    function selectWorkspace(slot, monitorName) {
+        if (!DesktopFeatures.contexts) {
+            Quickshell.execDetached(["hyprctl", "eval", "hl.get_monitor(" + luaString(monitorName) + "):set_workspace(" + luaString(String(slot)) + ")"]);
+            return true;
+        }
+        return run("select_workspace", [String(slot), luaString(monitorName)]);
+    }
     function toggleSpecial(role, monitorName) { return run("toggle_special", [luaString(role), luaString(monitorName)]); }
 
     function saveName(action, id, name) {

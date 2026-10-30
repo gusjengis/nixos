@@ -9,7 +9,11 @@
 let
   featureDir = "${repoRoot}/home/features/desktop/contexts";
   python = pkgs.python3.withPackages (p: [ p.msgpack ]);
-  notebookPython = pkgs.python3.withPackages (p: [ p.msgpack p.pyyaml p.plyvel ]);
+  notebookPython = pkgs.python3.withPackages (p: [
+    p.msgpack
+    p.pyyaml
+    p.plyvel
+  ]);
   contextNotes = pkgs.writeShellApplication {
     name = "context-notes";
     runtimeInputs = [ notebookPython ];
@@ -69,7 +73,13 @@ let
   };
 in
 {
-  config = {
+  options.desktopContexts.enable =
+    lib.mkEnableOption "persistent desktop contexts and session restoration"
+    // {
+      default = true;
+    };
+
+  config = lib.mkIf config.desktopContexts.enable {
     home.packages = [
       checkpoint
       shutdownBarrier

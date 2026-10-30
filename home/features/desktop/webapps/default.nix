@@ -40,8 +40,22 @@ let
   # unlinking webapp-*.desktop when the desktop was disabled.
   alwaysEntries = builtins.filter (name: !isWebapp name) allEntries;
   alwaysIcons = builtins.filter (name: !isWebapp name) allIcons;
-  desktopEntries = builtins.filter isWebapp allEntries;
-  desktopIcons = builtins.filter isWebapp allIcons;
+  # Shared meeting desktops retain document/cloud tools and Supernote mirroring.
+  meetingWebapp =
+    name:
+    builtins.any (prefix: lib.hasPrefix "webapp-${prefix}." name) [
+      "calendar"
+      "excel"
+      "onedrive"
+      "outlook"
+      "supernote"
+    ];
+  desktopEntries = builtins.filter (
+    name: isWebapp name && (config.personalDesktop.enable || meetingWebapp name)
+  ) allEntries;
+  desktopIcons = builtins.filter (
+    name: isWebapp name && (config.personalDesktop.enable || meetingWebapp name)
+  ) allIcons;
 in
 {
   config = lib.mkMerge [

@@ -25,6 +25,15 @@ let
   homeRoot = "${repoRoot}/home";
   configDir = "${homeRoot}/features/desktop/hyprland/config";
   hostDir = "${homeRoot}/hosts/${config.host.name}";
+  hostFeatures = pkgs.writeText "hyprland-host-features.lua" ''
+    return {
+      contexts = ${lib.boolToString config.desktopContexts.enable},
+      personal = ${lib.boolToString config.personalDesktop.enable},
+      development = ${lib.boolToString config.dev.enable},
+      remoteLauncher = ${lib.boolToString config.desktopLauncher.remoteOnly},
+      rdp_keymap = ${if config.host.name == "agc-conference" then ''"${hostDir}/rdp-keymap.xkb"'' else "nil"},
+    }
+  '';
 
   # hyprland.lua requires "platform-variables" directly, so that module name has
   # to resolve on every host. The directory is linked whole, so this per-host
@@ -74,8 +83,8 @@ in
       hyprland
       glassPackage
       sessionEnvSync
-      mailspringAfterTray
     ]
+    ++ lib.optional config.personalDesktop.enable mailspringAfterTray
     ++ (with pkgs; [
       hypridle
       # Started by autostart.lua. It used to come only from the untracked
@@ -88,9 +97,7 @@ in
       nerd-fonts.symbols-only
     ])
     # No aarch64 build.
-    ++ lib.optionals pkgs.stdenv.hostPlatform.isx86_64 [
-      # Neither package has an aarch64 build.
-      pkgs.linux-wallpaperengine
+    ++ lib.optionals (pkgs.stdenv.hostPlatform.isx86_64 && config.personalDesktop.enable) [
       pkgs.vial
     ];
 
@@ -151,6 +158,7 @@ in
     home.activation.hyprlandHostConfig = lib.hm.dag.entryBefore [ "checkLinkTargets" ] (
       ''
         ln -sfn "${platformVariables}" "${configDir}/platform-variables.lua"
+        ln -sfn "${hostFeatures}" "${configDir}/host-features.lua"
       ''
       + (
         if hasMonitors then

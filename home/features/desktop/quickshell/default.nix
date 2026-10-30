@@ -120,18 +120,24 @@ let
   };
   # Qt 6 ShaderEffect only loads precompiled .qsb, so the GLSL source kept in
   # the config tree is baked here and linked into the data dir below.
-  trayMonoShader = pkgs.runCommand "quickshell-tray-mono-shader" {
-    nativeBuildInputs = [ pkgs.qt6.qtshadertools ];
-  } ''
-    mkdir -p $out
-    qsb --qt6 -o $out/tray-mono.frag.qsb ${./config/bar/components/shaders/tray-mono.frag}
-  '';
-  barScrimShader = pkgs.runCommand "quickshell-bar-scrim-shader" {
-    nativeBuildInputs = [ pkgs.qt6.qtshadertools ];
-  } ''
-    mkdir -p $out
-    qsb --qt6 -o $out/bar-scrim.frag.qsb ${./config/bar/components/shaders/bar-scrim.frag}
-  '';
+  trayMonoShader =
+    pkgs.runCommand "quickshell-tray-mono-shader"
+      {
+        nativeBuildInputs = [ pkgs.qt6.qtshadertools ];
+      }
+      ''
+        mkdir -p $out
+        qsb --qt6 -o $out/tray-mono.frag.qsb ${./config/bar/components/shaders/tray-mono.frag}
+      '';
+  barScrimShader =
+    pkgs.runCommand "quickshell-bar-scrim-shader"
+      {
+        nativeBuildInputs = [ pkgs.qt6.qtshadertools ];
+      }
+      ''
+        mkdir -p $out
+        qsb --qt6 -o $out/bar-scrim.frag.qsb ${./config/bar/components/shaders/bar-scrim.frag}
+      '';
   aiUsage = pkgs.writeShellApplication {
     name = "quickshell-ai-usage";
     runtimeInputs = [ pkgs.python3 ];
@@ -163,6 +169,7 @@ let
     name = "quickshell-system-controls";
     runtimeInputs = [
       pkgs.networkmanager
+      pkgs.systemd
       pkgs.bluez
       pkgs.brightnessctl
       pkgs.python3
@@ -210,9 +217,16 @@ in
 {
   config = lib.mkIf config.desktopEnv.enable {
     xdg.dataFile."quickshell/laptop".text = if config.laptop.enable then "1" else "0";
+    xdg.dataFile."quickshell/features.json".text = builtins.toJSON {
+      contexts = config.desktopContexts.enable;
+      personal = config.personalDesktop.enable;
+      development = config.dev.enable;
+    };
     # Build artifact, so store-backed on purpose: edit the .frag and rebuild.
-    xdg.dataFile."quickshell/shaders/tray-mono.frag.qsb".source = "${trayMonoShader}/tray-mono.frag.qsb";
-    xdg.dataFile."quickshell/shaders/bar-scrim.frag.qsb".source = "${barScrimShader}/bar-scrim.frag.qsb";
+    xdg.dataFile."quickshell/shaders/tray-mono.frag.qsb".source =
+      "${trayMonoShader}/tray-mono.frag.qsb";
+    xdg.dataFile."quickshell/shaders/bar-scrim.frag.qsb".source =
+      "${barScrimShader}/bar-scrim.frag.qsb";
 
     # Waypipe starts its remote server before the metadata helper's wrapper runs.
     home.packages = [
@@ -227,14 +241,16 @@ in
       wallpaperFavorite
       wallpaperPhases
       wallpaperLocate
-      aiUsage
-      aiAccount
-      universalSearch
       systemControls
       hyprpickerPackage
       pkgs.mpv
       pkgs.waypipe
       pkgs.xwayland-satellite
+    ]
+    ++ lib.optionals config.dev.enable [
+      aiUsage
+      aiAccount
+      universalSearch
     ];
 
     # Link the directory so Quickshell and future tooling can atomically replace

@@ -6,7 +6,7 @@
 }:
 
 {
-  config = lib.mkIf config.desktopEnv.enable {
+  config = lib.mkIf (config.desktopEnv.enable && config.personalDesktop.enable) {
     home.packages = [ pkgs.notion ];
 
     # home.activation.createObsidianVaultDirectory = lib.hm.dag.entryAfter [ "writeBoundary" ] ''

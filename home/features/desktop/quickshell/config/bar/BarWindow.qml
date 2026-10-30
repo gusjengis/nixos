@@ -6,6 +6,7 @@ import Quickshell.Wayland
 import "../theme"
 import "../widgets"
 import "components"
+import "../state"
 
 PanelWindow {
     id: bar
@@ -131,6 +132,7 @@ PanelWindow {
             }
             Usage {
                 id: usage
+                visible: DesktopFeatures.development
                 usage: bar.usage
                 accountBusy: bar.accountBusy
                 accountError: bar.accountError

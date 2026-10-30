@@ -10,7 +10,7 @@
     with pkgs;
     [
     ]
-    ++ lib.optionals config.desktopEnv.enable [
+    ++ lib.optionals (config.desktopEnv.enable && config.personalDesktop.enable) [
       # TODO: belong in a phone sync/connection folder, not generally used for communication
       scrcpy
       kdePackages.kdeconnect-kde
@@ -31,17 +31,23 @@
     # No aarch64 builds. The Hyprland keybinds fall back to the webapp
     # launchers where these are missing; see the hyprland feature's
     # platform-variables selection.
-    ++ lib.optionals (pkgs.stdenv.hostPlatform.isx86_64 && config.desktopEnv.enable) [
-      zoom-us
-      slack
-    ];
+    ++
+      lib.optionals
+        (pkgs.stdenv.hostPlatform.isx86_64 && config.desktopEnv.enable && config.personalDesktop.enable)
+        [
+          slack
+        ]
+    ++ lib.optionals (pkgs.stdenv.hostPlatform.isx86_64 && config.desktopEnv.enable) [ zoom-us ];
 
-  programs.discord = lib.mkIf (pkgs.stdenv.hostPlatform.isx86_64 && config.desktopEnv.enable) {
-    enable = true;
-    package = pkgs.discord-canary;
-    configName = "discordcanary";
-    settings.SKIP_HOST_UPDATE = true;
-  };
+  programs.discord =
+    lib.mkIf
+      (pkgs.stdenv.hostPlatform.isx86_64 && config.desktopEnv.enable && config.personalDesktop.enable)
+      {
+        enable = true;
+        package = pkgs.discord-canary;
+        configName = "discordcanary";
+        settings.SKIP_HOST_UPDATE = true;
+      };
 
   # KDE Connect needs one-time pairing after first installation.
 }

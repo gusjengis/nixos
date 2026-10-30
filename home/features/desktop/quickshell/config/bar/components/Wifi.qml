@@ -3,7 +3,7 @@ import Quickshell
 import "../../theme"
 import "../../widgets"
 
-// Wi-Fi menu extra: status glyph in the bar, network list on click.
+// Primary network status in the bar, Wi-Fi controls on click.
 Rectangle {
     id: root
 
@@ -19,10 +19,17 @@ Rectangle {
 
     WifiGlyph {
         anchors.centerIn: parent
+        visible: root.state.activeType !== "ethernet"
         powered: root.state.enabled
         level: !root.state.connected ? 0 : root.signal >= 60 ? 3 : root.signal >= 30 ? 2 : 1
         color: Theme.barText
         size: 16
+    }
+
+    EthernetGlyph {
+        anchors.centerIn: parent
+        visible: root.state.activeType === "ethernet"
+        color: Theme.barText
     }
 
     MouseArea {

@@ -1,0 +1,54 @@
+diff --git a/src/server/src/ui/views/dmenu-model.cpp b/src/server/src/ui/views/dmenu-model.cpp
+--- a/src/server/src/ui/views/dmenu-model.cpp
++++ b/src/server/src/ui/views/dmenu-model.cpp
+@@ -27,7 +27,8 @@ void DMenuSection::setFilter(std::string_view query) {
+   m_filtered.clear();
+   fuzzy::Query const fuzzyQuery{queryStr};
+   for (auto [idx, e] : vicinae::enumerate(m_entries)) {
+-    auto const m = fuzzy::scoreWeighted({{e, 1.0}}, fuzzyQuery);
++    auto const title = e.substr(0, e.find('\t'));
++    auto const m = fuzzy::scoreWeighted({{title, 1.0}}, fuzzyQuery);
+     if (queryStr.empty() || m.accepted()) { m_filtered.push_back({{e, idx}, m.score}); }
+   }
+   std::ranges::stable_sort(m_filtered, std::greater{});
+@@ -52,5 +53,6 @@ DMenuSection::IndexedData DMenuSection::entryAt(int i) const {
+ QString DMenuSection::itemTitle(int i) const {
+   auto entry = entryAt(i).first;
++  entry = entry.substr(0, entry.find('\t'));
+   if (entry.starts_with('/')) {
+     return QString::fromStdString(getLastPathComponent(std::filesystem::path(entry)));
+   }
+@@ -72,5 +74,11 @@ QString DMenuSection::itemSubtitle(int i) const {
+ std::optional<ImageURL> DMenuSection::itemIcon(int i) const {
+   auto entry = entryAt(i).first;
++  // Optional title<TAB>icon-path rows. Plain dmenu rows retain their behavior.
++  if (auto separator = entry.find('\t'); separator != std::string_view::npos) {
++    auto icon = entry.substr(separator + 1);
++    if (!icon.empty())
++      return ImageURL::local(QString::fromUtf8(icon.data(), icon.size()));
++  }
+   if (entry.starts_with('/')) {
+     std::error_code ec;
+     if (std::filesystem::exists(entry, ec)) { return ImageURL::fileIcon(entry); }
+diff --git a/src/server/src/ui/qml/list/ListItemDelegate.qml b/src/server/src/ui/qml/list/ListItemDelegate.qml
+--- a/src/server/src/ui/qml/list/ListItemDelegate.qml
++++ b/src/server/src/ui/qml/list/ListItemDelegate.qml
+@@ -6,3 +6,4 @@
+ SelectableDelegate {
+     id: root
+-    height: featured ? 52 : 38
++    readonly property bool remotePicker: itemIconSource.includes("windows-tile.svg")
++    height: remotePicker ? 72 : featured ? 52 : 38
+@@ -30 +31 @@
+-        spacing: 10
++        spacing: root.remotePicker ? 14 : 10
+@@ -33,3 +34,3 @@
+             visible: root.itemIconSource !== ""
+-            Layout.preferredWidth: root.featured ? 32 : 26
+-            Layout.preferredHeight: root.featured ? 32 : 26
++            Layout.preferredWidth: root.remotePicker ? 48 : root.featured ? 32 : 26
++            Layout.preferredHeight: root.remotePicker ? 48 : root.featured ? 32 : 26
+@@ -75,2 +76,2 @@
+-                font.pointSize: root.featured ? Theme.regularFontSize * 1.14 : Theme.regularFontSize
++                font.pointSize: root.remotePicker ? Theme.regularFontSize * 1.5 : root.featured ? Theme.regularFontSize * 1.14 : Theme.regularFontSize
+                 font.weight: root.featured ? Font.DemiBold : Font.Normal
