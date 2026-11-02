@@ -15,7 +15,6 @@
     home-manager.url = "github:nix-community/home-manager";
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
     supernote-tool.url = "github:jya-dev/supernote-tool/c1019f1c290ed5b586a9518978dbb78240b882d3";
-    alga.url = "github:Tenzer/alga";
     nix-flatpak.url = "github:gmodena/nix-flatpak";
     rmatrix.url = "github:RoastBeefer00/rmatrix";
     claude-code-nix = {
@@ -42,6 +41,10 @@
     };
     # Keep the package set tested by the fork's Nix packaging.
     strata.url = "github:gusjengis/strata/build/1-nix-packaging";
+    strata-source = {
+      url = "github:gusjengis/strata/feat/finder-skin";
+      flake = false;
+    };
     # Caveman skill suite for OpenCode (output-token compression).
     # Update to latest: nix flake update caveman && rehome
     caveman = {
@@ -87,6 +90,37 @@
             # Make the flake inputs reachable from any module through `pkgs`.
             (final: prev: {
               inputs = inputs;
+              strata =
+                let
+                  source = inputs.strata-source;
+                  manifest = builtins.fromTOML (builtins.readFile "${source}/Cargo.toml");
+                  strataPkgs = inputs.strata.inputs.nixpkgs.legacyPackages.${system};
+                in
+                inputs.strata.packages.${system}.default.overrideAttrs (oldAttrs: {
+                  version = manifest.package.version;
+                  src = source;
+                  patches = (oldAttrs.patches or [ ]) ++ [
+                    ./home/features/desktop/strata/window-rim.patch
+                  ];
+                  cargoDeps = strataPkgs.rustPlatform.importCargoLock {
+                    lockFile = "${source}/Cargo.lock";
+                  };
+                  postPatch = "";
+                  STRATA_BUILD_COMMIT = source.rev;
+                  STRATA_UPDATER = "disabled";
+                  STRATA_TRUSTED_COMMAND_PATH = strataPkgs.lib.makeBinPath [
+                    strataPkgs.bubblewrap
+                    strataPkgs.ffmpeg
+                    strataPkgs.ffmpegthumbnailer
+                    strataPkgs.imagemagick
+                    strataPkgs.libraw
+                    strataPkgs.squashfsTools
+                    strataPkgs.util-linux
+                    strataPkgs.coreutils
+                    strataPkgs.fontconfig
+                    strataPkgs.xdg-utils
+                  ];
+                });
               obsidian = (import inputs.nixpkgs-obsidian {
                 inherit system;
                 config.allowUnfree = true;
