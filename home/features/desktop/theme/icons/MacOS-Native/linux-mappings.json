@@ -1,0 +1,4440 @@
+[
+  {
+    "kind": "app",
+    "id": "$(WRAPPEDPRODUCTBUNDLEIDENTIFIER)",
+    "source": "/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/Library/Xcode/Agents/XCTRunner.app",
+    "aliases": [
+      "apps/$(WRAPPEDPRODUCTBUNDLEIDENTIFIER)",
+      "apps/xctrunner"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "bobko.aerospace",
+    "source": "/Applications/AeroSpace.app",
+    "aliases": [
+      "apps/aerospace",
+      "apps/bobko.aerospace"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "cc.arduino.IDE2",
+    "source": "https://raw.githubusercontent.com/arduino/arduino-ide/615de517ffa5ae828b3109752316b2129363d00a/electron-app/resources/icon.icns",
+    "aliases": [
+      "apps/arduino",
+      "apps/arduino-ide",
+      "apps/cc.arduino.IDE2"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.1password.1password",
+    "source": "https://downloads.1password.com/mac/1Password-8.12.42-aarch64.zip",
+    "aliases": [
+      "apps/1password",
+      "apps/com.1password.1password",
+      "apps/com.onepassword.OnePassword"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.almostgoodenough.stockticker",
+    "source": "/Applications/StockTicker.app",
+    "aliases": [
+      "apps/com.almostgoodenough.stockticker",
+      "apps/stockticker"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.anthropic.claudefordesktop",
+    "source": "https://downloads.claude.ai/releases/darwin/universal/4.4212.0/Claude-cbfe3c56d49c49332ad5a9588303c9dbc70a5e7f.zip",
+    "aliases": [
+      "apps/claude",
+      "apps/com.anthropic.claudefordesktop",
+      "apps/webapp-claude"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.AMSEngagementViewService",
+    "source": "/System/Library/PrivateFrameworks/AppleMediaServicesUI.framework/Versions/A/Resources/AMSEngagementViewService.app",
+    "aliases": [
+      "apps/amsengagementviewservice",
+      "apps/com.apple.AMSEngagementViewService"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.ARDForcedViewer",
+    "source": "/System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Support/Shared Screen Viewer.app",
+    "aliases": [
+      "apps/com.apple.ARDForcedViewer",
+      "apps/shared-screen-viewer"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.AVB-Audio-Configuration",
+    "source": "/System/Library/CoreServices/AVB Configuration.app",
+    "aliases": [
+      "apps/avb-configuration",
+      "apps/com.apple.AVB-Audio-Configuration"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.AboutThisMacLauncher",
+    "source": "/System/Library/CoreServices/Applications/About This Mac.app",
+    "aliases": [
+      "apps/about-this-mac",
+      "apps/com.apple.AboutThisMacLauncher"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.AccessibilityInspector",
+    "source": "/Applications/Xcode.app/Contents/Applications/Accessibility Inspector.app",
+    "aliases": [
+      "apps/accessibility-inspector",
+      "apps/com.apple.AccessibilityInspector"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.AccessibilityOnboarding",
+    "source": "/System/Library/PrivateFrameworks/UniversalAccess.framework/Versions/A/Resources/Accessibility Tutorial.app",
+    "aliases": [
+      "apps/accessibility-tutorial",
+      "apps/com.apple.AccessibilityOnboarding"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.AccessibilityUIServer",
+    "source": "/System/Library/CoreServices/AccessibilityUIServer.app",
+    "aliases": [
+      "apps/accessibilityuiserver",
+      "apps/com.apple.AccessibilityUIServer"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.ActivityMonitor",
+    "source": "/System/Applications/Utilities/Activity Monitor.app",
+    "aliases": [
+      "apps/activity-monitor",
+      "apps/com.apple.ActivityMonitor"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.AddressBook",
+    "source": "/System/Applications/Contacts.app",
+    "aliases": [
+      "apps/com.apple.AddressBook",
+      "apps/contacts"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.AppSSOAgent",
+    "source": "/System/Library/PrivateFrameworks/AppSSO.framework/Support/AppSSOAgent.app",
+    "aliases": [
+      "apps/appssoagent",
+      "apps/com.apple.AppSSOAgent"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.AppStore",
+    "source": "/System/Applications/App Store.app",
+    "aliases": [
+      "apps/app-store",
+      "apps/com.apple.AppStore"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.AppleScriptUtility",
+    "source": "/System/Library/CoreServices/AppleScript Utility.app",
+    "aliases": [
+      "apps/applescript-utility",
+      "apps/com.apple.AppleScriptUtility"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.AssistiveControl.editor",
+    "source": "/System/Library/Input Methods/Assistive Control.app/Contents/Resources/Panel Editor.app",
+    "aliases": [
+      "apps/com.apple.AssistiveControl.editor",
+      "apps/panel-editor"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.Automator",
+    "source": "/System/Applications/Automator.app",
+    "aliases": [
+      "apps/automator",
+      "apps/com.apple.Automator"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.Automator.Automator-Application-Stub",
+    "source": "/System/Library/CoreServices/Automator Application Stub.app",
+    "aliases": [
+      "apps/automator-application-stub",
+      "apps/com.apple.Automator.Automator-Application-Stub"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.AutomatorInstaller",
+    "source": "/System/Library/CoreServices/Automator Installer.app",
+    "aliases": [
+      "apps/automator-installer",
+      "apps/com.apple.AutomatorInstaller"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.Batteries",
+    "source": "/System/Library/CoreServices/Batteries.app",
+    "aliases": [
+      "apps/batteries",
+      "apps/com.apple.Batteries"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.BluetoothFileExchange",
+    "source": "/System/Applications/Utilities/Bluetooth File Exchange.app",
+    "aliases": [
+      "apps/bluetooth-file-exchange",
+      "apps/com.apple.BluetoothFileExchange"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.BluetoothSetupAssistant",
+    "source": "/System/Library/CoreServices/BluetoothSetupAssistant.app",
+    "aliases": [
+      "apps/bluetoothsetupassistant",
+      "apps/com.apple.BluetoothSetupAssistant"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.BuildWebPage",
+    "source": "/System/Library/Image Capture/Automatic Tasks/Build Web Page.app",
+    "aliases": [
+      "apps/build-web-page",
+      "apps/com.apple.BuildWebPage"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.CalendarFileHandler",
+    "source": "/System/Library/CoreServices/CalendarFileHandler.app",
+    "aliases": [
+      "apps/calendarfilehandler",
+      "apps/com.apple.CalendarFileHandler"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.Calibration-Assistant",
+    "source": "/System/Library/PrivateFrameworks/AmbientDisplay.framework/Versions/A/Resources/Calibration Assistant.app",
+    "aliases": [
+      "apps/calibration-assistant",
+      "apps/com.apple.Calibration-Assistant"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.CertificateAssistant",
+    "source": "/System/Library/CoreServices/Certificate Assistant.app",
+    "aliases": [
+      "apps/certificate-assistant",
+      "apps/com.apple.CertificateAssistant"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.Chess",
+    "source": "/System/Applications/Chess.app",
+    "aliases": [
+      "apps/chess",
+      "apps/com.apple.Chess"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.ChineseTextConverterService",
+    "source": "/System/Library/Services/ChineseTextConverterService.app",
+    "aliases": [
+      "apps/chinesetextconverterservice",
+      "apps/com.apple.ChineseTextConverterService"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.CloudKit.ShareBear",
+    "source": "/System/Library/CoreServices/iCloud.app",
+    "aliases": [
+      "apps/com.apple.CloudKit.ShareBear",
+      "apps/icloud"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.ColorSyncCalibrator",
+    "source": "/System/Library/ColorSync/Calibrators/Display Calibrator.app",
+    "aliases": [
+      "apps/com.apple.ColorSyncCalibrator",
+      "apps/display-calibrator"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.ColorSyncUtility",
+    "source": "/System/Applications/Utilities/ColorSync Utility.app",
+    "aliases": [
+      "apps/colorsync-utility",
+      "apps/com.apple.ColorSyncUtility"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.Console",
+    "source": "/System/Applications/Utilities/Console.app",
+    "aliases": [
+      "apps/com.apple.Console",
+      "apps/console"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.CreateML",
+    "source": "/Applications/Xcode.app/Contents/Applications/Create ML.app",
+    "aliases": [
+      "apps/com.apple.CreateML",
+      "apps/create-ml"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.DVDPlayer",
+    "source": "/System/Library/CoreServices/Applications/DVD Player.app",
+    "aliases": [
+      "apps/com.apple.DVDPlayer",
+      "apps/dvd-player"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.DeskCam",
+    "source": "/System/Library/CoreServices/Applications/Desk View.app",
+    "aliases": [
+      "apps/com.apple.DeskCam",
+      "apps/desk-view"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.DiagnosticsModeAssistant",
+    "source": "/System/Library/CoreServices/Apple Diagnostics.app",
+    "aliases": [
+      "apps/apple-diagnostics",
+      "apps/com.apple.DiagnosticsModeAssistant"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.DiagnosticsReporter",
+    "source": "/System/Library/CoreServices/Diagnostics Reporter.app",
+    "aliases": [
+      "apps/com.apple.DiagnosticsReporter",
+      "apps/diagnostics-reporter"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.Dictionary",
+    "source": "/System/Applications/Dictionary.app",
+    "aliases": [
+      "apps/com.apple.Dictionary",
+      "apps/dictionary"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.DigitalColorMeter",
+    "source": "/System/Applications/Utilities/Digital Color Meter.app",
+    "aliases": [
+      "apps/com.apple.DigitalColorMeter",
+      "apps/digital-color-meter"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.DirectoryUtility",
+    "source": "/System/Library/CoreServices/Applications/Directory Utility.app",
+    "aliases": [
+      "apps/com.apple.DirectoryUtility",
+      "apps/directory-utility"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.DiskUtility",
+    "source": "/System/Applications/Utilities/Disk Utility.app",
+    "aliases": [
+      "apps/com.apple.DiskUtility",
+      "apps/disk-utility"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.EnhancedLogging",
+    "source": "/System/Library/CoreServices/Enhanced Logging.app",
+    "aliases": [
+      "apps/com.apple.EnhancedLogging",
+      "apps/enhanced-logging"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.EraseAssistant",
+    "source": "/System/Library/CoreServices/Erase Assistant.app",
+    "aliases": [
+      "apps/com.apple.EraseAssistant",
+      "apps/erase-assistant"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.ExpansionSlotUtility",
+    "source": "/System/Library/CoreServices/Applications/Expansion Slot Utility.app",
+    "aliases": [
+      "apps/com.apple.ExpansionSlotUtility",
+      "apps/expansion-slot-utility"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.FaceTime",
+    "source": "/System/Applications/FaceTime.app",
+    "aliases": [
+      "apps/com.apple.FaceTime",
+      "apps/facetime"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.FileMerge",
+    "source": "/Applications/Xcode.app/Contents/Applications/FileMerge.app",
+    "aliases": [
+      "apps/com.apple.FileMerge",
+      "apps/filemerge"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.FileProvider-Feedback",
+    "source": "/System/Library/CoreServices/FileProvider-Feedback.app",
+    "aliases": [
+      "apps/com.apple.FileProvider-Feedback",
+      "apps/fileprovider-feedback"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.FolderActionsDispatcher",
+    "source": "/System/Library/CoreServices/FolderActionsDispatcher.app",
+    "aliases": [
+      "apps/com.apple.FolderActionsDispatcher",
+      "apps/folderactionsdispatcher"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.FolderActionsSetup",
+    "source": "/System/Library/CoreServices/Applications/Folder Actions Setup.app",
+    "aliases": [
+      "apps/com.apple.FolderActionsSetup",
+      "apps/folder-actions-setup"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.FontBook",
+    "source": "/System/Applications/Font Book.app",
+    "aliases": [
+      "apps/com.apple.FontBook",
+      "apps/font-book"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.GameTrampoline",
+    "source": "/System/Library/CoreServices/GameTrampoline.app",
+    "aliases": [
+      "apps/com.apple.GameTrampoline",
+      "apps/gametrampoline"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.GenerativePlaygroundApp",
+    "source": "/System/Applications/Image Playground.app",
+    "aliases": [
+      "apps/com.apple.GenerativePlaygroundApp",
+      "apps/image-playground"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.Home",
+    "source": "/System/Applications/Home.app",
+    "aliases": [
+      "apps/com.apple.Home",
+      "apps/home"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.IPAInstaller",
+    "source": "/System/Library/CoreServices/Applications/iOS App Installer.app",
+    "aliases": [
+      "apps/com.apple.IPAInstaller",
+      "apps/ios-app-installer"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.IconComposer",
+    "source": "/Applications/Xcode.app/Contents/Applications/Icon Composer.app",
+    "aliases": [
+      "apps/com.apple.IconComposer",
+      "apps/icon-composer"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.Image_Capture",
+    "source": "/System/Applications/Image Capture.app",
+    "aliases": [
+      "apps/com.apple.Image_Capture",
+      "apps/image-capture"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.JavaLauncher",
+    "source": "/System/Library/CoreServices/JavaLauncher.app",
+    "aliases": [
+      "apps/com.apple.JavaLauncher",
+      "apps/javalauncher"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.KeyboardSetupAssistant",
+    "source": "/System/Library/CoreServices/KeyboardSetupAssistant.app",
+    "aliases": [
+      "apps/com.apple.KeyboardSetupAssistant",
+      "apps/keyboardsetupassistant"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.LockScreen",
+    "source": "/System/Library/CoreServices/RemoteManagement/AppleVNCServer.bundle/Contents/Support/LockScreen.app",
+    "aliases": [
+      "apps/com.apple.LockScreen",
+      "apps/lockscreen"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.Magnifier",
+    "source": "/System/Applications/Utilities/Magnifier.app",
+    "aliases": [
+      "apps/com.apple.Magnifier",
+      "apps/magnifier"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.MakePDF",
+    "source": "/System/Library/Image Capture/Automatic Tasks/MakePDF.app",
+    "aliases": [
+      "apps/com.apple.MakePDF",
+      "apps/makepdf"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.Maps",
+    "source": "/System/Applications/Maps.app",
+    "aliases": [
+      "apps/com.apple.Maps",
+      "apps/maps"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.MedicalImagingCalibrator",
+    "source": "/System/Library/CoreServices/Medical Imaging Calibrator.app",
+    "aliases": [
+      "apps/com.apple.MedicalImagingCalibrator",
+      "apps/medical-imaging-calibrator"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.MigrateAssistant",
+    "source": "/System/Applications/Utilities/Migration Assistant.app",
+    "aliases": [
+      "apps/com.apple.MigrateAssistant",
+      "apps/migration-assistant"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.MobileDeviceUpdater",
+    "source": "/System/Library/Templates/Data/Library/Apple/System/Library/PrivateFrameworks/MobileDevice.framework/Versions/A/Resources/MobileDeviceUpdater.app",
+    "aliases": [
+      "apps/com.apple.MobileDeviceUpdater",
+      "apps/mobiledeviceupdater"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.MobileSMS",
+    "source": "/System/Applications/Messages.app",
+    "aliases": [
+      "apps/com.apple.MobileSMS",
+      "apps/messages"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.Music",
+    "source": "/System/Applications/Music.app",
+    "aliases": [
+      "apps/com.apple.Music",
+      "apps/multimedia-audio-player",
+      "apps/music"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.Notes",
+    "source": "/System/Applications/Notes.app",
+    "aliases": [
+      "apps/com.apple.Notes",
+      "apps/notes"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.OAHSoftwareUpdateApp",
+    "source": "/System/Library/CoreServices/Rosetta 2 Updater.app",
+    "aliases": [
+      "apps/com.apple.OAHSoftwareUpdateApp",
+      "apps/rosetta-2-updater"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.PIPAgent",
+    "source": "/System/Library/CoreServices/PIPAgent.app",
+    "aliases": [
+      "apps/com.apple.PIPAgent",
+      "apps/pipagent"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.PackageUIKit.Install-in-Progress",
+    "source": "/System/Library/CoreServices/Install in Progress.app",
+    "aliases": [
+      "apps/com.apple.PackageUIKit.Install-in-Progress",
+      "apps/install-in-progress"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.PairedDevices",
+    "source": "/System/Library/CoreServices/Paired Devices.app",
+    "aliases": [
+      "apps/com.apple.PairedDevices",
+      "apps/paired-devices"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.Pass-Viewer",
+    "source": "/System/Library/CoreServices/Pass Viewer.app",
+    "aliases": [
+      "apps/com.apple.Pass-Viewer",
+      "apps/pass-viewer"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.Passwords",
+    "source": "/System/Applications/Passwords.app",
+    "aliases": [
+      "apps/com.apple.Passwords",
+      "apps/passwords"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.Passwords.MenuBarExtra",
+    "source": "/System/Applications/Passwords.app/Contents/Library/LoginItems/PasswordsMenuBarExtra.app",
+    "aliases": [
+      "apps/com.apple.Passwords.MenuBarExtra",
+      "apps/passwordsmenubarextra"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.PeopleViewService",
+    "source": "/System/Library/CoreServices/PeopleViewService.app",
+    "aliases": [
+      "apps/com.apple.PeopleViewService",
+      "apps/peopleviewservice"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.PhotoBooth",
+    "source": "/System/Applications/Photo Booth.app",
+    "aliases": [
+      "apps/com.apple.PhotoBooth",
+      "apps/photo-booth"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.Photos",
+    "source": "/System/Applications/Photos.app",
+    "aliases": [
+      "apps/com.apple.Photos",
+      "apps/photos"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.Preview",
+    "source": "/System/Applications/Preview.app",
+    "aliases": [
+      "apps/com.apple.Preview",
+      "apps/org.gnome.Evince",
+      "apps/org.gnome.Loupe",
+      "apps/preview"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.ProblemReporter",
+    "source": "/System/Library/CoreServices/Problem Reporter.app",
+    "aliases": [
+      "apps/com.apple.ProblemReporter",
+      "apps/problem-reporter"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.QuickLookDaemon",
+    "source": "/System/Library/Frameworks/QuickLook.framework/Versions/A/Resources/quicklookd.app",
+    "aliases": [
+      "apps/com.apple.QuickLookDaemon",
+      "apps/quicklookd"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.QuickTimePlayerX",
+    "source": "/System/Applications/QuickTime Player.app",
+    "aliases": [
+      "apps/com.apple.QuickTimePlayerX",
+      "apps/multimedia-video-player",
+      "apps/quicktime-player"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.RealityComposerPro",
+    "source": "/Applications/Xcode.app/Contents/Applications/Reality Composer Pro.app",
+    "aliases": [
+      "apps/com.apple.RealityComposerPro",
+      "apps/reality-composer-pro"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.RemoteDesktopAgent",
+    "source": "/System/Library/CoreServices/RemoteManagement/ARDAgent.app",
+    "aliases": [
+      "apps/ardagent",
+      "apps/com.apple.RemoteDesktopAgent"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.RemoteDesktopMessageAgent",
+    "source": "/System/Library/CoreServices/RemoteManagement/Remote Desktop Message.app",
+    "aliases": [
+      "apps/com.apple.RemoteDesktopMessageAgent",
+      "apps/remote-desktop-message"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.SSAssistanceCursor",
+    "source": "/System/Library/CoreServices/RemoteManagement/ScreensharingAgent.bundle/Contents/Support/SSAssistanceCursor.app",
+    "aliases": [
+      "apps/com.apple.SSAssistanceCursor",
+      "apps/ssassistancecursor"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.SSMenuAgent",
+    "source": "/System/Library/CoreServices/RemoteManagement/SSMenuAgent.app",
+    "aliases": [
+      "apps/com.apple.SSMenuAgent",
+      "apps/ssmenuagent"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.ScreenContinuity",
+    "source": "/System/Applications/iPhone Mirroring.app",
+    "aliases": [
+      "apps/com.apple.ScreenContinuity",
+      "apps/iphone-mirroring"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.ScreenReaderUIServer",
+    "source": "/System/Library/PrivateFrameworks/ScreenReader.framework/Versions/A/Resources/ScreenReaderUIServer.app",
+    "aliases": [
+      "apps/com.apple.ScreenReaderUIServer",
+      "apps/screenreaderuiserver"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.ScreenSaver.Engine",
+    "source": "/System/Library/CoreServices/ScreenSaverEngine.app",
+    "aliases": [
+      "apps/com.apple.ScreenSaver.Engine",
+      "apps/screensaverengine"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.ScreenSharing",
+    "source": "/System/Applications/Utilities/Screen Sharing.app",
+    "aliases": [
+      "apps/com.apple.ScreenSharing",
+      "apps/screen-sharing"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.ScreenTimeWidgetApplication",
+    "source": "/System/Library/CoreServices/Screen Time.app",
+    "aliases": [
+      "apps/com.apple.ScreenTimeWidgetApplication",
+      "apps/screen-time"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.ScriptEditor.id.cocoa-applet-template",
+    "source": "/System/Library/Templates/Data/Library/Application Support/Script Editor/Templates/Cocoa-AppleScript Applet.app",
+    "aliases": [
+      "apps/cocoa-applescript-applet",
+      "apps/com.apple.ScriptEditor.id.cocoa-applet-template"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.ScriptEditor.id.droplet-with-settable-properties-template",
+    "source": "/System/Library/Templates/Data/Library/Application Support/Script Editor/Templates/Droplets/Droplet with Settable Properties.app",
+    "aliases": [
+      "apps/com.apple.ScriptEditor.id.droplet-with-settable-properties-template",
+      "apps/droplet-with-settable-properties"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.ScriptEditor.id.file-processing-droplet-template",
+    "source": "/System/Library/Templates/Data/Library/Application Support/Script Editor/Templates/Droplets/Recursive File Processing Droplet.app",
+    "aliases": [
+      "apps/com.apple.ScriptEditor.id.file-processing-droplet-template",
+      "apps/recursive-file-processing-droplet"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.ScriptEditor.id.image-file-processing-droplet-template",
+    "source": "/System/Library/Templates/Data/Library/Application Support/Script Editor/Templates/Droplets/Recursive Image File Processing Droplet.app",
+    "aliases": [
+      "apps/com.apple.ScriptEditor.id.image-file-processing-droplet-template",
+      "apps/recursive-image-file-processing-droplet"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.ScriptEditor2",
+    "source": "/System/Applications/Utilities/Script Editor.app",
+    "aliases": [
+      "apps/com.apple.ScriptEditor2",
+      "apps/script-editor"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.ScriptMenuApp",
+    "source": "/System/Library/CoreServices/Script Menu.app",
+    "aliases": [
+      "apps/com.apple.ScriptMenuApp",
+      "apps/script-menu"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.Settings",
+    "source": "/System/Library/CoreServices/SettingsPlaceholder.app",
+    "aliases": [
+      "apps/com.apple.Settings",
+      "apps/settingsplaceholder"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.SetupAssistant",
+    "source": "/System/Library/CoreServices/Setup Assistant.app",
+    "aliases": [
+      "apps/com.apple.SetupAssistant",
+      "apps/setup-assistant"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.Siri",
+    "source": "/System/Library/CoreServices/Siri.app",
+    "aliases": [
+      "apps/com.apple.Siri",
+      "apps/siri"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.SoftwareUpdateNotificationManager",
+    "source": "/System/Library/PrivateFrameworks/SoftwareUpdate.framework/Versions/A/Resources/SoftwareUpdateNotificationManager.app",
+    "aliases": [
+      "apps/com.apple.SoftwareUpdateNotificationManager",
+      "apps/softwareupdatenotificationmanager"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.Spotlight",
+    "source": "/System/Library/CoreServices/Spotlight.app",
+    "aliases": [
+      "apps/com.apple.Spotlight",
+      "apps/spotlight"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.Stickies",
+    "source": "/System/Applications/Stickies.app",
+    "aliases": [
+      "apps/com.apple.Stickies",
+      "apps/stickies"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.SummaryService",
+    "source": "/System/Library/Services/Summary Service.app",
+    "aliases": [
+      "apps/com.apple.SummaryService",
+      "apps/summary-service"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.SyncServices.AppleMobileDeviceHelper",
+    "source": "/System/Library/Templates/Data/Library/Apple/System/Library/PrivateFrameworks/MobileDevice.framework/Versions/A/AppleMobileDeviceHelper.app",
+    "aliases": [
+      "apps/applemobiledevicehelper",
+      "apps/com.apple.SyncServices.AppleMobileDeviceHelper"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.SyncServices.AppleMobileSync",
+    "source": "/System/Library/Templates/Data/Library/Apple/System/Library/PrivateFrameworks/MobileDevice.framework/Versions/A/AppleMobileSync.app",
+    "aliases": [
+      "apps/applemobilesync",
+      "apps/com.apple.SyncServices.AppleMobileSync"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.SystemProfiler",
+    "source": "/System/Applications/Utilities/System Information.app",
+    "aliases": [
+      "apps/com.apple.SystemProfiler",
+      "apps/system-information"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.TV",
+    "source": "/System/Applications/TV.app",
+    "aliases": [
+      "apps/com.apple.TV",
+      "apps/tv"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.Terminal",
+    "source": "/System/Applications/Utilities/Terminal.app",
+    "aliases": [
+      "apps/com.apple.Terminal",
+      "apps/terminal",
+      "apps/utilities-terminal"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.TextEdit",
+    "source": "/System/Applications/TextEdit.app",
+    "aliases": [
+      "apps/accessories-text-editor",
+      "apps/com.apple.TextEdit",
+      "apps/textedit"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.Ticket-Viewer",
+    "source": "/System/Library/CoreServices/Applications/Ticket Viewer.app",
+    "aliases": [
+      "apps/com.apple.Ticket-Viewer",
+      "apps/ticket-viewer"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.VNCDragHelper",
+    "source": "/System/Library/CoreServices/RemoteManagement/AppleVNCServer.bundle/Contents/Support/SSDragHelper.app",
+    "aliases": [
+      "apps/com.apple.VNCDragHelper",
+      "apps/ssdraghelper"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.VNCGuestRequest",
+    "source": "/System/Library/CoreServices/RemoteManagement/AppleVNCServer.bundle/Contents/Support/Share Screen Request.app",
+    "aliases": [
+      "apps/com.apple.VNCGuestRequest",
+      "apps/share-screen-request"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.VoiceMemos",
+    "source": "/System/Applications/VoiceMemos.app",
+    "aliases": [
+      "apps/com.apple.VoiceMemos",
+      "apps/voicememos"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.VoiceOver",
+    "source": "/System/Library/CoreServices/VoiceOver.app",
+    "aliases": [
+      "apps/com.apple.VoiceOver",
+      "apps/voiceover"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.VoiceOverQuickstart",
+    "source": "/System/Library/PrivateFrameworks/ScreenReader.framework/Versions/A/Resources/VoiceOver Quickstart.app",
+    "aliases": [
+      "apps/com.apple.VoiceOverQuickstart",
+      "apps/voiceover-quickstart"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.VoiceOverUtility",
+    "source": "/System/Applications/Utilities/VoiceOver Utility.app",
+    "aliases": [
+      "apps/com.apple.VoiceOverUtility",
+      "apps/voiceover-utility"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.VoiceOverUtilityCacheBuilder",
+    "source": "/System/Applications/Utilities/VoiceOver Utility.app/Contents/OtherBinaries/VoiceOverUtilityCacheBuilder.app",
+    "aliases": [
+      "apps/com.apple.VoiceOverUtilityCacheBuilder",
+      "apps/voiceoverutilitycachebuilder"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.XProtectFramework.XProtect",
+    "source": "/System/Library/Templates/Data/Library/Apple/System/Library/CoreServices/XProtect.app",
+    "aliases": [
+      "apps/com.apple.XProtectFramework.XProtect",
+      "apps/xprotect"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.accessibility.AXVisualSupportAgent",
+    "source": "/System/Library/PrivateFrameworks/UniversalAccess.framework/Versions/A/Resources/AXVisualSupportAgent.app",
+    "aliases": [
+      "apps/axvisualsupportagent",
+      "apps/com.apple.accessibility.AXVisualSupportAgent"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.accessibility.AccessibilityReader",
+    "source": "/System/Library/CoreServices/Accessibility Reader.app",
+    "aliases": [
+      "apps/accessibility-reader",
+      "apps/com.apple.accessibility.AccessibilityReader"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.accessibility.LiveSpeech",
+    "source": "/System/Library/PrivateFrameworks/AccessibilitySharedSupport.framework/Versions/A/Resources/Live Speech.app",
+    "aliases": [
+      "apps/com.apple.accessibility.LiveSpeech",
+      "apps/live-speech"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.accessibility.LiveTranscriptionAgent",
+    "source": "/System/Library/PrivateFrameworks/AccessibilitySharedSupport.framework/Versions/A/Resources/Live Captions.app",
+    "aliases": [
+      "apps/com.apple.accessibility.LiveTranscriptionAgent",
+      "apps/live-captions"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.accessoryaccess.uiagent",
+    "source": "/System/Library/Frameworks/AccessoryAccess.framework/Versions/A/Resources/Virtual Machine Accessories.app",
+    "aliases": [
+      "apps/com.apple.accessoryaccess.uiagent",
+      "apps/virtual-machine-accessories"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.airport.airportutility",
+    "source": "/System/Applications/Utilities/AirPort Utility.app",
+    "aliases": [
+      "apps/airport-utility",
+      "apps/com.apple.airport.airportutility"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.appleseed.FeedbackAssistant",
+    "source": "/System/Library/CoreServices/Applications/Feedback Assistant.app",
+    "aliases": [
+      "apps/com.apple.appleseed.FeedbackAssistant",
+      "apps/feedback-assistant"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.apps.launcher",
+    "source": "/System/Applications/Apps.app",
+    "aliases": [
+      "apps/apps",
+      "apps/com.apple.apps.launcher"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.archiveutility",
+    "source": "/System/Library/CoreServices/Applications/Archive Utility.app",
+    "aliases": [
+      "apps/archive-utility",
+      "apps/com.apple.archiveutility"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.audio.AudioMIDISetup",
+    "source": "/System/Applications/Utilities/Audio MIDI Setup.app",
+    "aliases": [
+      "apps/audio-midi-setup",
+      "apps/com.apple.audio.AudioMIDISetup"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.backup.launcher",
+    "source": "/System/Applications/Time Machine.app",
+    "aliases": [
+      "apps/com.apple.backup.launcher",
+      "apps/time-machine"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.bird",
+    "source": "/System/Library/PrivateFrameworks/iCloudDriveCore.framework/Versions/A/Resources/iCloud Drive.app",
+    "aliases": [
+      "apps/com.apple.bird",
+      "apps/icloud-drive"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.calculator",
+    "source": "/System/Applications/Calculator.app",
+    "aliases": [
+      "apps/accessories-calculator",
+      "apps/calculator",
+      "apps/com.apple.calculator"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.campo",
+    "source": "/System/Applications/Siri AI.app",
+    "aliases": [
+      "apps/com.apple.campo",
+      "apps/siri-ai"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.clock",
+    "source": "/System/Applications/Clock.app",
+    "aliases": [
+      "apps/clock",
+      "apps/com.apple.clock"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.controlcenter",
+    "source": "/System/Library/CoreServices/ControlCenter.app",
+    "aliases": [
+      "apps/com.apple.controlcenter",
+      "apps/controlcenter"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.ctkbind",
+    "source": "/System/Library/Frameworks/CryptoTokenKit.framework/ctkbind.app",
+    "aliases": [
+      "apps/com.apple.ctkbind",
+      "apps/ctkbind"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.displaycalibrator",
+    "source": "/System/Library/CoreServices/Pro Display Calibrator.app",
+    "aliases": [
+      "apps/com.apple.displaycalibrator",
+      "apps/pro-display-calibrator"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.dock",
+    "source": "/System/Library/CoreServices/Dock.app",
+    "aliases": [
+      "apps/com.apple.dock",
+      "apps/dock"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.dt.CommandLineTools.installondemand",
+    "source": "/System/Library/CoreServices/Install Command Line Developer Tools.app",
+    "aliases": [
+      "apps/com.apple.dt.CommandLineTools.installondemand",
+      "apps/install-command-line-developer-tools"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.dt.Instruments",
+    "source": "/Applications/Xcode.app/Contents/Applications/Instruments.app",
+    "aliases": [
+      "apps/com.apple.dt.Instruments",
+      "apps/instruments"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.dt.Xcode",
+    "source": "/Applications/Xcode.app",
+    "aliases": [
+      "apps/com.apple.dt.Xcode",
+      "apps/xcode"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.dt.Xcode-Helper",
+    "source": "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Xcode/Agents/Xcode Helper.app",
+    "aliases": [
+      "apps/com.apple.dt.Xcode-Helper",
+      "apps/xcode-helper"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.exposelauncher",
+    "source": "/System/Applications/Mission Control.app",
+    "aliases": [
+      "apps/com.apple.exposelauncher",
+      "apps/mission-control"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.familycontrols.useragent",
+    "source": "/System/Library/PrivateFrameworks/FamilyControls.framework/Versions/A/Resources/ParentalControls.app",
+    "aliases": [
+      "apps/com.apple.familycontrols.useragent",
+      "apps/parentalcontrols"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.finder",
+    "source": "/System/Library/CoreServices/Finder.app",
+    "aliases": [
+      "apps/Thunar",
+      "apps/com.apple.finder",
+      "apps/finder",
+      "apps/io.github.lgse.Strata",
+      "apps/org.xfce.thunar",
+      "apps/system-file-manager",
+      "apps/thunar"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.finder.Open-AirDrop",
+    "source": "/System/Library/CoreServices/Finder.app/Contents/Applications/AirDrop.app",
+    "aliases": [
+      "apps/airdrop",
+      "apps/com.apple.finder.Open-AirDrop"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.finder.Open-AllMyFiles",
+    "source": "/System/Library/CoreServices/Finder.app/Contents/Applications/All My Files.app",
+    "aliases": [
+      "apps/all-my-files",
+      "apps/com.apple.finder.Open-AllMyFiles"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.finder.Open-Computer",
+    "source": "/System/Library/CoreServices/Finder.app/Contents/Applications/Computer.app",
+    "aliases": [
+      "apps/com.apple.finder.Open-Computer",
+      "apps/computer"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.finder.Open-Network",
+    "source": "/System/Library/CoreServices/Finder.app/Contents/Applications/Network.app",
+    "aliases": [
+      "apps/com.apple.finder.Open-Network",
+      "apps/network"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.finder.Open-Recents",
+    "source": "/System/Library/CoreServices/Finder.app/Contents/Applications/Recents.app",
+    "aliases": [
+      "apps/com.apple.finder.Open-Recents",
+      "apps/recents"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.finder.Open-iCloudDrive",
+    "source": "/System/Library/CoreServices/Finder.app/Contents/Applications/iCloud Drive.app",
+    "aliases": [
+      "apps/com.apple.finder.Open-iCloudDrive"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.findmy",
+    "source": "/System/Applications/FindMy.app",
+    "aliases": [
+      "apps/com.apple.findmy",
+      "apps/findmy"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.freeform",
+    "source": "/System/Applications/Freeform.app",
+    "aliases": [
+      "apps/com.apple.freeform",
+      "apps/freeform"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.gamecenter",
+    "source": "/System/Library/CoreServices/Game Center.app",
+    "aliases": [
+      "apps/com.apple.gamecenter",
+      "apps/game-center"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.games",
+    "source": "/System/Applications/Games.app",
+    "aliases": [
+      "apps/com.apple.games",
+      "apps/games"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.garageband10",
+    "source": "/Applications/GarageBand.app",
+    "aliases": [
+      "apps/com.apple.garageband10",
+      "apps/garageband"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.grapher",
+    "source": "/System/Applications/Utilities/Grapher.app",
+    "aliases": [
+      "apps/com.apple.grapher",
+      "apps/grapher"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.helpviewer",
+    "source": "/System/Applications/Tips.app",
+    "aliases": [
+      "apps/com.apple.helpviewer",
+      "apps/tips"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.iBooksX",
+    "source": "/System/Applications/Books.app",
+    "aliases": [
+      "apps/books",
+      "apps/com.apple.iBooksX"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.iCal",
+    "source": "/System/Applications/Calendar.app",
+    "aliases": [
+      "apps/calendar",
+      "apps/com.apple.iCal",
+      "apps/office-calendar"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.iCloudUserNotificationsd",
+    "source": "/System/Library/PrivateFrameworks/AOSAccounts.framework/Versions/A/Resources/iCloudUserNotificationsd.app",
+    "aliases": [
+      "apps/com.apple.iCloudUserNotificationsd",
+      "apps/icloudusernotificationsd"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.iMovieApp",
+    "source": "/Applications/iMovie.app",
+    "aliases": [
+      "apps/com.apple.iMovieApp",
+      "apps/imovie"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.iWork.Keynote",
+    "source": "/Applications/Keynote.app",
+    "aliases": [
+      "apps/com.apple.iWork.Keynote",
+      "apps/keynote"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.iWork.Numbers",
+    "source": "/Applications/Numbers.app",
+    "aliases": [
+      "apps/com.apple.iWork.Numbers",
+      "apps/numbers"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.iWork.Pages",
+    "source": "/Applications/Pages.app",
+    "aliases": [
+      "apps/com.apple.iWork.Pages",
+      "apps/pages"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.icq",
+    "source": "/System/Library/CoreServices/iCloud+.app",
+    "aliases": [
+      "apps/com.apple.icq",
+      "apps/icloud+"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.inputmethod.Korean.HanjaTool",
+    "source": "/System/Library/Input Methods/KoreanIM.app/Contents/PlugIns/KIM_Extension.appex/Contents/Resources/HanjaTool.app",
+    "aliases": [
+      "apps/com.apple.inputmethod.Korean.HanjaTool",
+      "apps/hanjatool"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.inputmethod.Tamil",
+    "source": "/System/Library/Input Methods/TamilIM.app",
+    "aliases": [
+      "apps/com.apple.inputmethod.Tamil",
+      "apps/tamilim"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.inputmethod.ironwood",
+    "source": "/System/Library/Input Methods/DictationIM.app",
+    "aliases": [
+      "apps/com.apple.inputmethod.ironwood",
+      "apps/dictationim"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.installer",
+    "source": "/System/Library/CoreServices/Installer.app",
+    "aliases": [
+      "apps/com.apple.installer",
+      "apps/installer"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.iphonesimulator",
+    "source": "/Applications/Xcode.app/Contents/Developer/Applications/Simulator.app",
+    "aliases": [
+      "apps/com.apple.iphonesimulator",
+      "apps/simulator"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.journal",
+    "source": "/System/Applications/Journal.app",
+    "aliases": [
+      "apps/com.apple.journal",
+      "apps/journal"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.keychainaccess",
+    "source": "/System/Library/CoreServices/Applications/Keychain Access.app",
+    "aliases": [
+      "apps/com.apple.keychainaccess",
+      "apps/keychain-access"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.mail",
+    "source": "/System/Applications/Mail.app",
+    "aliases": [
+      "apps/com.apple.mail",
+      "apps/mail"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.mcx.ProfileHelper",
+    "source": "/System/Library/CoreServices/ProfileHelper.app",
+    "aliases": [
+      "apps/com.apple.mcx.ProfileHelper",
+      "apps/profilehelper"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.mobilephone",
+    "source": "/System/Applications/Phone.app",
+    "aliases": [
+      "apps/com.apple.mobilephone",
+      "apps/phone"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.musicrecognition.mac",
+    "source": "/System/Library/CoreServices/MusicRecognitionMac.app",
+    "aliases": [
+      "apps/com.apple.musicrecognition.mac",
+      "apps/musicrecognitionmac"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.news",
+    "source": "/System/Applications/News.app",
+    "aliases": [
+      "apps/com.apple.news",
+      "apps/news"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.podcasts",
+    "source": "/System/Applications/Podcasts.app",
+    "aliases": [
+      "apps/com.apple.podcasts",
+      "apps/podcasts"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.print.AirScanLegacyDiscovery",
+    "source": "/System/Library/Templates/Data/Library/Image Capture/Support/LegacyDeviceDiscoveryHelpers/AirScanLegacyDiscovery.app",
+    "aliases": [
+      "apps/airscanlegacydiscovery",
+      "apps/com.apple.print.AirScanLegacyDiscovery"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.print.add",
+    "source": "/System/Library/CoreServices/AddPrinter.app",
+    "aliases": [
+      "apps/addprinter",
+      "apps/com.apple.print.add"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.printcenter",
+    "source": "/System/Applications/Utilities/Print Center.app",
+    "aliases": [
+      "apps/com.apple.printcenter",
+      "apps/print-center"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.python3",
+    "source": "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app",
+    "aliases": [
+      "apps/com.apple.python3"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.quicklook.qlmanage",
+    "source": "/System/Library/Frameworks/QuickLook.framework/Versions/A/Resources/qlmanage.app",
+    "aliases": [
+      "apps/com.apple.quicklook.qlmanage",
+      "apps/qlmanage"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.reminders",
+    "source": "/System/Applications/Reminders.app",
+    "aliases": [
+      "apps/com.apple.reminders",
+      "apps/reminders"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.screenshot.launcher",
+    "source": "/System/Applications/Utilities/Screenshot.app",
+    "aliases": [
+      "apps/com.apple.screenshot.launcher",
+      "apps/screenshot"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.shortcuts",
+    "source": "/System/Applications/Shortcuts.app",
+    "aliases": [
+      "apps/com.apple.shortcuts",
+      "apps/shortcuts"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.siri.launcher",
+    "source": "/System/Applications/Siri.app",
+    "aliases": [
+      "apps/com.apple.siri.launcher"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.ssinvitationagent",
+    "source": "/System/Library/CoreServices/RemoteManagement/ScreensharingAgent.bundle/Contents/Support/SSInvitationAgent.app",
+    "aliases": [
+      "apps/com.apple.ssinvitationagent",
+      "apps/ssinvitationagent"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.stocks",
+    "source": "/System/Applications/Stocks.app",
+    "aliases": [
+      "apps/com.apple.stocks",
+      "apps/stocks"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.syncserver",
+    "source": "/System/Library/Frameworks/SyncServices.framework/Versions/A/Resources/SyncServer.app",
+    "aliases": [
+      "apps/com.apple.syncserver",
+      "apps/syncserver"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.syncservices.ConflictResolver",
+    "source": "/System/Library/PrivateFrameworks/SyncServicesUI.framework/Versions/A/Resources/Conflict Resolver.app",
+    "aliases": [
+      "apps/com.apple.syncservices.ConflictResolver",
+      "apps/conflict-resolver"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.systempreferences",
+    "source": "/System/Applications/System Settings.app",
+    "aliases": [
+      "apps/com.apple.systempreferences",
+      "apps/org.gnome.Settings",
+      "apps/preferences-system",
+      "apps/system-settings"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.tips",
+    "source": "/System/Library/CoreServices/TipsSpotlightHandler.app",
+    "aliases": [
+      "apps/com.apple.tips",
+      "apps/tipsspotlighthandler"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.universalcontrol",
+    "source": "/System/Library/CoreServices/UniversalControl.app",
+    "aliases": [
+      "apps/com.apple.universalcontrol",
+      "apps/universalcontrol"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.wallpaper.agent",
+    "source": "/System/Library/CoreServices/WallpaperAgent.app",
+    "aliases": [
+      "apps/com.apple.wallpaper.agent",
+      "apps/wallpaperagent"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.weather",
+    "source": "/System/Applications/Weather.app",
+    "aliases": [
+      "apps/com.apple.weather",
+      "apps/weather"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.weather.menu",
+    "source": "/System/Applications/Weather.app/Contents/Library/LoginItems/WeatherMenu.app",
+    "aliases": [
+      "apps/com.apple.weather.menu",
+      "apps/weathermenu"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.widgetkit.simulator",
+    "source": "/System/Library/CoreServices/WidgetKit Simulator.app",
+    "aliases": [
+      "apps/com.apple.widgetkit.simulator",
+      "apps/widgetkit-simulator"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.apple.wifi.diagnostics",
+    "source": "/System/Library/CoreServices/Applications/Wireless Diagnostics.app",
+    "aliases": [
+      "apps/com.apple.wifi.diagnostics",
+      "apps/wireless-diagnostics"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.bambulab.bambu-studio",
+    "source": "/Applications/BambuStudio.app",
+    "aliases": [
+      "apps/BambuStudio",
+      "apps/bambu-studio",
+      "apps/bambustudio",
+      "apps/com.bambulab.BambuStudio",
+      "apps/com.bambulab.bambu-studio"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.cockatrice.Oracle",
+    "source": "/Applications/oracle.app",
+    "aliases": [
+      "apps/com.cockatrice.Oracle",
+      "apps/oracle"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.codicesoftware.gluon",
+    "source": "/Applications/PlasticSCM.app/Contents/Applications/Gluon.app",
+    "aliases": [
+      "apps/com.codicesoftware.gluon",
+      "apps/gluon"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.codicesoftware.plasticscm",
+    "source": "/Applications/PlasticSCM.app",
+    "aliases": [
+      "apps/plasticscm"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.codicesoftware.plasticscm",
+    "source": "/Applications/PlasticSCM.app/Contents/Applications/Unity DevOps Version Control.app",
+    "aliases": [
+      "apps/com.codicesoftware.plasticscm",
+      "apps/unity-devops-version-control"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.codicesoftware.plasticscm.cm",
+    "source": "/Applications/PlasticSCM.app/Contents/Applications/cm.app",
+    "aliases": [
+      "apps/cm",
+      "apps/com.codicesoftware.plasticscm.cm"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.codicesoftware.plasticscm.server",
+    "source": "/Applications/PlasticSCMServer.app",
+    "aliases": [
+      "apps/com.codicesoftware.plasticscm.server",
+      "apps/plasticscmserver"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.codicesoftware.unityclouddrive",
+    "source": "/Applications/PlasticSCM.app/Contents/Applications/Unity Cloud Drive.app",
+    "aliases": [
+      "apps/com.codicesoftware.unityclouddrive",
+      "apps/unity-cloud-drive"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.gingerlabs.Notability",
+    "source": "/Applications/Notability.app",
+    "aliases": [
+      "apps/com.gingerlabs.Notability",
+      "apps/notability"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.github.GitHubClient",
+    "source": "/Applications/GitHub Desktop.app",
+    "aliases": [
+      "apps/com.github.GitHubClient",
+      "apps/github-desktop"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.google.Chrome",
+    "source": "/Applications/Google Chrome.app",
+    "aliases": [
+      "apps/com.google.Chrome",
+      "apps/google-chrome",
+      "apps/google-chrome-stable"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.google.Chrome.framework.AlertNotificationService",
+    "source": "/Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/156.0.8078.79/Helpers/Google Chrome Helper (Alerts).app",
+    "aliases": [
+      "apps/google-chrome-helper-(alerts)"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.google.Chrome.framework.AlertNotificationService",
+    "source": "/Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/156.0.8078.79/Helpers/Google Chrome Helper (Aperitif Alerts).app",
+    "aliases": [
+      "apps/com.google.Chrome.framework.AlertNotificationService",
+      "apps/google-chrome-helper-(aperitif-alerts)"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.harryshamansky.Stitcher",
+    "source": "/Applications/Stitcher.app",
+    "aliases": [
+      "apps/com.harryshamansky.Stitcher",
+      "apps/stitcher"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.hautetechnique.midiview",
+    "source": "/Applications/MidiView.app",
+    "aliases": [
+      "apps/com.hautetechnique.midiview",
+      "apps/midiview"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.hnc.Discord",
+    "source": "/Applications/Discord.app",
+    "aliases": [
+      "apps/com.hnc.Discord",
+      "apps/discord",
+      "apps/discord-canary",
+      "apps/webapp-discord"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.janhuelsmann.SaneSideButtons",
+    "source": "/Applications/SaneSideButtons.app",
+    "aliases": [
+      "apps/com.janhuelsmann.SaneSideButtons",
+      "apps/sanesidebuttons"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.jobssoft.paintlite",
+    "source": "/Applications/Paint X.app",
+    "aliases": [
+      "apps/com.jobssoft.paintlite",
+      "apps/paint-x"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.knollsoft.Rectangle",
+    "source": "/Applications/Rectangle.app",
+    "aliases": [
+      "apps/com.knollsoft.Rectangle",
+      "apps/rectangle"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.logi.ghub",
+    "source": "/Library/Application Support/Logi/LGHUB/depots/710931/core/lghub.app",
+    "aliases": [
+      "apps/com.logi.ghub",
+      "apps/lghub"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.logi.ghub.agent",
+    "source": "/Library/Application Support/Logi/LGHUB/depots/710931/core/lghub.app/Contents/MacOS/lghub_agent.app",
+    "aliases": [
+      "apps/com.logi.ghub.agent",
+      "apps/lghub_agent"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.logi.ghub.sso",
+    "source": "/Library/Application Support/Logi/LGHUB/depots/710931/core/lghub.app/Contents/MacOS/lghub_sso_handler.app",
+    "aliases": [
+      "apps/com.logi.ghub.sso",
+      "apps/lghub_sso_handler"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.logi.ghub.ui",
+    "source": "/Library/Application Support/Logi/LGHUB/depots/710931/core/lghub.app/Contents/MacOS/lghub_ui.app",
+    "aliases": [
+      "apps/com.logi.ghub.ui",
+      "apps/lghub_ui"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.lwouis.alt-tab-macos",
+    "source": "/Applications/AltTab.app",
+    "aliases": [
+      "apps/alttab",
+      "apps/com.lwouis.alt-tab-macos"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.microsoft.OneDrive",
+    "source": "/Applications/OneDrive.app",
+    "aliases": [
+      "apps/com.microsoft.OneDrive",
+      "apps/onedrive",
+      "apps/webapp-onedrive"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.microsoft.OneDrive.OneDriveFileHandler",
+    "source": "/Applications/OneDrive.app/Contents/OneDrive File Handler.app",
+    "aliases": [
+      "apps/com.microsoft.OneDrive.OneDriveFileHandler",
+      "apps/onedrive-file-handler"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.microsoft.OneDrive.UI",
+    "source": "/Applications/OneDrive.app/Contents/Library/OneDriveUI.app",
+    "aliases": [
+      "apps/com.microsoft.OneDrive.UI",
+      "apps/onedriveui"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.microsoft.OneDriveLauncher",
+    "source": "/Applications/OneDrive.app/Contents/Library/LoginItems/OneDrive Launcher.app",
+    "aliases": [
+      "apps/com.microsoft.OneDriveLauncher",
+      "apps/onedrive-launcher"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.microsoft.OneDriveStandaloneUpdater",
+    "source": "/Applications/OneDrive.app/Contents/StandaloneUpdater.app",
+    "aliases": [
+      "apps/com.microsoft.OneDriveStandaloneUpdater",
+      "apps/standaloneupdater"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.microsoft.OneDriveUpdater",
+    "source": "/Applications/OneDrive.app/Contents/OneDrive Updater.app",
+    "aliases": [
+      "apps/com.microsoft.OneDriveUpdater",
+      "apps/onedrive-updater"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.microsoft.Outlook",
+    "source": "/Applications/Microsoft Outlook.app",
+    "aliases": [
+      "apps/com.microsoft.Outlook",
+      "apps/microsoft-outlook",
+      "apps/outlook",
+      "apps/webapp-outlook"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.microsoft.SharePoint-mac",
+    "source": "/Applications/OneDrive.app/Contents/OneDrive Sync Service.app",
+    "aliases": [
+      "apps/com.microsoft.SharePoint-mac",
+      "apps/onedrive-sync-service"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.microsoft.SkyDriveLauncher",
+    "source": "/Applications/OneDrive.app/Contents/Library/LoginItems/Launcher Disabler.app",
+    "aliases": [
+      "apps/com.microsoft.SkyDriveLauncher",
+      "apps/launcher-disabler"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.microsoft.SyncReporter",
+    "source": "/Applications/OneDrive.app/Contents/SyncReporter.app",
+    "aliases": [
+      "apps/com.microsoft.SyncReporter",
+      "apps/syncreporter"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.microsoft.VSCode",
+    "source": "/Applications/Visual Studio Code.app",
+    "aliases": [
+      "apps/code",
+      "apps/com.microsoft.VSCode",
+      "apps/visual-studio-code"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.microsoft.Word",
+    "source": "/Applications/Microsoft Word.app",
+    "aliases": [
+      "apps/com.microsoft.Word",
+      "apps/microsoft-word"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.microsoft.errorreporting",
+    "source": "/Applications/OneDrive.app/Contents/SharedSupport/Microsoft Error Reporting.app",
+    "aliases": [
+      "apps/com.microsoft.errorreporting",
+      "apps/microsoft-error-reporting"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.microsoft.outlook.profilemanager",
+    "source": "/Applications/Microsoft Outlook.app/Contents/SharedSupport/Outlook Profile Manager.app",
+    "aliases": [
+      "apps/com.microsoft.outlook.profilemanager",
+      "apps/outlook-profile-manager"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.moonlight-stream.Moonlight",
+    "source": "/Applications/Moonlight.app",
+    "aliases": [
+      "apps/com.moonlight-stream.Moonlight",
+      "apps/moonlight"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.music.lpm",
+    "source": "/Applications/MIDI Keyboard.app",
+    "aliases": [
+      "apps/com.music.lpm",
+      "apps/midi-keyboard"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.nektony.diskinspector",
+    "source": "/Applications/Disk Inspector.app",
+    "aliases": [
+      "apps/com.nektony.diskinspector",
+      "apps/disk-inspector"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.obsproject.obs-studio",
+    "source": "https://raw.githubusercontent.com/obsproject/obs-studio/65c320b46e1af5c7a555161aea6182cdf7a8c524/cmake/macos/resources/AppIcon.icns",
+    "aliases": [
+      "apps/com.obsproject.Studio",
+      "apps/com.obsproject.obs-studio",
+      "apps/obs",
+      "apps/obs-studio"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.openai.chat",
+    "source": "/Applications/ChatGPT.app",
+    "aliases": [
+      "apps/chatgpt",
+      "apps/com.openai.chat",
+      "apps/webapp-chatgpt"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.pixelstudio.pro.mac",
+    "source": "/Applications/Pixel Studio.app",
+    "aliases": [
+      "apps/com.pixelstudio.pro.mac",
+      "apps/pixel-studio"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.postmanlabs.mac",
+    "source": "/Applications/Postman.app",
+    "aliases": [
+      "apps/com.postmanlabs.mac",
+      "apps/postman"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.rogueamoeba.ace",
+    "source": "/Library/Audio/Plug-Ins/HAL/ACE.driver/Contents/Resources/Rogue Amoeba Audio Capture Engine (ACE).app",
+    "aliases": [
+      "apps/com.rogueamoeba.ace",
+      "apps/rogue-amoeba-audio-capture-engine-(ace)"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.tcltk.wish",
+    "source": "/System/Library/Frameworks/Tk.framework/Versions/8.5/Resources/Wish Shell.app",
+    "aliases": [
+      "apps/wish-shell"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.tcltk.wish",
+    "source": "/System/Library/Frameworks/Tk.framework/Versions/8.5/Resources/Wish.app",
+    "aliases": [
+      "apps/com.tcltk.wish",
+      "apps/wish"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.tinyspeck.slackmacgap",
+    "source": "/Applications/Slack.app",
+    "aliases": [
+      "apps/com.tinyspeck.slackmacgap",
+      "apps/slack",
+      "apps/webapp-slack"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.todoist.mac.Todoist",
+    "source": "https://electron-dl.todoist.com/mac/Todoist-darwin-9.36.1-arm64-latest.dmg",
+    "aliases": [
+      "apps/com.todoist.mac.Todoist",
+      "apps/todoist",
+      "apps/webapp-todoist"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.valvesoftware.steam",
+    "source": "https://client-update.steamstatic.com/appdmg_osx.zip.984652b88a9737e3f4e77c656d9ffa67d5042c2c",
+    "aliases": [
+      "apps/com.valvesoftware.Steam",
+      "apps/com.valvesoftware.steam",
+      "apps/steam"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "com.xamarin.profiler",
+    "source": "/Applications/Xamarin Profiler.app",
+    "aliases": [
+      "apps/com.xamarin.profiler",
+      "apps/xamarin-profiler"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "io.mpv",
+    "source": "https://raw.githubusercontent.com/mpv-player/mpv/914a11c30c6a1710fe1f4333654696f2dfb3c3af/TOOLS/osxbundle/mpv.app/Contents/Resources/icon.icns",
+    "aliases": [
+      "apps/io.mpv",
+      "apps/mpv"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "io.tailscale.ipn.macos",
+    "source": "/Applications/Tailscale.app",
+    "aliases": [
+      "apps/io.tailscale.ipn.macos",
+      "apps/tailscale"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "md.obsidian",
+    "source": "/Applications/Obsidian.app",
+    "aliases": [
+      "apps/md.obsidian",
+      "apps/obsidian"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "net.kovidgoyal.kitty",
+    "source": "/Applications/kitty.app",
+    "aliases": [
+      "apps/kitty",
+      "apps/net.kovidgoyal.kitty"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "net.methodred.MIDIPlayer-X",
+    "source": "/Applications/MIDIPlayer X.app",
+    "aliases": [
+      "apps/midiplayer-x",
+      "apps/net.methodred.MIDIPlayer-X"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "net.whatsapp.WhatsApp",
+    "source": "https://web.whatsapp.com/desktop/mac_native/release/?version=2.26.43.27&extension=zip&configuration=Release&branch=master&is_buck=true",
+    "aliases": [
+      "apps/net.whatsapp.WhatsApp",
+      "apps/webapp-whatsapp",
+      "apps/whatsapp"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "nl.jeffreykuiken.NoirApp.mac",
+    "source": "/Applications/Noir.app",
+    "aliases": [
+      "apps/nl.jeffreykuiken.NoirApp.mac",
+      "apps/noir"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "org.audacityteam.audacity",
+    "source": "/Applications/Audacity.app",
+    "aliases": [
+      "apps/audacity",
+      "apps/org.audacityteam.audacity"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "org.gimp.gimp",
+    "source": "https://download.gimp.org/gimp/v3.2/macos/gimp-3.2.6-arm64.dmg",
+    "aliases": [
+      "apps/gimp",
+      "apps/org.gimp.GIMP",
+      "apps/org.gimp.gimp"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "org.libreoffice.script",
+    "source": "https://download.documentfoundation.org/libreoffice/stable/26.8.2/mac/aarch64/LibreOffice_26.8.2_MacOS_aarch64.dmg",
+    "aliases": [
+      "apps/libreoffice",
+      "apps/libreoffice-startcenter",
+      "apps/org.libreoffice.script"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "org.pqrs.Karabiner-Core-Service",
+    "source": "/Library/Application Support/org.pqrs/Karabiner-Elements/Karabiner-Core-Service.app",
+    "aliases": [
+      "apps/karabiner-core-service",
+      "apps/org.pqrs.Karabiner-Core-Service"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "org.pqrs.Karabiner-Elements-Non-Privileged-Agents-v2",
+    "source": "/Library/Application Support/org.pqrs/Karabiner-Elements/Karabiner-Elements Non-Privileged Agents v2.app",
+    "aliases": [
+      "apps/karabiner-elements-non-privileged-agents-v2",
+      "apps/org.pqrs.Karabiner-Elements-Non-Privileged-Agents-v2"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "org.pqrs.Karabiner-Elements-Privileged-Daemons-v2",
+    "source": "/Library/Application Support/org.pqrs/Karabiner-Elements/Karabiner-Elements Privileged Daemons v2.app",
+    "aliases": [
+      "apps/karabiner-elements-privileged-daemons-v2",
+      "apps/org.pqrs.Karabiner-Elements-Privileged-Daemons-v2"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "org.pqrs.Karabiner-Elements.Settings",
+    "source": "/Applications/Karabiner-Elements.app",
+    "aliases": [
+      "apps/karabiner-elements",
+      "apps/org.pqrs.Karabiner-Elements.Settings"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "org.pqrs.Karabiner-EventViewer",
+    "source": "/Applications/Karabiner-EventViewer.app",
+    "aliases": [
+      "apps/karabiner-eventviewer",
+      "apps/org.pqrs.Karabiner-EventViewer"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "org.pqrs.Karabiner-Menu",
+    "source": "/Library/Application Support/org.pqrs/Karabiner-Elements/Karabiner-Menu.app",
+    "aliases": [
+      "apps/karabiner-menu",
+      "apps/org.pqrs.Karabiner-Menu"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "org.pqrs.Karabiner-MultitouchExtension",
+    "source": "/Library/Application Support/org.pqrs/Karabiner-Elements/Karabiner-MultitouchExtension.app",
+    "aliases": [
+      "apps/karabiner-multitouchextension",
+      "apps/org.pqrs.Karabiner-MultitouchExtension"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "org.pqrs.Karabiner-NotificationWindow",
+    "source": "/Library/Application Support/org.pqrs/Karabiner-Elements/Karabiner-NotificationWindow.app",
+    "aliases": [
+      "apps/karabiner-notificationwindow",
+      "apps/org.pqrs.Karabiner-NotificationWindow"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "org.pqrs.Karabiner-Updater",
+    "source": "/Library/Application Support/org.pqrs/Karabiner-Elements/Karabiner-Updater.app",
+    "aliases": [
+      "apps/karabiner-updater",
+      "apps/org.pqrs.Karabiner-Updater"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "org.pqrs.Karabiner-VirtualHIDDevice-Daemon",
+    "source": "/Library/Application Support/org.pqrs/Karabiner-DriverKit-VirtualHIDDevice/Applications/Karabiner-VirtualHIDDevice-Daemon.app",
+    "aliases": [
+      "apps/karabiner-virtualhiddevice-daemon",
+      "apps/org.pqrs.Karabiner-VirtualHIDDevice-Daemon"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "org.prismlauncher.PrismLauncher",
+    "source": "https://raw.githubusercontent.com/PrismLauncher/PrismLauncher/6e6f81779a2f32fd98550004051ec834cf4c5e30/program_info/prismlauncher.icns",
+    "aliases": [
+      "apps/org.prismlauncher.PrismLauncher",
+      "apps/prismlauncher"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "org.python.IDLE",
+    "source": "/Applications/Python 3.12/IDLE.app",
+    "aliases": [
+      "apps/idle",
+      "apps/org.python.IDLE"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "org.python.PythonLauncher",
+    "source": "/Applications/Python 3.12/Python Launcher.app",
+    "aliases": [
+      "apps/org.python.PythonLauncher",
+      "apps/python-launcher"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "org.python.python",
+    "source": "/Library/Frameworks/Python.framework/Versions/3.12/Resources/Python.app",
+    "aliases": [
+      "apps/org.python.python",
+      "apps/python"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "org.sparkle-project.Sparkle.Updater",
+    "source": "/Library/Application Support/org.pqrs/Karabiner-Elements/Karabiner-Updater.app/Contents/Frameworks/Sparkle.framework/Versions/B/Updater.app",
+    "aliases": [
+      "apps/org.sparkle-project.Sparkle.Updater",
+      "apps/updater"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "previews.com.apple.PreviewAgent.iOS",
+    "source": "/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/Library/Xcode/Agents/XCPreviewAgent.app",
+    "aliases": [
+      "apps/previews.com.apple.PreviewAgent.iOS",
+      "apps/xcpreviewagent"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "previews.com.apple.PreviewAgent.tvOS",
+    "source": "/Applications/Xcode.app/Contents/Developer/Platforms/AppleTVSimulator.platform/Developer/Library/Xcode/Agents/XCPreviewAgent.app",
+    "aliases": [
+      "apps/previews.com.apple.PreviewAgent.tvOS"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "previews.com.apple.PreviewAgent.watchOS",
+    "source": "/Applications/Xcode.app/Contents/Developer/Platforms/WatchSimulator.platform/Developer/Library/Xcode/Agents/XCPreviewAgent.app",
+    "aliases": [
+      "apps/previews.com.apple.PreviewAgent.watchOS"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "pro.betterdisplay.BetterDisplay",
+    "source": "/Applications/BetterDisplay.app",
+    "aliases": [
+      "apps/betterdisplay",
+      "apps/pro.betterdisplay.BetterDisplay"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "us.zoom.Transcode",
+    "source": "/Applications/zoom.us.app/Contents/Frameworks/Transcode.app",
+    "aliases": [
+      "apps/transcode",
+      "apps/us.zoom.Transcode"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "us.zoom.airhost",
+    "source": "/Applications/zoom.us.app/Contents/Frameworks/airhost.app",
+    "aliases": [
+      "apps/airhost",
+      "apps/us.zoom.airhost"
+    ]
+  },
+  {
+    "kind": "app",
+    "id": "us.zoom.xos",
+    "source": "/Applications/zoom.us.app",
+    "aliases": [
+      "apps/Zoom",
+      "apps/us.zoom.xos",
+      "apps/zoom",
+      "apps/zoom.us"
+    ]
+  },
+  {
+    "kind": "place",
+    "id": "applications-other",
+    "source": "/Applications",
+    "aliases": [
+      "places/applications-other",
+      "places/folder-applications"
+    ]
+  },
+  {
+    "kind": "place",
+    "id": "drive-harddisk",
+    "source": "/",
+    "aliases": [
+      "devices/drive-harddisk",
+      "devices/drive-harddisk-root",
+      "devices/drive-harddisk-system"
+    ]
+  },
+  {
+    "kind": "place",
+    "id": "folder",
+    "source": "public.folder",
+    "aliases": [
+      "places/folder",
+      "places/inode-directory",
+      "places/x-directory-normal"
+    ]
+  },
+  {
+    "kind": "place",
+    "id": "folder-documents",
+    "source": "/Users/anthonygreen/Documents",
+    "aliases": [
+      "places/folder-documents"
+    ]
+  },
+  {
+    "kind": "place",
+    "id": "folder-download",
+    "source": "/Users/anthonygreen/Downloads",
+    "aliases": [
+      "places/folder-download",
+      "places/folder-downloads"
+    ]
+  },
+  {
+    "kind": "place",
+    "id": "folder-music",
+    "source": "/Users/anthonygreen/Music",
+    "aliases": [
+      "places/folder-music"
+    ]
+  },
+  {
+    "kind": "place",
+    "id": "folder-pictures",
+    "source": "/Users/anthonygreen/Pictures",
+    "aliases": [
+      "places/folder-pictures"
+    ]
+  },
+  {
+    "kind": "place",
+    "id": "folder-publicshare",
+    "source": "/Users/anthonygreen/Public",
+    "aliases": [
+      "places/folder-publicshare"
+    ]
+  },
+  {
+    "kind": "place",
+    "id": "folder-videos",
+    "source": "/Users/anthonygreen/Movies",
+    "aliases": [
+      "places/folder-videos"
+    ]
+  },
+  {
+    "kind": "place",
+    "id": "user-desktop",
+    "source": "/Users/anthonygreen/Desktop",
+    "aliases": [
+      "places/folder-desktop",
+      "places/user-desktop"
+    ]
+  },
+  {
+    "kind": "place",
+    "id": "user-home",
+    "source": "/Users/anthonygreen",
+    "aliases": [
+      "places/folder-home",
+      "places/user-home"
+    ]
+  },
+  {
+    "kind": "resource",
+    "id": "AlertCautionBadgeIcon",
+    "source": "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/AlertCautionBadgeIcon.icns",
+    "aliases": [
+      "status/dialog-warning"
+    ]
+  },
+  {
+    "kind": "resource",
+    "id": "AlertNoteIcon",
+    "source": "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/AlertNoteIcon.icns",
+    "aliases": [
+      "status/dialog-information"
+    ]
+  },
+  {
+    "kind": "resource",
+    "id": "AlertStopIcon",
+    "source": "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/AlertStopIcon.icns",
+    "aliases": [
+      "status/dialog-error"
+    ]
+  },
+  {
+    "kind": "resource",
+    "id": "CDAudioVolumeIcon",
+    "source": "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/CDAudioVolumeIcon.icns",
+    "aliases": [
+      "devices/media-optical",
+      "devices/media-optical-audio"
+    ]
+  },
+  {
+    "kind": "resource",
+    "id": "DeveloperFolderIcon",
+    "source": "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/DeveloperFolderIcon.icns",
+    "aliases": [
+      "places/folder-development"
+    ]
+  },
+  {
+    "kind": "resource",
+    "id": "FullTrashIcon",
+    "source": "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/FullTrashIcon.icns",
+    "aliases": [
+      "places/user-trash-full"
+    ]
+  },
+  {
+    "kind": "resource",
+    "id": "GenericAirDiskIcon",
+    "source": "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/GenericAirDiskIcon.icns",
+    "aliases": [
+      "devices/drive-harddisk-usb",
+      "devices/drive-removable-media"
+    ]
+  },
+  {
+    "kind": "resource",
+    "id": "GenericDocumentIcon",
+    "source": "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/GenericDocumentIcon.icns",
+    "aliases": [
+      "mimetypes/unknown"
+    ]
+  },
+  {
+    "kind": "resource",
+    "id": "GenericFontIcon",
+    "source": "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/GenericFontIcon.icns",
+    "aliases": [
+      "mimetypes/application-x-font-ttf"
+    ]
+  },
+  {
+    "kind": "resource",
+    "id": "GenericNetworkIcon",
+    "source": "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/GenericNetworkIcon.icns",
+    "aliases": [
+      "places/folder-remote",
+      "places/network-server",
+      "places/network-workgroup"
+    ]
+  },
+  {
+    "kind": "resource",
+    "id": "LibraryFolderIcon",
+    "source": "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/LibraryFolderIcon.icns",
+    "aliases": [
+      "places/folder-library"
+    ]
+  },
+  {
+    "kind": "resource",
+    "id": "OpenFolderIcon",
+    "source": "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/OpenFolderIcon.icns",
+    "aliases": [
+      "places/folder-open"
+    ]
+  },
+  {
+    "kind": "resource",
+    "id": "SidebarDesktopFolder",
+    "source": "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/SidebarDesktopFolder.icns",
+    "aliases": [
+      "places/user-desktop-symbolic"
+    ]
+  },
+  {
+    "kind": "resource",
+    "id": "SidebarDocumentsFolder",
+    "source": "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/SidebarDocumentsFolder.icns",
+    "aliases": [
+      "places/folder-documents-symbolic"
+    ]
+  },
+  {
+    "kind": "resource",
+    "id": "SidebarDownloadsFolder",
+    "source": "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/SidebarDownloadsFolder.icns",
+    "aliases": [
+      "places/folder-download-symbolic"
+    ]
+  },
+  {
+    "kind": "resource",
+    "id": "SidebarGenericFolder",
+    "source": "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/SidebarGenericFolder.icns",
+    "aliases": [
+      "places/folder-symbolic"
+    ]
+  },
+  {
+    "kind": "resource",
+    "id": "SidebarHomeFolder",
+    "source": "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/SidebarHomeFolder.icns",
+    "aliases": [
+      "places/user-home-symbolic"
+    ]
+  },
+  {
+    "kind": "resource",
+    "id": "SidebarMoviesFolder",
+    "source": "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/SidebarMoviesFolder.icns",
+    "aliases": [
+      "places/folder-videos-symbolic"
+    ]
+  },
+  {
+    "kind": "resource",
+    "id": "SidebarMusicFolder",
+    "source": "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/SidebarMusicFolder.icns",
+    "aliases": [
+      "places/folder-music-symbolic"
+    ]
+  },
+  {
+    "kind": "resource",
+    "id": "SidebarNetwork",
+    "source": "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/SidebarNetwork.icns",
+    "aliases": [
+      "places/folder-remote-symbolic",
+      "places/network-workgroup-symbolic"
+    ]
+  },
+  {
+    "kind": "resource",
+    "id": "SidebarPicturesFolder",
+    "source": "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/SidebarPicturesFolder.icns",
+    "aliases": [
+      "places/folder-pictures-symbolic"
+    ]
+  },
+  {
+    "kind": "resource",
+    "id": "SmartFolderIcon",
+    "source": "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/SmartFolderIcon.icns",
+    "aliases": [
+      "places/folder-saved-search"
+    ]
+  },
+  {
+    "kind": "resource",
+    "id": "SystemFolderIcon",
+    "source": "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/SystemFolderIcon.icns",
+    "aliases": [
+      "places/folder-system"
+    ]
+  },
+  {
+    "kind": "resource",
+    "id": "TrashIcon",
+    "source": "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/TrashIcon.icns",
+    "aliases": [
+      "places/user-trash"
+    ]
+  },
+  {
+    "kind": "resource",
+    "id": "UsersFolderIcon",
+    "source": "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/UsersFolderIcon.icns",
+    "aliases": [
+      "places/folder-users"
+    ]
+  },
+  {
+    "kind": "resource",
+    "id": "UtilitiesFolder",
+    "source": "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/UtilitiesFolder.icns",
+    "aliases": [
+      "places/folder-utilities"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.adobe.illustrator.ai-image",
+    "source": "com.adobe.illustrator.ai-image",
+    "aliases": [
+      "mimetypes/application-illustrator",
+      "mimetypes/application-vnd.adobe.illustrator"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.adobe.pdf",
+    "source": "com.adobe.pdf",
+    "aliases": [
+      "mimetypes/application-acrobat",
+      "mimetypes/application-nappdf",
+      "mimetypes/application-pdf",
+      "mimetypes/application-x-pdf",
+      "mimetypes/image-pdf"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.adobe.photoshop-image",
+    "source": "com.adobe.photoshop-image",
+    "aliases": [
+      "mimetypes/application-photoshop",
+      "mimetypes/application-x-photoshop",
+      "mimetypes/image-photoshop",
+      "mimetypes/image-psd",
+      "mimetypes/image-vnd.adobe.photoshop",
+      "mimetypes/image-x-photoshop",
+      "mimetypes/image-x-psd"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.apple.Music.rmp-playlist",
+    "source": "com.apple.Music.rmp-playlist",
+    "aliases": [
+      "mimetypes/application-vnd.rn-rn_music_package"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.apple.application-bundle",
+    "source": "com.apple.application-bundle",
+    "aliases": [
+      "apps/application-x-executable"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.apple.binhex-archive",
+    "source": "com.apple.binhex-archive",
+    "aliases": [
+      "mimetypes/application-mac-binhex40"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.apple.chess.pgn",
+    "source": "com.apple.chess.pgn",
+    "aliases": [
+      "mimetypes/application-vnd.chess-pgn",
+      "mimetypes/application-x-chess-pgn"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.apple.disk-image",
+    "source": "com.apple.disk-image",
+    "aliases": [
+      "mimetypes/application-x-apple-diskimage",
+      "mimetypes/application-x-cd-image"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.apple.finance.order",
+    "source": "com.apple.finance.order",
+    "aliases": [
+      "mimetypes/application-vnd.apple.finance.order"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.apple.ibooks",
+    "source": "com.apple.ibooks",
+    "aliases": [
+      "mimetypes/application-x-ibooks+zip"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.apple.ibooks-container",
+    "source": "com.apple.ibooks-container",
+    "aliases": [
+      "mimetypes/application-ibooks+zip"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.apple.ibooks-folder",
+    "source": "com.apple.ibooks-folder",
+    "aliases": [
+      "mimetypes/application-x-ibooks-folder"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.apple.icns",
+    "source": "com.apple.icns",
+    "aliases": [
+      "mimetypes/image-x-icns"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.apple.installer-package-archive",
+    "source": "com.apple.installer-package-archive",
+    "aliases": [
+      "mimetypes/application-x-xar"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.apple.iwork.keynote.sffkey",
+    "source": "com.apple.iwork.keynote.sffkey",
+    "aliases": [
+      "mimetypes/application-vnd.apple.keynote",
+      "mimetypes/application-x-iwork-keynote-sffkey"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.apple.iwork.keynote.sffkth",
+    "source": "com.apple.iwork.keynote.sffkth",
+    "aliases": [
+      "mimetypes/application-x-iwork-keynote-sffkth"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.apple.iwork.numbers.sffnumbers",
+    "source": "com.apple.iwork.numbers.sffnumbers",
+    "aliases": [
+      "mimetypes/application-vnd.apple.numbers",
+      "mimetypes/application-x-iwork-numbers-sffnumbers"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.apple.iwork.numbers.sfftemplate",
+    "source": "com.apple.iwork.numbers.sfftemplate",
+    "aliases": [
+      "mimetypes/application-x-iwork-numbers-sfftemplate"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.apple.iwork.pages.sffpages",
+    "source": "com.apple.iwork.pages.sffpages",
+    "aliases": [
+      "mimetypes/application-vnd.apple.pages",
+      "mimetypes/application-x-iwork-pages-sffpages"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.apple.iwork.pages.sfftemplate",
+    "source": "com.apple.iwork.pages.sfftemplate",
+    "aliases": [
+      "mimetypes/application-x-iwork-pages-sfftemplate"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.apple.log",
+    "source": "com.apple.log",
+    "aliases": [
+      "mimetypes/text-x-log"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.apple.macbinary-archive",
+    "source": "com.apple.macbinary-archive",
+    "aliases": [
+      "mimetypes/application-macbinary"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.apple.macpaint-image",
+    "source": "com.apple.macpaint-image",
+    "aliases": [
+      "mimetypes/image-x-macpaint"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.apple.mail.mbox",
+    "source": "com.apple.mail.mbox",
+    "aliases": [
+      "mimetypes/application-mbox"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.apple.mobileconfig",
+    "source": "com.apple.mobileconfig",
+    "aliases": [
+      "mimetypes/application-x-apple-aspen-config"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.apple.mobileprovision",
+    "source": "com.apple.mobileprovision",
+    "aliases": [
+      "mimetypes/application-x-apple-aspen-mobileprovision"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.apple.pict",
+    "source": "com.apple.pict",
+    "aliases": [
+      "mimetypes/image-pict",
+      "mimetypes/image-x-pict"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.apple.pkpass",
+    "source": "com.apple.pkpass",
+    "aliases": [
+      "mimetypes/application-vnd.apple.pkpass"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.apple.pkpasses-data",
+    "source": "com.apple.pkpasses-data",
+    "aliases": [
+      "mimetypes/application-vnd.apple.pkpasses"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.apple.protected-mpeg-4-audio-b",
+    "source": "com.apple.protected-mpeg-4-audio-b",
+    "aliases": [
+      "mimetypes/audio-x-m4b"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.apple.quicktime-audio",
+    "source": "com.apple.quicktime-audio",
+    "aliases": [
+      "mimetypes/audio-x-quicktime"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.apple.quicktime-movie",
+    "source": "com.apple.quicktime-movie",
+    "aliases": [
+      "mimetypes/video-quicktime"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.apple.realitycomposerpro",
+    "source": "com.apple.realitycomposerpro",
+    "aliases": [
+      "mimetypes/application-octet-stream"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.apple.webarchive",
+    "source": "com.apple.webarchive",
+    "aliases": [
+      "mimetypes/application-x-webarchive"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.audible.aa-audiobook",
+    "source": "com.audible.aa-audiobook",
+    "aliases": [
+      "mimetypes/audio-audible",
+      "mimetypes/audio-vnd.audible",
+      "mimetypes/audio-x-pn-audibleaudio"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.audible.aax-audiobook",
+    "source": "com.audible.aax-audiobook",
+    "aliases": [
+      "mimetypes/audio-vnd.audible.aax"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.compuserve.gif",
+    "source": "com.compuserve.gif",
+    "aliases": [
+      "mimetypes/image-gif"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.ilm.openexr-image",
+    "source": "com.ilm.openexr-image",
+    "aliases": [
+      "mimetypes/image-x-exr"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.kodak.flashpix-image",
+    "source": "com.kodak.flashpix-image",
+    "aliases": [
+      "mimetypes/image-fpx"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.microsoft.bmp",
+    "source": "com.microsoft.bmp",
+    "aliases": [
+      "mimetypes/image-bmp",
+      "mimetypes/image-x-MS-bmp",
+      "mimetypes/image-x-bmp"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.microsoft.dds",
+    "source": "com.microsoft.dds",
+    "aliases": [
+      "mimetypes/image-x-dds"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.microsoft.excel.sheet.binary.macroenabled",
+    "source": "com.microsoft.excel.sheet.binary.macroenabled",
+    "aliases": [
+      "mimetypes/application-vnd.ms-excel.sheet.binary.macroEnabled.12",
+      "mimetypes/application-vnd.ms-excel.sheet.binary.macroenabled.12"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.microsoft.excel.xlt",
+    "source": "com.microsoft.excel.xlt",
+    "aliases": [
+      "mimetypes/application-msexcel",
+      "mimetypes/application-vnd.ms-excel",
+      "mimetypes/application-x-msexcel",
+      "mimetypes/zz-application-zz-winassoc-xls"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.microsoft.ico",
+    "source": "com.microsoft.ico",
+    "aliases": [
+      "mimetypes/application-ico",
+      "mimetypes/image-ico",
+      "mimetypes/image-icon",
+      "mimetypes/image-vnd.microsoft.icon",
+      "mimetypes/image-x-ico",
+      "mimetypes/image-x-icon",
+      "mimetypes/text-ico"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.microsoft.outlook15.email-message",
+    "source": "com.microsoft.outlook15.email-message",
+    "aliases": [
+      "mimetypes/message-rfc822"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.microsoft.outlook15.icalendar",
+    "source": "com.microsoft.outlook15.icalendar",
+    "aliases": [
+      "mimetypes/application-ics",
+      "mimetypes/text-calendar",
+      "mimetypes/text-x-vcalendar"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.microsoft.powerpoint.ppt",
+    "source": "com.microsoft.powerpoint.ppt",
+    "aliases": [
+      "mimetypes/application-mspowerpoint",
+      "mimetypes/application-powerpoint",
+      "mimetypes/application-vnd.ms-powerpoint",
+      "mimetypes/application-x-mspowerpoint"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.microsoft.waveform-audio",
+    "source": "com.microsoft.waveform-audio",
+    "aliases": [
+      "mimetypes/audio-vnd.wave",
+      "mimetypes/audio-wav",
+      "mimetypes/audio-x-wav"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.microsoft.windows-executable",
+    "source": "com.microsoft.windows-executable",
+    "aliases": [
+      "mimetypes/application-x-ms-dos-executable",
+      "mimetypes/application-x-msdownload"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.microsoft.word.dot",
+    "source": "com.microsoft.word.dot",
+    "aliases": [
+      "mimetypes/application-msword",
+      "mimetypes/application-vnd.ms-word",
+      "mimetypes/application-x-msword",
+      "mimetypes/zz-application-zz-winassoc-doc"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.microsoft.word.mhtml",
+    "source": "com.microsoft.word.mhtml",
+    "aliases": [
+      "mimetypes/application-x-mimearchive"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.netscape.javascript-source",
+    "source": "com.netscape.javascript-source",
+    "aliases": [
+      "mimetypes/application-javascript",
+      "mimetypes/application-x-javascript",
+      "mimetypes/text-javascript",
+      "mimetypes/text-jscript"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.pixar.universal-scene-description-mobile",
+    "source": "com.pixar.universal-scene-description-mobile",
+    "aliases": [
+      "mimetypes/model-vnd.usdz+zip"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.sgi.sgi-image",
+    "source": "com.sgi.sgi-image",
+    "aliases": [
+      "mimetypes/image-sgi",
+      "mimetypes/image-x-sgi"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.topografix.gpx",
+    "source": "com.topografix.gpx",
+    "aliases": [
+      "mimetypes/application-gpx",
+      "mimetypes/application-gpx+xml",
+      "mimetypes/application-x-gpx",
+      "mimetypes/application-x-gpx+xml"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "com.truevision.tga-image",
+    "source": "com.truevision.tga-image",
+    "aliases": [
+      "mimetypes/application-tga",
+      "mimetypes/application-x-targa",
+      "mimetypes/application-x-tga",
+      "mimetypes/image-targa",
+      "mimetypes/image-tga",
+      "mimetypes/image-x-icb",
+      "mimetypes/image-x-targa",
+      "mimetypes/image-x-tga"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "net.daringfireball.markdown",
+    "source": "net.daringfireball.markdown",
+    "aliases": [
+      "mimetypes/text-markdown",
+      "mimetypes/text-x-markdown"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "org.3gpp.adaptive-multi-rate-audio",
+    "source": "org.3gpp.adaptive-multi-rate-audio",
+    "aliases": [
+      "mimetypes/audio-AMR",
+      "mimetypes/audio-amr",
+      "mimetypes/audio-amr-encrypted"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "org.7-zip.7-zip-archive",
+    "source": "org.7-zip.7-zip-archive",
+    "aliases": [
+      "mimetypes/application-x-7z-compressed"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "org.chromium.extension",
+    "source": "org.chromium.extension",
+    "aliases": [
+      "mimetypes/application-x-chrome-extension"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "org.chromium.shortcut",
+    "source": "org.chromium.shortcut",
+    "aliases": [
+      "mimetypes/application-x-chrome-shortcut"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "org.gnu.gnu-zip-archive",
+    "source": "org.gnu.gnu-zip-archive",
+    "aliases": [
+      "mimetypes/application-gzip",
+      "mimetypes/application-x-gzip"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "org.gnu.gnu-zip-tar-archive",
+    "source": "org.gnu.gnu-zip-tar-archive",
+    "aliases": [
+      "mimetypes/application-x-compressed-tar"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "org.idpf.epub-container",
+    "source": "org.idpf.epub-container",
+    "aliases": [
+      "mimetypes/application-epub+zip"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "org.idpf.epub-folder",
+    "source": "org.idpf.epub-folder",
+    "aliases": [
+      "mimetypes/application-x-epub-folder"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "org.ietf.mhtml",
+    "source": "org.ietf.mhtml",
+    "aliases": [
+      "mimetypes/multipart-related"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "org.khronos.astc",
+    "source": "org.khronos.astc",
+    "aliases": [
+      "mimetypes/image-astc"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "org.khronos.glb",
+    "source": "org.khronos.glb",
+    "aliases": [
+      "mimetypes/model-gltf-binary"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "org.khronos.gltf",
+    "source": "org.khronos.gltf",
+    "aliases": [
+      "mimetypes/model-gltf+json"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "org.khronos.ktx",
+    "source": "org.khronos.ktx",
+    "aliases": [
+      "mimetypes/image-ktx"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "org.khronos.ktx2",
+    "source": "org.khronos.ktx2",
+    "aliases": [
+      "mimetypes/image-ktx2"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "org.nema.dicom",
+    "source": "org.nema.dicom",
+    "aliases": [
+      "mimetypes/application-dicom"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "org.oasis-open.opendocument.text",
+    "source": "org.oasis-open.opendocument.text",
+    "aliases": [
+      "mimetypes/application-vnd.oasis.opendocument.text"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "org.oasis-open.opendocument.text-template",
+    "source": "org.oasis-open.opendocument.text-template",
+    "aliases": [
+      "mimetypes/application-vnd.oasis.opendocument.text-template"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "org.oasis-open.xliff",
+    "source": "org.oasis-open.xliff",
+    "aliases": [
+      "mimetypes/application-x-xliff",
+      "mimetypes/application-x-xliff+xml",
+      "mimetypes/application-xliff+xml"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "org.openoffice.text",
+    "source": "org.openoffice.text",
+    "aliases": [
+      "mimetypes/application-vnd.sun.xml.writer"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "org.openoffice.text-template",
+    "source": "org.openoffice.text-template",
+    "aliases": [
+      "mimetypes/application-vnd.sun.xml.writer.template"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "org.openxmlformats.presentationml.presentation",
+    "source": "org.openxmlformats.presentationml.presentation",
+    "aliases": [
+      "mimetypes/application-vnd.openxmlformats-officedocument.presentationml.presentation",
+      "mimetypes/x-office-presentation"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "org.openxmlformats.presentationml.presentation.macroenabled",
+    "source": "org.openxmlformats.presentationml.presentation.macroenabled",
+    "aliases": [
+      "mimetypes/application-vnd.ms-powerpoint.presentation.macroEnabled.12",
+      "mimetypes/application-vnd.ms-powerpoint.presentation.macroenabled.12"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "org.openxmlformats.presentationml.slideshow",
+    "source": "org.openxmlformats.presentationml.slideshow",
+    "aliases": [
+      "mimetypes/application-vnd.openxmlformats-officedocument.presentationml.slideshow"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "org.openxmlformats.presentationml.slideshow.macroenabled",
+    "source": "org.openxmlformats.presentationml.slideshow.macroenabled",
+    "aliases": [
+      "mimetypes/application-vnd.ms-powerpoint.slideshow.macroEnabled.12",
+      "mimetypes/application-vnd.ms-powerpoint.slideshow.macroenabled.12"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "org.openxmlformats.presentationml.template",
+    "source": "org.openxmlformats.presentationml.template",
+    "aliases": [
+      "mimetypes/application-vnd.openxmlformats-officedocument.presentationml.template"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "org.openxmlformats.presentationml.template.macroenabled",
+    "source": "org.openxmlformats.presentationml.template.macroenabled",
+    "aliases": [
+      "mimetypes/application-vnd.ms-powerpoint.template.macroEnabled.12",
+      "mimetypes/application-vnd.ms-powerpoint.template.macroenabled.12"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "org.openxmlformats.spreadsheetml.sheet",
+    "source": "org.openxmlformats.spreadsheetml.sheet",
+    "aliases": [
+      "mimetypes/application-vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "mimetypes/x-office-spreadsheet"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "org.openxmlformats.spreadsheetml.sheet.macroenabled",
+    "source": "org.openxmlformats.spreadsheetml.sheet.macroenabled",
+    "aliases": [
+      "mimetypes/application-vnd.ms-excel.sheet.macroEnabled.12",
+      "mimetypes/application-vnd.ms-excel.sheet.macroenabled.12"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "org.openxmlformats.spreadsheetml.template",
+    "source": "org.openxmlformats.spreadsheetml.template",
+    "aliases": [
+      "mimetypes/application-vnd.openxmlformats-officedocument.spreadsheetml.template"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "org.openxmlformats.spreadsheetml.template.macroenabled",
+    "source": "org.openxmlformats.spreadsheetml.template.macroenabled",
+    "aliases": [
+      "mimetypes/application-vnd.ms-excel.template.macroEnabled.12",
+      "mimetypes/application-vnd.ms-excel.template.macroenabled.12"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "org.openxmlformats.wordprocessingml.document",
+    "source": "org.openxmlformats.wordprocessingml.document",
+    "aliases": [
+      "mimetypes/application-vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "mimetypes/x-office-document"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "org.openxmlformats.wordprocessingml.document.macroenabled",
+    "source": "org.openxmlformats.wordprocessingml.document.macroenabled",
+    "aliases": [
+      "mimetypes/application-vnd.ms-word.document.macroEnabled.12",
+      "mimetypes/application-vnd.ms-word.document.macroenabled.12"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "org.openxmlformats.wordprocessingml.template",
+    "source": "org.openxmlformats.wordprocessingml.template",
+    "aliases": [
+      "mimetypes/application-vnd.openxmlformats-officedocument.wordprocessingml.template"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "org.openxmlformats.wordprocessingml.template.macroenabled",
+    "source": "org.openxmlformats.wordprocessingml.template.macroenabled",
+    "aliases": [
+      "mimetypes/application-vnd.ms-word.template.macroEnabled.12",
+      "mimetypes/application-vnd.ms-word.template.macroenabled.12"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "org.tukaani.tar-xz-archive",
+    "source": "org.tukaani.tar-xz-archive",
+    "aliases": [
+      "mimetypes/application-x-xz-compressed-tar"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "org.tukaani.xz-archive",
+    "source": "org.tukaani.xz-archive",
+    "aliases": [
+      "mimetypes/application-x-xz"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "org.webmproject.webm",
+    "source": "org.webmproject.webm",
+    "aliases": [
+      "mimetypes/video-webm"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "org.webmproject.webp",
+    "source": "org.webmproject.webp",
+    "aliases": [
+      "mimetypes/image-webp"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "org.xiph.ogg-audio",
+    "source": "org.xiph.ogg-audio",
+    "aliases": [
+      "mimetypes/audio-ogg",
+      "mimetypes/audio-x-ogg"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "org.xiph.ogv",
+    "source": "org.xiph.ogv",
+    "aliases": [
+      "mimetypes/video-ogg",
+      "mimetypes/video-x-ogg"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.3gpp",
+    "source": "public.3gpp",
+    "aliases": [
+      "mimetypes/audio-3gpp",
+      "mimetypes/audio-3gpp-encrypted",
+      "mimetypes/audio-x-rn-3gpp-amr",
+      "mimetypes/audio-x-rn-3gpp-amr-encrypted",
+      "mimetypes/audio-x-rn-3gpp-amr-wb",
+      "mimetypes/audio-x-rn-3gpp-amr-wb-encrypted",
+      "mimetypes/video-3gp",
+      "mimetypes/video-3gpp",
+      "mimetypes/video-3gpp-encrypted"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.3gpp2",
+    "source": "public.3gpp2",
+    "aliases": [
+      "mimetypes/audio-3gpp2",
+      "mimetypes/video-3gpp2"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.aac-audio",
+    "source": "public.aac-audio",
+    "aliases": [
+      "mimetypes/audio-aac",
+      "mimetypes/audio-x-aac"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.ac3-audio",
+    "source": "public.ac3-audio",
+    "aliases": [
+      "mimetypes/audio-ac3"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.aifc-audio",
+    "source": "public.aifc-audio",
+    "aliases": [
+      "mimetypes/audio-x-aifc",
+      "mimetypes/audio-x-aiffc"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.aiff-audio",
+    "source": "public.aiff-audio",
+    "aliases": [
+      "mimetypes/audio-aiff",
+      "mimetypes/audio-x-aiff"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.au-audio",
+    "source": "public.au-audio",
+    "aliases": [
+      "mimetypes/audio-basic"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.audio",
+    "source": "public.audio",
+    "aliases": [
+      "mimetypes/audio-x-generic"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.avchd-content",
+    "source": "public.avchd-content",
+    "aliases": [
+      "mimetypes/video-mp2t"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.avci",
+    "source": "public.avci",
+    "aliases": [
+      "mimetypes/image-avci"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.avcs",
+    "source": "public.avcs",
+    "aliases": [
+      "mimetypes/image-avcs"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.avi",
+    "source": "public.avi",
+    "aliases": [
+      "mimetypes/video-avi",
+      "mimetypes/video-divx",
+      "mimetypes/video-msvideo",
+      "mimetypes/video-vnd.avi",
+      "mimetypes/video-vnd.divx",
+      "mimetypes/video-x-avi",
+      "mimetypes/video-x-msvideo"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.avif",
+    "source": "public.avif",
+    "aliases": [
+      "mimetypes/image-avif",
+      "mimetypes/image-avif-sequence"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.bzip2-archive",
+    "source": "public.bzip2-archive",
+    "aliases": [
+      "mimetypes/application-bzip2",
+      "mimetypes/application-x-bzip",
+      "mimetypes/application-x-bzip2"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.c-header",
+    "source": "public.c-header",
+    "aliases": [
+      "mimetypes/text-x-chdr"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.c-plus-plus-header",
+    "source": "public.c-plus-plus-header",
+    "aliases": [
+      "mimetypes/text-x-c++hdr"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.c-plus-plus-source",
+    "source": "public.c-plus-plus-source",
+    "aliases": [
+      "mimetypes/text-x-c++src"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.c-source",
+    "source": "public.c-source",
+    "aliases": [
+      "mimetypes/text-x-c",
+      "mimetypes/text-x-csrc"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.comma-separated-values-text",
+    "source": "public.comma-separated-values-text",
+    "aliases": [
+      "mimetypes/text-csv",
+      "mimetypes/text-x-comma-separated-values",
+      "mimetypes/text-x-csv"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.cpio-archive",
+    "source": "public.cpio-archive",
+    "aliases": [
+      "mimetypes/application-x-cpio"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.csh-script",
+    "source": "public.csh-script",
+    "aliases": [
+      "mimetypes/application-x-csh"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.dv-movie",
+    "source": "public.dv-movie",
+    "aliases": [
+      "mimetypes/video-dv",
+      "mimetypes/video-x-dv"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.flc-animation",
+    "source": "public.flc-animation",
+    "aliases": [
+      "mimetypes/video-flc",
+      "mimetypes/video-fli",
+      "mimetypes/video-x-fli",
+      "mimetypes/video-x-flic"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.font",
+    "source": "public.font",
+    "aliases": [
+      "mimetypes/font-x-generic"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.geojson",
+    "source": "public.geojson",
+    "aliases": [
+      "mimetypes/application-geo+json",
+      "mimetypes/application-vnd.geo+json"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.geometry-definition-format",
+    "source": "public.geometry-definition-format",
+    "aliases": [
+      "mimetypes/model-obj"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.heifs",
+    "source": "public.heifs",
+    "aliases": [
+      "mimetypes/image-heic",
+      "mimetypes/image-heic-sequence",
+      "mimetypes/image-heif",
+      "mimetypes/image-heif-sequence"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.html",
+    "source": "public.html",
+    "aliases": [
+      "mimetypes/application-xhtml+xml",
+      "mimetypes/text-html"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.jpeg",
+    "source": "public.jpeg",
+    "aliases": [
+      "mimetypes/image-jpeg",
+      "mimetypes/image-pjpeg",
+      "mimetypes/image-x-generic"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.jpeg-2000",
+    "source": "public.jpeg-2000",
+    "aliases": [
+      "mimetypes/image-jp2",
+      "mimetypes/image-jpeg2000",
+      "mimetypes/image-jpeg2000-image",
+      "mimetypes/image-x-jpeg2000-image"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.jpeg-xl",
+    "source": "public.jpeg-xl",
+    "aliases": [
+      "mimetypes/image-jxl"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.json",
+    "source": "public.json",
+    "aliases": [
+      "mimetypes/application-json"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.m3u-playlist",
+    "source": "public.m3u-playlist",
+    "aliases": [
+      "mimetypes/application-m3u",
+      "mimetypes/audio-m3u",
+      "mimetypes/audio-mpegurl",
+      "mimetypes/audio-x-m3u",
+      "mimetypes/audio-x-mp3-playlist",
+      "mimetypes/audio-x-mpegurl"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.make-source",
+    "source": "public.make-source",
+    "aliases": [
+      "mimetypes/text-x-makefile"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.midi-audio",
+    "source": "public.midi-audio",
+    "aliases": [
+      "mimetypes/audio-midi",
+      "mimetypes/audio-x-midi"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.movie",
+    "source": "public.movie",
+    "aliases": [
+      "mimetypes/video-x-generic"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.mp3",
+    "source": "public.mp3",
+    "aliases": [
+      "mimetypes/audio-mp3",
+      "mimetypes/audio-mpeg",
+      "mimetypes/audio-x-mp3",
+      "mimetypes/audio-x-mpeg",
+      "mimetypes/audio-x-mpg"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.mpeg",
+    "source": "public.mpeg",
+    "aliases": [
+      "mimetypes/video-mpeg",
+      "mimetypes/video-mpeg-system",
+      "mimetypes/video-x-mpeg",
+      "mimetypes/video-x-mpeg-system",
+      "mimetypes/video-x-mpeg2"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.mpeg-2-video",
+    "source": "public.mpeg-2-video",
+    "aliases": [
+      "mimetypes/video-mpeg2"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.mpeg-4",
+    "source": "public.mpeg-4",
+    "aliases": [
+      "mimetypes/video-mp4",
+      "mimetypes/video-mp4v-es",
+      "mimetypes/video-x-m4v"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.mpeg-4-audio",
+    "source": "public.mpeg-4-audio",
+    "aliases": [
+      "mimetypes/audio-m4a",
+      "mimetypes/audio-mp4",
+      "mimetypes/audio-x-m4a"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.ofd",
+    "source": "public.ofd",
+    "aliases": [
+      "mimetypes/application-ofd"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.opencl-source",
+    "source": "public.opencl-source",
+    "aliases": [
+      "mimetypes/text-x-opencl-src"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.opentype-collection-font",
+    "source": "public.opentype-collection-font",
+    "aliases": [
+      "mimetypes/application-vnd.oasis.opendocument.chart-template"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.opentype-font",
+    "source": "public.opentype-font",
+    "aliases": [
+      "mimetypes/application-x-font-otf",
+      "mimetypes/font-otf"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.pbm",
+    "source": "public.pbm",
+    "aliases": [
+      "mimetypes/image-x-portable-bitmap",
+      "mimetypes/image-x-portable-graymap",
+      "mimetypes/image-x-portable-pixmap"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.perl-script",
+    "source": "public.perl-script",
+    "aliases": [
+      "mimetypes/application-x-perl",
+      "mimetypes/text-x-perl",
+      "mimetypes/text-x-perl-script"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.php-script",
+    "source": "public.php-script",
+    "aliases": [
+      "mimetypes/application-x-php",
+      "mimetypes/text-php"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.plain-text",
+    "source": "public.plain-text",
+    "aliases": [
+      "mimetypes/text-plain",
+      "mimetypes/text-x-generic"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.pls-playlist",
+    "source": "public.pls-playlist",
+    "aliases": [
+      "mimetypes/application-pls",
+      "mimetypes/audio-scpls",
+      "mimetypes/audio-x-scpls"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.png",
+    "source": "public.png",
+    "aliases": [
+      "mimetypes/image-png"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.python-script",
+    "source": "public.python-script",
+    "aliases": [
+      "mimetypes/application-x-python",
+      "mimetypes/text-x-python",
+      "mimetypes/text-x-python-script"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.rtf",
+    "source": "public.rtf",
+    "aliases": [
+      "mimetypes/application-rtf",
+      "mimetypes/text-rtf"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.ruby-script",
+    "source": "public.ruby-script",
+    "aliases": [
+      "mimetypes/application-x-ruby",
+      "mimetypes/text-x-ruby-script"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.shell-script",
+    "source": "public.shell-script",
+    "aliases": [
+      "mimetypes/application-x-shellscript",
+      "mimetypes/text-x-sh",
+      "mimetypes/text-x-shellscript"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.source-code",
+    "source": "public.source-code",
+    "aliases": [
+      "mimetypes/text-x-script",
+      "mimetypes/text-x-source"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.standard-tesselated-geometry-format",
+    "source": "public.standard-tesselated-geometry-format",
+    "aliases": [
+      "mimetypes/model-stl",
+      "mimetypes/model-x.stl-ascii",
+      "mimetypes/model-x.stl-binary"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.svg-image",
+    "source": "public.svg-image",
+    "aliases": [
+      "mimetypes/image-svg+xml"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.tab-separated-values-text",
+    "source": "public.tab-separated-values-text",
+    "aliases": [
+      "mimetypes/text-tab-separated-values"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.tar-archive",
+    "source": "public.tar-archive",
+    "aliases": [
+      "mimetypes/application-x-gtar",
+      "mimetypes/application-x-tar"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.tar-bzip2-archive",
+    "source": "public.tar-bzip2-archive",
+    "aliases": [
+      "mimetypes/application-x-bzip-compressed-tar",
+      "mimetypes/application-x-bzip1-compressed-tar",
+      "mimetypes/application-x-bzip2-compressed-tar"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.tiff",
+    "source": "public.tiff",
+    "aliases": [
+      "mimetypes/image-tiff"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.truetype-collection-font",
+    "source": "public.truetype-collection-font",
+    "aliases": [
+      "mimetypes/font-collection"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.utf8-plain-text",
+    "source": "public.utf8-plain-text",
+    "aliases": [
+      "mimetypes/text-plain;charset=utf-8"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.uuencoded-archive",
+    "source": "public.uuencoded-archive",
+    "aliases": [
+      "mimetypes/text-x-uuencode",
+      "mimetypes/zz-application-zz-winassoc-uu"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.vcard",
+    "source": "public.vcard",
+    "aliases": [
+      "mimetypes/text-directory",
+      "mimetypes/text-vcard",
+      "mimetypes/text-x-vcard"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.xbitmap-image",
+    "source": "public.xbitmap-image",
+    "aliases": [
+      "mimetypes/image-x-xbitmap"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.xml",
+    "source": "public.xml",
+    "aliases": [
+      "mimetypes/application-xml",
+      "mimetypes/text-xml"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.yaml",
+    "source": "public.yaml",
+    "aliases": [
+      "mimetypes/application-x-yaml",
+      "mimetypes/application-yaml",
+      "mimetypes/text-x-yaml",
+      "mimetypes/text-yaml"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.z-archive",
+    "source": "public.z-archive",
+    "aliases": [
+      "mimetypes/application-x-compress"
+    ]
+  },
+  {
+    "kind": "type",
+    "id": "public.zip-archive",
+    "source": "public.zip-archive",
+    "aliases": [
+      "mimetypes/application-x-archive",
+      "mimetypes/application-x-zip",
+      "mimetypes/application-x-zip-compressed",
+      "mimetypes/application-zip",
+      "mimetypes/package-x-generic"
+    ]
+  }
+]

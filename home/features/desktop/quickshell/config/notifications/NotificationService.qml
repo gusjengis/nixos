@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import Quickshell.Io
 import Quickshell.Services.Notifications
 
 Scope {
@@ -14,6 +15,11 @@ Scope {
     // Set by Notification Center; banners stay hidden while it is open.
     property bool centerOpen: false
     property alias doNotDisturb: preferences.doNotDisturb
+
+    IpcHandler {
+        target: "notifications"
+        function dnd(): bool { return root.doNotDisturb; }
+    }
 
     PersistentProperties {
         id: preferences

@@ -46,6 +46,7 @@ Scope {
     }
 
     UsageService { id: usageService }
+    OpenCodeService { id: sessionOverview }
     BatteryService { id: batteryService }
     SystemControlsService { id: systemControlsService }
     MonitorModes {
@@ -94,6 +95,7 @@ Scope {
                 battery: batteryService
                 systemControls: systemControlsService
                 notificationService: notifications
+                openCodeService: sessionOverview
                 openLauncher: root.openLauncher
             }
         }

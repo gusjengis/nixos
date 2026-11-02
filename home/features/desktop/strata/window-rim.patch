@@ -1,0 +1,40 @@
+diff --git a/src/finder.css b/src/finder.css
+--- a/src/finder.css
++++ b/src/finder.css
+@@ -20,7 +20,7 @@ window.csd,
+ window {
+   font-weight: 500;
+   background: @finder_content;
+-  box-shadow: inset 0 0 0 1px alpha(white, 0.10);
++  box-shadow: none;
+ }
+ 
+ .tab-window,
+@@ -45,26 +45,20 @@ window {
+   border: none;
+ }
+ 
+-/* Glass edge light: brighter toward the window edges, fading inward. The
+-   bottom rim belongs to the footer cap at the window edge, so no line crosses
+-   the panel where the status bar meets it. */
++/* Broad sidebar edge light; the hairline belongs to the compositor border. */
+ .sidebar-shell {
+   box-shadow:
+-    inset 1px 0 alpha(white, 0.16),
+     inset 24px 0 40px -24px alpha(white, 0.10);
+ }
+ 
+ .sidebar-cap.over-sidebar {
+   box-shadow:
+-    inset 1px 0 alpha(white, 0.16),
+-    inset 0 1px alpha(white, 0.10),
+     inset 24px 0 40px -24px alpha(white, 0.10),
+     inset 0 24px 40px -24px alpha(white, 0.10);
+ }
+ 
+ .footer-cap.over-sidebar {
+   box-shadow:
+-    inset 1px 0 alpha(white, 0.16),
+     inset 24px 0 40px -24px alpha(white, 0.10);
+ }
+ 

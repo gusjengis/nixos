@@ -56,6 +56,7 @@ binds["SUPER + SHIFT + 3"]()
 assert(dispatches[1].kind == "dsp.window.move" and dispatches[1].value.workspace == "3")
 assert(binds["SUPER + CTRL + ALT + SHIFT + R"].value == "systemctl reboot")
 assert(binds["SUPER + CTRL + ALT + SHIFT + S"].value == "systemctl poweroff")
+assert(binds["SUPER + CTRL + ALT + SHIFT + E"].value == "hyprctl dispatch exit")
 startup["hyprland.start"]()
 for _, command in ipairs(launched) do
 	assert(not command:find("context", 1, true), command)
@@ -64,3 +65,12 @@ for _, command in ipairs(launched) do
 	assert(not command:find("kdeconnect", 1, true), command)
 end
 print("PASS: ordinary workspaces, direct file launch, restart, and no context/personal autostarts")
+
+package.loaded["desktop-features"] = { contexts = true, personal = false, development = false }
+package.loaded.sessions = {}
+package.loaded.keybinds = nil
+require("keybinds")
+assert(binds["SUPER + CTRL + ALT + SHIFT + R"].value == "systemctl reboot")
+assert(binds["SUPER + CTRL + ALT + SHIFT + S"].value == "systemctl poweroff")
+assert(binds["SUPER + CTRL + ALT + SHIFT + E"].value == "context-session-exit")
+print("PASS: context saves never gate reboot/poweroff; compositor exit uses bounded helper")

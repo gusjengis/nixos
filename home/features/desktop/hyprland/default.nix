@@ -21,6 +21,7 @@ let
     else
       hyprlandPackages.hyprland;
   glassPackage = pkgs.callPackage ./glass/package.nix { inherit hyprland; };
+  bordersPackage = pkgs.callPackage ./borders.nix { inherit hyprland; };
 
   homeRoot = "${repoRoot}/home";
   configDir = "${homeRoot}/features/desktop/hyprland/config";
@@ -82,6 +83,7 @@ in
     home.packages = [
       hyprland
       glassPackage
+      bordersPackage
       sessionEnvSync
     ]
     ++ lib.optional config.personalDesktop.enable mailspringAfterTray
@@ -143,6 +145,8 @@ in
 
     # Compiled compositor plugin is immutable and rebuilt with matching headers.
     xdg.dataFile."hyprglass/libhyprglass.so".source = "${glassPackage}/lib/libhyprglass.so";
+    xdg.dataFile."hypr-borders/borders-plus-plus.so".source =
+      "${bordersPackage}/lib/libborders-plus-plus.so";
 
     # Home Manager's `force` cannot replace a pre-existing *directory* with a
     # symlink (its `ln -Tsf` gives up on non-empty directories). Until the

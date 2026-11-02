@@ -19,7 +19,7 @@ return {
 	gis = "chromium --app=https://mattgeocore.co.pierce.wa.us/login/home?filter=cvwebext",
 	db = "chromium --app=https://database.azuregreenconsultants.com/map",
 	claude = desktopLauncher .. " webapp-claude",
-	fileManager = "thunar",
+	fileManager = "strata",
 	whatsapp = desktopLauncher .. " webapp-whatsapp",
 	excel = desktopLauncher .. " webapp-excel",
 	calendar = desktopLauncher .. " webapp-calendar",

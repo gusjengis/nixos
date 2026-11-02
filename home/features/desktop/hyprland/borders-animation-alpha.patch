@@ -1,0 +1,46 @@
+diff --git a/borderDeco.cpp b/borderDeco.cpp
+--- a/borderDeco.cpp
++++ b/borderDeco.cpp
+@@ -8,6 +8,7 @@
+ #include <hyprutils/memory/Casts.hpp>
+ using namespace Hyprutils::Memory;
+ using namespace Render::GL;
++#include <hyprland/src/render/pass/BorderPassElement.hpp>
+ #include "BorderppPassElement.hpp"
+ #include "globals.hpp"
+ 
+@@ -78,8 +79,5 @@ void CBordersPlusPlus::draw(PHLMONITOR pMonitor, const float& a) {
+ 
+-    CBorderPPPassElement::SBorderPPData data;
+-    data.deco = this;
+-
+-    g_pHyprRenderer->m_renderPass.add(makeUnique<CBorderPPPassElement>(data));
++    drawPass(pMonitor, a);
+ }
+ 
+ void CBordersPlusPlus::drawPass(PHLMONITOR pMonitor, const float& a) {
+@@ -146,14 +144,16 @@ void CBordersPlusPlus::drawPass(PHLMONITOR pMonitor, const float& a) {
+         if (fullBox.width < 1 || fullBox.height < 1)
+             break;
+ 
+-        g_pHyprOpenGL->scissor(nullptr);
+-
+-        g_pHyprOpenGL->renderBorder(fullBox, Config::CGradientValueData(CHyprColor{static_cast<uint64_t>(vars.borderColors[i]->value())}),
+-                                    CHyprOpenGLImpl::SBorderRenderData{.round         = NATURALROUND ? sc<int>(ORIGINALROUND) : sc<int>(rounding),
+-                                                                       .roundingPower = ROUNDINGPOWER,
+-                                                                       .borderSize    = THISBORDERSIZE,
+-                                                                       .a             = a,
+-                                                                       .outerRound    = NATURALROUND ? sc<int>(ORIGINALROUND) : -1});
++        CBorderPassElement::SBorderData data;
++        data.box           = fullBox;
++        data.grad1         = Config::CGradientValueData(CHyprColor{static_cast<uint64_t>(vars.borderColors[i]->value())});
++        data.round         = NATURALROUND ? sc<int>(ORIGINALROUND) : sc<int>(rounding);
++        data.roundingPower = ROUNDINGPOWER;
++        data.borderSize    = THISBORDERSIZE;
++        data.a             = a;
++        data.outerRound    = NATURALROUND ? sc<int>(ORIGINALROUND) : -1;
++        data.window        = PWINDOW;
++        g_pHyprRenderer->addPassElement(makeUnique<CBorderPassElement>(data));
+     }
+ 
+     m_seExtents = {{fullThickness, fullThickness}, {fullThickness, fullThickness}};

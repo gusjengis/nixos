@@ -11,10 +11,11 @@ hl.config({
 	general = {
 		gaps_in = 5,
 		gaps_out = 0,
-		border_size = 2,
+		-- Inner gray hairline; borders-plus-plus supplies the outer black pixel.
+		border_size = 1,
 		col = {
-			active_border = "rgba(595959ff)",
-			inactive_border = "rgba(595959aa)",
+			active_border = "rgba(404040ff)",
+			inactive_border = "rgba(404040ff)",
 		},
 		resize_on_border = false,
 		allow_tearing = false,
@@ -52,6 +53,17 @@ hl.window_rule({
 	workspace_blur = false,
 })
 
+-- Match the glass shader's circular contour and Finder's dark hairline.
+hl.window_rule({
+	name = "strata-finder-window",
+	match = { class = "^io.github.lgse.Strata$" },
+	-- Single-instance activation creates windows in the old process. Ignore its
+	-- persistent launch token so each file-manager window opens where invoked.
+	workspace = "unset",
+	rounding = 21,
+	rounding_power = 2,
+})
+
 hl.curve("easeOutQuint", { type = "bezier", points = { { 0.23, 1 }, { 0.32, 1 } } })
 hl.curve("easeInOutCubic", { type = "bezier", points = { { 0.65, 0.05 }, { 0.36, 1 } } })
 hl.curve("linear", { type = "bezier", points = { { 0, 0 }, { 1, 1 } } })
@@ -85,15 +97,6 @@ hl.layer_rule({
 	match = { namespace = "^quickshell-wallpaper-overlay$" },
 	animation = "fade",
 })
-
--- Older running compositors can reload this config before the new binary starts.
-if hl.supports_layer_rule_effect and hl.supports_layer_rule_effect("no_workspace_blur") then
-	hl.layer_rule({
-		name = "context-work-widget-sharp",
-		match = { namespace = "^quickshell-in-progress$" },
-		no_workspace_blur = true,
-	})
-end
 
 hl.layer_rule({
 	name = "quickshell-popup-blur",
@@ -150,3 +153,4 @@ colorPickerNoAnimationRule = hl.layer_rule({
 })
 
 require("glass")
+require("borders")

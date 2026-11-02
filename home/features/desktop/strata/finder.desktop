@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=Finder
+GenericName=File Manager
+Comment=Browse files and folders
+Exec=strata %U
+Icon=io.github.lgse.Strata
+Terminal=false
+Categories=Utility;FileTools;FileManager;
+MimeType=inode/directory;
+Keywords=files;folders;browser;explorer;manager;strata;
+StartupNotify=true
+StartupWMClass=io.github.lgse.Strata

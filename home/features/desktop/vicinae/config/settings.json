@@ -25,7 +25,10 @@
    "theme": {
       "dark": {
          "name": "spotlight",
-         "icon_theme": "hicolor"
+         "icon_theme": "MacOS-Native"
+      },
+      "light": {
+         "icon_theme": "MacOS-Native"
       }
    },
    "telemetry": {

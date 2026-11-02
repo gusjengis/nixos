@@ -9,26 +9,74 @@
   config,
   lib,
   pkgs,
+  repoRoot,
   ...
 }:
 
 let
+  configRoot = "${repoRoot}/home/features/desktop/theme";
   gtkThemeName = "Adwaita-dark";
-  iconThemeName = "Papirus-Dark";
+  iconThemeName = "MacOS-Native";
   kvantumTheme = "KvAdaptaDark";
+  iconPython = pkgs.python3.withPackages (ps: [ ps.pillow ps.cairosvg ps.watchdog ]);
+  macosIcons = pkgs.writeShellApplication {
+    name = "macos-icons";
+    runtimeInputs = [ iconPython pkgs.gtk3 pkgs.fontconfig ];
+    text = ''
+      exec python3 "${configRoot}/macos-icons.py" "$@"
+    '';
+  };
 in
 {
-  home.packages = [ pkgs.papirus-icon-theme ];
+  home.packages = [
+    pkgs.papirus-icon-theme
+    macosIcons
+  ];
+
+  # The complete writable theme and its original inputs are repository-owned.
+  # Application-generated icons land in the same tree through this link.
+  xdg.dataFile."icons/${iconThemeName}" = {
+    force = true;
+    source = config.lib.file.mkOutOfStoreSymlink "${configRoot}/icons/${iconThemeName}";
+  };
+  xdg.dataFile."macos-native/source" = {
+    force = true;
+    source = config.lib.file.mkOutOfStoreSymlink "${configRoot}/icon-source";
+  };
+
+  # Install the actual platform/style plugins and export their search paths for
+  # both Qt versions; an environment hint alone does not make qtct available.
+  qt = {
+    enable = true;
+    platformTheme.name = "qtct";
+    style.name = "kvantum";
+  };
+
+  systemd.user.services.macos-icons = lib.mkIf config.desktopEnv.enable {
+    Unit = {
+      Description = "Generate macOS-style icons for installed applications";
+      After = [ "graphical-session.target" ];
+      PartOf = [ "graphical-session.target" ];
+    };
+    Service = {
+      ExecStart = "${macosIcons}/bin/macos-icons --watch";
+      Restart = "on-failure";
+      RestartSec = 3;
+    };
+    Install.WantedBy = [ "graphical-session.target" ];
+  };
+
+  home.activation.macosIconRefresh = lib.mkIf config.desktopEnv.enable (
+    lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+      run ${macosIcons}/bin/macos-icons
+    ''
+  );
 
   ###### Environment hints (kept minimal but practical)
   home.sessionVariables = {
     # GTK's built-in dark variant advertises darkness to Electron. The theme
     # name "Adwaita-dark" looks dark in GTK but Electron reports light for it.
     GTK_THEME = "Adwaita:dark";
-
-    # Qt
-    QT_STYLE_OVERRIDE = "kvantum";
-    QT_QPA_PLATFORMTHEME = "qt6ct"; # if you only have qt5ct, change to "qt5ct"
 
     # Helps some Electron/Chromium builds pick the right defaults
     XDG_CURRENT_DESKTOP = "Hyprland";
@@ -46,7 +94,6 @@ in
 
     iconTheme = {
       name = iconThemeName;
-      package = pkgs.papirus-icon-theme;
     };
 
     gtk3.extraConfig = {
@@ -104,14 +151,19 @@ in
     theme=${kvantumTheme}
   '';
 
-  # Optional: some Qt apps read these
-  xdg.configFile."qt5ct/qt5ct.conf".text = ''
-    [Appearance]
-    style=kvantum
-  '';
-
-  xdg.configFile."qt6ct/qt6ct.conf".text = ''
-    [Appearance]
-    style=kvantum
+  # QSettings replaces files atomically. Link the editable directories so GUI
+  # changes stay in the repository, retaining any existing custom palettes.
+  xdg.configFile."qt5ct".source = config.lib.file.mkOutOfStoreSymlink "${configRoot}/qt5ct";
+  xdg.configFile."qt6ct".source = config.lib.file.mkOutOfStoreSymlink "${configRoot}/qt6ct";
+  home.activation.qtIconConfigMigrateToSymlink = lib.hm.dag.entryBefore [ "checkLinkTargets" ] ''
+    for app in qt5ct qt6ct; do
+      target="${config.xdg.configHome}/$app"
+      if [[ -d "$target" && ! -L "$target" ]]; then
+        run cp -an "$target/." "${configRoot}/$app/"
+        backup="${config.xdg.stateHome}/qt-theme-migration/$app-$(date +%s)"
+        run mkdir -p "$(dirname "$backup")"
+        run mv "$target" "$backup"
+      fi
+    done
   '';
 }

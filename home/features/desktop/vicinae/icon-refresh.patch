@@ -1,0 +1,37 @@
+diff --git a/src/server/src/theme/theme.cpp b/src/server/src/theme/theme.cpp
+--- a/src/server/src/theme/theme.cpp
++++ b/src/server/src/theme/theme.cpp
+@@ -1,8 +1,15 @@
+ #include "theme/theme.hpp"
+ #include "theme/colors.hpp"
+ #include "theme/theme-db.hpp"
+ #include "theme/theme-file.hpp"
++#include "ui/image/image-renderer.hpp"
++#include <QIcon>
++#include <QPixmapCache>
+ 
+ void ThemeService::setTheme(const ThemeFile &info) {
++  // Icons may have changed on disk without changing the theme's name.
++  QIcon::setThemeSearchPaths(QIcon::themeSearchPaths());
++  QPixmapCache::clear();
++  ImageRendering::clearCache();
+   m_theme = std::make_unique<ThemeFile>(info);
+   emit themeChanged(info);
+diff --git a/src/server/src/ui/image/image-url.cpp b/src/server/src/ui/image/image-url.cpp
+--- a/src/server/src/ui/image/image-url.cpp
++++ b/src/server/src/ui/image/image-url.cpp
+@@ -12,1 +12,3 @@
+-  if (type == ImageURLType::Builtin || type == ImageURLType::Symbol) return true;
++  if (type == ImageURLType::Builtin || type == ImageURLType::Symbol ||
++      type == ImageURLType::System || type == ImageURLType::FileIcon)
++    return true;
+diff --git a/src/server/src/ipc/ipc-command-handler.cpp b/src/server/src/ipc/ipc-command-handler.cpp
+--- a/src/server/src/ipc/ipc-command-handler.cpp
++++ b/src/server/src/ipc/ipc-command-handler.cpp
+@@ -227,1 +227,6 @@
++    if (verb == "refresh-icons") {
++      ThemeService::instance().reloadCurrentTheme();
++      return {};
++    }
++
+     if (verb == "set") {

@@ -10,10 +10,10 @@ import "theme"
 import "widgets"
 
 // Dictation capture (CTRL + dictation key). Handy has no way to hand a
-// transcript to a caller; it types it into whatever has keyboard focus. This
-// popup is that focus target: it opens as recording starts, Handy types the
-// transcript into it after the key is released, and once the typing goes
-// quiet the text is written as a new note in the Obsidian vault's Raw/ folder.
+// transcript to a caller; it pastes it into whatever has keyboard focus. This
+// popup is that focus target: it opens as recording starts, Handy pastes the
+// transcript into it after the key is released, and the text is written into
+// the originating saved context's notebook.
 PanelWindow {
     id: capture
 
@@ -21,6 +21,8 @@ PanelWindow {
     // stops arriving, then "saving" / "saved" / "failed".
     property string phase: "listening"
     property string errorText: ""
+    property string contextId: ""
+    property bool savePending: false
 
     visible: false
     focusable: true
@@ -34,8 +36,13 @@ PanelWindow {
     WlrLayershell.namespace: "quickshell-capture"
 
     function open() {
+        if (owner.running || writer.running)
+            return;
         if (visible && phase !== "saved" && phase !== "failed")
             return;
+        contextId = "";
+        savePending = false;
+        owner.running = true;
         closeTimer.stop();
         field.text = "";
         errorText = "";
@@ -44,7 +51,7 @@ PanelWindow {
         field.forceActiveFocus();
     }
 
-    // Recording stopped; Handy is about to transcribe and type.
+    // Recording stopped; Handy is about to transcribe and paste.
     function released() {
         if (!visible || phase !== "listening")
             return;
@@ -73,18 +80,50 @@ PanelWindow {
     function save() {
         quietTimer.stop();
         noTextTimeout.stop();
+        if (owner.running) {
+            savePending = true;
+            return;
+        }
         const text = field.text.trim();
         if (text === "") {
             close();
             return;
         }
         phase = "saving";
-        writer.command = ["capture-note", text];
+        if (contextId === "") {
+            close();
+            return;
+        }
+        writer.command = ["context-notes", "--context", contextId, "capture"];
+        writer.captureBody = JSON.stringify({body: text});
         writer.running = true;
     }
 
     Process {
+        id: owner
+        command: ["context-notes", "capture-owner"]
+        stdout: StdioCollector { id: ownerOutput }
+        onExited: (code, status) => {
+            if (code === 0 && status === 0) {
+                try { capture.contextId = JSON.parse(ownerOutput.text).context_id || ""; }
+                catch (_) { capture.contextId = ""; }
+            }
+            if (capture.savePending && capture.visible) {
+                capture.savePending = false;
+                capture.save();
+            }
+        }
+    }
+
+    Process {
         id: writer
+        property string captureBody: ""
+        stdinEnabled: true
+        onStarted: {
+            write(captureBody);
+            stdinEnabled = false;
+        }
+        onRunningChanged: if (!running) stdinEnabled = true;
         stderr: StdioCollector { id: writerErrors }
         onExited: (code, status) => {
             if (code === 0 && status === 0) {
@@ -92,15 +131,14 @@ PanelWindow {
                 closeTimer.interval = 450;
             } else {
                 capture.phase = "failed";
-                capture.errorText = writerErrors.text.trim() || "capture-note exited with " + code;
+                capture.errorText = writerErrors.text.trim() || "context-notes exited with " + code;
                 closeTimer.interval = 6000;
             }
             closeTimer.restart();
         }
     }
 
-    // Handy types the whole transcript in one burst; a short silence after the
-    // last keystroke means it is done.
+    // Allow the clipboard paste (or a manual edit) to settle before saving.
     Timer {
         id: quietTimer
         interval: 700
@@ -176,7 +214,7 @@ PanelWindow {
                             "listening": "Listening…",
                             "transcribing": "Transcribing…",
                             "saving": "Saving…",
-                            "saved": "Saved to Raw",
+                            "saved": "Saved to notebook",
                             "failed": "Could not save"
                         })[capture.phase]
                     color: capture.phase === "failed" ? Theme.danger : Theme.text
@@ -196,7 +234,7 @@ PanelWindow {
                 Layout.fillWidth: true
                 Layout.maximumHeight: 230
                 // Stays visible even while empty: a hidden item cannot hold
-                // the keyboard focus Handy types into.
+                // the keyboard focus Handy pastes into.
                 wrapMode: TextEdit.Wrap
                 color: Theme.text
                 selectionColor: "#0a84ff"

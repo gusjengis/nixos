@@ -2,7 +2,7 @@
 
 pkgs.hyprlandPlugins.mkHyprlandPlugin {
   pluginName = "hyprglass";
-  version = "0.9.1-macglass-experimental";
+  version = "0.9.1-macglass-appleglass";
   inherit hyprland;
   src = pkgs.fetchFromGitHub {
     owner = "hyprnux";
@@ -20,9 +20,10 @@ pkgs.hyprlandPlugins.mkHyprlandPlugin {
     ./layer-shadow.patch
     ./surface-material.patch
     ./portable-backend.patch
+    ./apple-glass.patch
   ];
   nativeBuildInputs = [ pkgs.wayland-scanner ];
-  makeFlags = [ "HYPRGLASS_VERSION=0.9.1-macglass-experimental" ];
+  makeFlags = [ "HYPRGLASS_VERSION=0.9.1-macglass-appleglass" ];
   enableParallelBuilding = true;
   installPhase = ''
     runHook preInstall

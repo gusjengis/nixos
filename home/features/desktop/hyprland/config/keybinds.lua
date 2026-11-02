@@ -43,6 +43,7 @@ bind("SUPER + F11", function()
 	end
 end, "Fullscreen")
 bind("SUPER + F", hl.dsp.exec_cmd(features.contexts and "contextctl files" or vars.fileManager), "Launch File Manager")
+bind("SUPER + SHIFT + F", hl.dsp.exec_cmd(features.contexts and "contextctl files --session-directory" or vars.fileManager), "Open Session Directory")
 bind("SUPER + V", hl.dsp.window.float(), "Toggle Floating")
 bind("SUPER + W", hl.dsp.exec_cmd("qs ipc call wallpaper toggle"), "Wallpaper Picker")
 bind("SUPER + R", hl.dsp.exec_cmd("qs ipc call bar toggle"), "Toggle Status Bar")
@@ -59,7 +60,7 @@ if features.personal then
 
 	bind("code:202", hl.dsp.exec_cmd("handy --toggle-transcription"), "Dictate")
 	hl.bind("code:202", hl.dsp.exec_cmd(stop_dictation), { release = true })
-	-- Hold to dictate straight into a new Obsidian note (vault Raw/ folder).
+	-- Hold to dictate into the originating context's notebook.
 	bind(
 		"CTRL + code:202",
 		hl.dsp.exec_cmd("qs ipc call capture open & handy --toggle-transcription"),
@@ -122,22 +123,21 @@ for workspace = 1, 10 do
 	end, "Move to Workspace " .. workspace)
 end
 
-local checkpoint = features.contexts and "context-checkpoint save --reason shutdown && " or ""
+-- logind performs bounded best-effort checkpointing for reboot/poweroff.
+-- Compositor exit has no logind phase, so use the bounded exit helper.
 bind(
 	"SUPER + CTRL + ALT + SHIFT + E",
 	hl.dsp.exec_cmd(
-		(features.contexts and "context-checkpoint save --reason compositor-exit && " or "") .. "hyprctl dispatch exit"
+		features.contexts and "context-session-exit" or "hyprctl dispatch exit"
 	),
 	"Exit Hyprland"
 )
 bind(
 	"SUPER + CTRL + ALT + SHIFT + S",
-	hl.dsp.exec_cmd(
-		features.contexts and (checkpoint .. "alga power off && systemctl poweroff") or "systemctl poweroff"
-	),
+	hl.dsp.exec_cmd("systemctl poweroff"),
 	"Shutdown"
 )
-bind("SUPER + CTRL + ALT + SHIFT + R", hl.dsp.exec_cmd(checkpoint .. "systemctl reboot"), "Restart")
+bind("SUPER + CTRL + ALT + SHIFT + R", hl.dsp.exec_cmd("systemctl reboot"), "Restart")
 
 bind("SUPER + mouse:272", hl.dsp.window.drag(), "Move Window", { mouse = true })
 bind("SUPER + mouse:273", hl.dsp.window.resize(), "Resize Window", { mouse = true })

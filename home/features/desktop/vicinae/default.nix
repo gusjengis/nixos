@@ -31,7 +31,7 @@ let
     '';
   };
   vicinaePackage = inputs.vicinae.packages.${pkgs.stdenv.hostPlatform.system}.default.overrideAttrs (old: {
-    patches = (old.patches or [ ]) ++ [ ./spotlight-layout.patch ./spotlight-glass.patch ./spotlight-suggestion.patch ./spotlight-placement.patch ]
+    patches = (old.patches or [ ]) ++ [ ./spotlight-layout.patch ./spotlight-glass.patch ./spotlight-suggestion.patch ./spotlight-placement.patch ./spotlight-parity.patch ./icon-refresh.patch ./workspace-tracking.patch ]
       ++ lib.optional cfg.remoteOnly ./dmenu-icons.patch;
     postPatch = (old.postPatch or "") + ''
       substituteInPlace src/server/src/ui/qml/launcher/LauncherWindowLayerShell.qml \

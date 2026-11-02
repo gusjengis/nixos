@@ -25,6 +25,11 @@ diff --git a/src/server/src/ui/qml/views/RootSearchList.qml b/src/server/src/ui/
 +                featured: true
 +                height: 58
                  itemAlias: delegateLoader.alias
+@@ -81,3 +82,3 @@
+-                itemAccessory: delegateLoader.accessoryText
++                itemAccessory: selected ? delegateLoader.accessoryText : ""
+                 itemAccessoryColor: delegateLoader.accessoryColor
+                 quickAccessIndex: delegateLoader.quickAccessIndex
 diff --git a/src/server/src/ui/qml/launcher/SearchBar.qml b/src/server/src/ui/qml/launcher/SearchBar.qml
 --- a/src/server/src/ui/qml/launcher/SearchBar.qml
 +++ b/src/server/src/ui/qml/launcher/SearchBar.qml
@@ -50,6 +55,20 @@ diff --git a/src/server/src/ui/qml/launcher/SearchBar.qml b/src/server/src/ui/qm
 diff --git a/src/server/src/ui/qml/list/ListItemDelegate.qml b/src/server/src/ui/qml/list/ListItemDelegate.qml
 --- a/src/server/src/ui/qml/list/ListItemDelegate.qml
 +++ b/src/server/src/ui/qml/list/ListItemDelegate.qml
+@@ -33,4 +33,4 @@
+             visible: root.itemIconSource !== ""
+-            Layout.preferredWidth: root.featured ? 32 : 26
+-            Layout.preferredHeight: root.featured ? 32 : 26
++            Layout.preferredWidth: root.featured ? 40 : 32
++            Layout.preferredHeight: root.featured ? 40 : 32
+             Layout.alignment: Qt.AlignVCenter
+@@ -38,5 +38,5 @@
+             ViciImage {
+                 anchors.fill: parent
+                 source: root.itemIconSource
+-                safetyMargins: true
++                safetyMargins: false
+             }
 @@ -58,5 +58,5 @@
              Layout.fillWidth: true
              Layout.minimumWidth: 100

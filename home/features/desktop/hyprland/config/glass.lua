@@ -20,7 +20,7 @@ end
 tint = math.max(0, math.min(1, tint))
 
 local glass = hl.plugin.hyprglass
-local namespaces = "vicinae,quickshell-menu,quickshell-panel,quickshell-cc-pill,quickshell-cc-tile,quickshell-cc-detail,quickshell-notification-card"
+local namespaces = "vicinae,quickshell-menu,quickshell-panel,quickshell-cc-pill,quickshell-cc-tile,quickshell-cc-detail,quickshell-notification-card,quickshell-in-progress"
 local grouped = glass.mac_rects_supported and glass.mac_rects_supported()
 if grouped then
 	namespaces = namespaces .. ",quickshell-cc-group"
@@ -35,6 +35,8 @@ glass.layer("vicinae", { mac_inset = 110, mac_radius = -1, mac_placeholder_addit
 -- equal Theme.glassShadowPadding; radii match Theme.menuRadius/panelRadius.
 glass.layer("quickshell-menu", { mac_inset = 80, mac_radius = 13, mac_shadow = 0.2, mac_outline = 0.2 })
 glass.layer("quickshell-panel", { mac_inset = 80, mac_radius = 22, mac_shadow = 0.2, mac_outline = 0.2 })
+-- InProgressWidget.qml reserves the same 80px shadow padding around its card.
+glass.layer("quickshell-in-progress", { mac_inset = 80, mac_radius = 24, mac_shadow = 0.2, mac_outline = 0.2 })
 glass.layer("quickshell-cc-pill", { mac_inset = 80, mac_radius = 32, mac_shadow = 0.08, mac_outline = 0.2 })
 glass.layer("quickshell-cc-tile", { mac_inset = 80, mac_radius = 32, mac_shadow = 0.08, mac_outline = 0.2 })
 glass.layer("quickshell-notification-card", { mac_inset = 80, mac_radius = 22, mac_shadow = 0.2, mac_outline = 0.2, mac_tangential = false })

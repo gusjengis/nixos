@@ -1,0 +1,42 @@
+diff --git a/src/server/src/services/app-service/xdg/xdg-app-database.cpp b/src/server/src/services/app-service/xdg/xdg-app-database.cpp
+--- a/src/server/src/services/app-service/xdg/xdg-app-database.cpp
++++ b/src/server/src/services/app-service/xdg/xdg-app-database.cpp
+@@ -3,3 +3,4 @@
+ #include "internal/wayland/xdg-activation.hpp"
++#include "services/window-manager/hyprland/hyprctl.hpp"
+ #include "services/app-service/abstract-app-db.hpp"
+ #include "services/app-service/xdg/xdg-app.hpp"
+@@ -503,1 +504,33 @@
++  if (qEnvironmentVariableIsSet("HYPRLAND_INSTANCE_SIGNATURE")) {
++    // Dispatch synchronously for every activation, never when the launcher opens.
++    // Hyprland mints a fresh workspace token here, inherited by child processes.
++    // Do this before any XDG activation roundtrip can delay workspace capture.
++    QStringList cmdline;
++    cmdline << prog << args;
++    const auto shellQuote = [](QString value) {
++      value.replace("'", "'\\''");
++      return "'" + value + "'";
++    };
++    QString command = "cd -- " + shellQuote(workingDirectory
++        ? QString::fromStdString(workingDirectory->string()) : QDir::homePath()) + " && exec ";
++    for (const auto &arg : cmdline) {
++      command += shellQuote(arg) + " ";
++    }
++
++    // Lua long strings preserve shell quoting, Unicode and newlines verbatim.
++    // Prefix a space so Lua cannot discard a leading newline from the payload.
++    QString equals;
++    while (command.contains("]" + equals + "]")) equals += "=";
++    const auto request = ("dispatch hl.dsp.exec_cmd([" + equals + "[ " + command
++                          + "]" + equals + "])").toStdString();
++    const auto reply = Hyprland::Controller::oneshot(request);
++    if (reply.trimmed() != "ok") {
++      // Do not fall back: that would silently launch on the wrong workspace.
++      qWarning() << "Hyprland tracked launch failed:" << reply;
++      return false;
++    }
++    qInfo() << "App dispatched with workspace tracking" << cmdline;
++    return true;
++  }
++
+   QProcess process;

@@ -5,9 +5,8 @@ hl.on("hyprland.start", function()
 	hl.exec_cmd("xset r rate 190 50")
 	hl.exec_cmd("hyprctl setcursor $cursor_theme $cursor_size")
 	-- Refreshes the systemd/D-Bus copies of WAYLAND_DISPLAY and friends before
-	-- starting the services that need them. Without this, thunar.service
-	-- inherits the previous compositor's dead socket and crash-loops.
-	local services = "session-env-sync thunar.service tailscale-tray.service"
+	-- starting the services that need the current compositor's sockets.
+	local services = "session-env-sync tailscale-tray.service"
 	if features.contexts then
 		services = services .. " desktop-contexts.service context-shutdown-barrier.service"
 	end
@@ -25,7 +24,6 @@ hl.on("hyprland.start", function()
 		hl.exec_cmd("timeline-hyprfocusd-snitch")
 	end
 
-	-- hl.exec_cmd("alga power on")
 
 	-- Low-battery warnings are a systemd user timer now, on laptops only.
 	-- See features/hardware/battery.

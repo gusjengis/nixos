@@ -22,6 +22,7 @@ PanelWindow {
     required property var battery
     required property var systemControls
     required property var notificationService
+    required property var openCodeService
     required property var openLauncher
 
     readonly property var monitor: Hyprland.monitorFor(screen)
@@ -37,7 +38,7 @@ PanelWindow {
         const state = toplevel.lastIpcObject;
         return state && state.fullscreen > 0 && state.fullscreenClient === 2;
     })
-    readonly property bool popupVisible: media.popupVisible || usage.popupVisible || tray.popupVisible || wifi.popupVisible || battery.popupVisible || controlCenter.popupVisible || clock.popupVisible
+    readonly property bool popupVisible: openCode.popupVisible || media.popupVisible || usage.popupVisible || tray.popupVisible || wifi.popupVisible || battery.popupVisible || controlCenter.popupVisible || clock.popupVisible
 
     visible: shown || notchFullscreen
     // Wallpaper-dependent scrim is on the bottom layer, below app windows.
@@ -108,6 +109,7 @@ PanelWindow {
                 verticalCenter: parent.verticalCenter
             }
             barScreen: bar.screen
+            onLauncherRequested: bar.openLauncher()
         }
 
         Media {
@@ -129,6 +131,11 @@ PanelWindow {
 
             Tray {
                 id: tray
+            }
+            OpenCode {
+                id: openCode
+                visible: DesktopFeatures.development
+                service: bar.openCodeService
             }
             Usage {
                 id: usage

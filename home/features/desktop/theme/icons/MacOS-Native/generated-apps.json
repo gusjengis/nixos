@@ -1,0 +1,411 @@
+[
+  {
+    "name": "Vial",
+    "icon": "Vial",
+    "desktop": "/home/gusjengis/.nix-profile/share/applications/Vial.desktop",
+    "source": "/home/gusjengis/.nix-profile/share/icons/hicolor/512x512/apps/Vial.png",
+    "fingerprint": "1c68663c7edf1b0b5d0ab024379beba01fa8e60c5098dda309e6b648c704c7f7",
+    "artwork": "app-sources/a3b2a7245ddb42a4d41b649c5950a36982ad36c5578fa253df1a3253df9ebd32.png"
+  },
+  {
+    "name": "Android Studio (stable channel)",
+    "icon": "android-studio",
+    "desktop": "/home/gusjengis/.nix-profile/share/applications/android-studio.desktop",
+    "source": "/home/gusjengis/.nix-profile/share/icons/Papirus/128x128/apps/android-studio.svg",
+    "fingerprint": "b7ae76956d2e703b7b8b01c144f79d0bd7f2aa1bbdcd321946c13309233c2ec0",
+    "artwork": "app-sources/8ae07b7d8aacf99ad428d0bd3b499c541389402a7c1d2894395d2f216da69696.png"
+  },
+  {
+    "name": "ATLauncher",
+    "icon": "atlauncher",
+    "desktop": "/home/gusjengis/.nix-profile/share/applications/atlauncher.desktop",
+    "source": "/home/gusjengis/.nix-profile/share/icons/hicolor/128x128/apps/atlauncher.png",
+    "fingerprint": "0218a76629c2d9a1aa09b11aeca02193956047e47563f19eddd1acee498666a7",
+    "artwork": "app-sources/4260881177a5376ee1a522a2cb8eca09fc5a716a7a7eceb2c71b51dc18950d99.png"
+  },
+  {
+    "name": "Bluetooth Manager",
+    "icon": "blueman",
+    "desktop": "/home/gusjengis/.nix-profile/share/applications/blueman-manager.desktop",
+    "source": "/home/gusjengis/.nix-profile/share/icons/hicolor/256x256/apps/blueman.png",
+    "fingerprint": "a063485756be087d3587cb2c83c695b53ef999fe899fb698e0c22976d662118c",
+    "artwork": "app-sources/19ecb2568e206d7e7732f8b13b6b8240dadc54f3fd3179f4413f1d17a682abcb.png"
+  },
+  {
+    "name": "Bluetooth Adapters",
+    "icon": "blueman-device",
+    "desktop": "/home/gusjengis/.nix-profile/share/applications/blueman-adapters.desktop",
+    "source": "/home/gusjengis/.nix-profile/share/icons/hicolor/scalable/devices/blueman-device.svg",
+    "fingerprint": "4bc531854d1c16915891d9e511f20ea8ca4ba00c67d66bc2c7973a603db4f70b",
+    "artwork": "app-sources/ae8dbdceb0e6ce0f6da07634799b9f1f7c89eece3470b8f4b4b09c6ba9c1a87d.png"
+  },
+  {
+    "name": "btop++",
+    "icon": "btop",
+    "desktop": "/home/gusjengis/.local/share/applications/btop.desktop",
+    "source": "/home/gusjengis/.nix-profile/share/icons/hicolor/scalable/apps/btop.svg",
+    "fingerprint": "bd4cc50508a1c75b8522aff13de5d407247bc14aeb7134a00195dbf87b9214fc",
+    "artwork": "app-sources/215547f620261e0078cd63dcd6771d9d02084e7ced1e519d3fbc6f0dc456db54.png"
+  },
+  {
+    "name": "Chromium",
+    "icon": "chromium",
+    "desktop": "/home/gusjengis/.local/share/applications/chromium-browser.desktop",
+    "source": "/home/gusjengis/.nix-profile/share/icons/hicolor/256x256/apps/chromium.png",
+    "fingerprint": "d37747e648781f1e4565878ecbf6ee7327a203b7bfa121963580ca49cc387386",
+    "artwork": "app-sources/23a8512d2532b5d4fbb6ffcf9ae32a88843a8408639e29299d9113802f35de8e.png"
+  },
+  {
+    "name": "Easy Effects",
+    "icon": "com.github.wwmm.easyeffects",
+    "desktop": "/home/gusjengis/.nix-profile/share/applications/com.github.wwmm.easyeffects.desktop",
+    "source": "/home/gusjengis/.nix-profile/share/icons/hicolor/scalable/apps/com.github.wwmm.easyeffects.svg",
+    "fingerprint": "97ebf64f2f844ac3819fa152fd40f60b39fb147c09c9d7d42e03e46e2daa3a0f",
+    "artwork": "app-sources/d8bfb2a541701895a483174e520469b5939b3082fc7308603e37ad218c11fd43.png"
+  },
+  {
+    "name": "Manage Printing",
+    "icon": "cups",
+    "desktop": "/nix/store/ns769gwc5z8a1vlkiyz3s1c77g97yksc-cups-2.4.19/share/applications/cups.desktop",
+    "source": "/home/gusjengis/.nix-profile/share/icons/Papirus/128x128/apps/cups.svg",
+    "fingerprint": "447b4409169afd34bdde9f53af8dc013832109bbed9a0cbcacc9be3355310a43",
+    "artwork": "app-sources/6eab3b20b619bdccb6a72c98594c1bf2f698fa161e840aa41397dbf1ffbb52d4.png"
+  },
+  {
+    "name": "F3D",
+    "icon": "f3d",
+    "desktop": "/home/gusjengis/.nix-profile/share/applications/f3d.desktop",
+    "source": "/home/gusjengis/.nix-profile/share/icons/hicolor/256x256/apps/f3d.png",
+    "fingerprint": "715d6c750bf0873e11b7d91dc711be74952845a01cd0ae40347a30cd9c5d400c",
+    "artwork": "app-sources/72aaa7c1bc8864196b49bf06a35da2adbf25e502ddb0f62a2c98d6e293874f54.png"
+  },
+  {
+    "name": "Filelight",
+    "icon": "filelight",
+    "desktop": "/home/gusjengis/.nix-profile/share/applications/org.kde.filelight.desktop",
+    "source": "/home/gusjengis/.nix-profile/share/icons/hicolor/128x128/apps/filelight.png",
+    "fingerprint": "975b8c1a4b261d3acca227f2e851924cc56683be69e6cda3c51a9c17f4b3ea41",
+    "artwork": "app-sources/1f2bf496717b4f191345008ef87591c3561a381a29b6c5a42de0bb8d579db146.png"
+  },
+  {
+    "name": "Handy",
+    "icon": "handy",
+    "desktop": "/home/gusjengis/.nix-profile/share/applications/Handy.desktop",
+    "source": "/home/gusjengis/.nix-profile/share/icons/hicolor/256x256@2/apps/handy.png",
+    "fingerprint": "ff5ef7471ddd88c9364dbc28d39c2d44bec9f12a77e31f3f5e0220a0d9fa3ac3",
+    "artwork": "app-sources/15e9729e370a59b912e9701f499329c224ea868de7431b738a4e0252ad81c750.png"
+  },
+  {
+    "name": "KDE Connect",
+    "icon": "kdeconnect",
+    "desktop": "/home/gusjengis/.nix-profile/share/applications/org.kde.kdeconnect.app.desktop",
+    "source": "/home/gusjengis/.nix-profile/share/icons/hicolor/scalable/apps/kdeconnect.svg",
+    "fingerprint": "56a70de4c553c26ab01c37deb7d0b7be1d33748c9c47ed2fdd64178579e43d49",
+    "artwork": "app-sources/0306e49846a259b1e247b1697ad371ce9a3f37203f13289403d2e2b03aae71b6.png"
+  },
+  {
+    "name": "Kdenlive",
+    "icon": "kdenlive",
+    "desktop": "/home/gusjengis/.nix-profile/share/applications/org.kde.kdenlive.desktop",
+    "source": "/home/gusjengis/.nix-profile/share/icons/hicolor/512x512/apps/kdenlive.png",
+    "fingerprint": "d86e503d36b5186fec5c777a5cf99fb931b0047e8b284a0ec98cbccf8b0ab09b",
+    "artwork": "app-sources/d44edb9cea58f9d3ea6e081a9de6831765b1436aeb5d8284ea476dc67ba34fff.png"
+  },
+  {
+    "name": "Kvantum Manager",
+    "icon": "kvantum",
+    "desktop": "/home/gusjengis/.nix-profile/share/applications/kvantummanager.desktop",
+    "source": "/home/gusjengis/.nix-profile/share/icons/hicolor/scalable/apps/kvantum.svg",
+    "fingerprint": "bbc27b1a79a215fb6424bd156006003c4b181da8d939254f9892ebc48aab5f04",
+    "artwork": "app-sources/ac1de3351d2d2ef473332337c13db63f1d63396a71d85e5d0c77dfdb115322dc.png"
+  },
+  {
+    "name": "LibreOffice Base",
+    "icon": "libreoffice-base",
+    "desktop": "/home/gusjengis/.nix-profile/share/applications/base.desktop",
+    "source": "/home/gusjengis/.nix-profile/share/icons/hicolor/512x512/apps/libreoffice-base.png",
+    "fingerprint": "e0e6972789b1a98cbc033098fd89117bf7ceaf5290359bc06b84b160245c6797",
+    "artwork": "app-sources/9f4d8c9f0efb509c8f103d10e296c98c0e5c62c26b41a73d4d1d491945f71dee.png"
+  },
+  {
+    "name": "LibreOffice Calc",
+    "icon": "libreoffice-calc",
+    "desktop": "/home/gusjengis/.nix-profile/share/applications/calc.desktop",
+    "source": "/home/gusjengis/.nix-profile/share/icons/hicolor/512x512/apps/libreoffice-calc.png",
+    "fingerprint": "247992758cd4a8d764df7b27e46424ae76338acbca76e1504e41d564b55e9931",
+    "artwork": "app-sources/35cf6116fb8c65ac2ae30dff50dcbe18e1336791496b028fb1801902951fac64.png"
+  },
+  {
+    "name": "LibreOffice Draw",
+    "icon": "libreoffice-draw",
+    "desktop": "/home/gusjengis/.nix-profile/share/applications/draw.desktop",
+    "source": "/home/gusjengis/.nix-profile/share/icons/hicolor/512x512/apps/libreoffice-draw.png",
+    "fingerprint": "cc441f7c488d3fb81743cf0152edba6303462550b31c91e9261b65e579ea109f",
+    "artwork": "app-sources/1a4f7cbf11dac90b819c624f4d311494923561dbc4e6a625a90439eec33b3f30.png"
+  },
+  {
+    "name": "LibreOffice Impress",
+    "icon": "libreoffice-impress",
+    "desktop": "/home/gusjengis/.nix-profile/share/applications/impress.desktop",
+    "source": "/home/gusjengis/.nix-profile/share/icons/hicolor/512x512/apps/libreoffice-impress.png",
+    "fingerprint": "587765c4bc6567fbc716024f5a99c36e437a40f1af8993455f3fc0e5bbcd8dc2",
+    "artwork": "app-sources/b04a7578b474420be6047ffc45f3f8641989293cdbb26cddcc017289c26e3d3b.png"
+  },
+  {
+    "name": "LibreOffice Math",
+    "icon": "libreoffice-math",
+    "desktop": "/home/gusjengis/.nix-profile/share/applications/math.desktop",
+    "source": "/home/gusjengis/.nix-profile/share/icons/hicolor/512x512/apps/libreoffice-math.png",
+    "fingerprint": "5a5802927f0e7bacb2737faa5487ccb6af06f9441997aab86ed7ea8afe3403f1",
+    "artwork": "app-sources/3390ee1985b09925b155bee5c955bbd7711a61779d8c0942c173de548e80405a.png"
+  },
+  {
+    "name": "LibreOffice Writer",
+    "icon": "libreoffice-writer",
+    "desktop": "/home/gusjengis/.nix-profile/share/applications/writer.desktop",
+    "source": "/home/gusjengis/.nix-profile/share/icons/hicolor/512x512/apps/libreoffice-writer.png",
+    "fingerprint": "0447ac70b99dffe9c0c65b41e3e596d9734c7b16e062d27c60639a0b7da1f713",
+    "artwork": "app-sources/accbe89de7adc7c080a96d58d61970fd86fb1e5442483590147d07274065b0b3.png"
+  },
+  {
+    "name": "MacBook",
+    "icon": "macos-native-absolute-0322af050165f0f1",
+    "desktop": "/home/gusjengis/.nix-profile/share/applications/macbook.desktop",
+    "source": "/home/gusjengis/.config/macbook-remote/apple.svg",
+    "fingerprint": "5b5e27f05442b80a6dcac8b32f7e9443cc5cd9f4cc920249c9abda21efa96f0e",
+    "artwork": "app-sources/b1a71391cd864b085614eb394b48e30dda32d9fc839ac1d67968f3360de2ce56.png",
+    "override": "/home/gusjengis/.local/share/applications/macbook.desktop"
+  },
+  {
+    "name": "Mailspring",
+    "icon": "mailspring",
+    "desktop": "/home/gusjengis/.nix-profile/share/applications/Mailspring.desktop",
+    "source": "/home/gusjengis/.nix-profile/share/icons/hicolor/512x512/apps/mailspring.png",
+    "fingerprint": "7e987229769f8a6f08c7af83b7586fadffe91385cf70ddc204968f625b64aaaa",
+    "artwork": "app-sources/19bb7f258fb02ee58e49d8815cc88cb76cdb6c603b445a223bc29085ab5abfb6.png"
+  },
+  {
+    "name": "NixOS Manual",
+    "icon": "nix-snowflake",
+    "desktop": "/run/current-system/sw/share/applications/nixos-manual.desktop",
+    "source": "/run/current-system/sw/share/icons/hicolor/512x512/apps/nix-snowflake.png",
+    "fingerprint": "43641d52450420d8e6ce4417159428e8a25134886d20bd0d518427d7c4126227",
+    "artwork": "app-sources/209b000531549781b44c23bc4305a0459618bca229a61fceaf3560824723957d.png"
+  },
+  {
+    "name": "NVIDIA X Server Settings",
+    "icon": "nvidia-settings",
+    "desktop": "/run/current-system/sw/share/applications/nvidia-settings.desktop",
+    "source": "/run/current-system/sw/share/icons/hicolor/128x128/apps/nvidia-settings.png",
+    "fingerprint": "053f548380a63ad52714ee001c24db7994586547076f49e0123b167013be8bb5",
+    "artwork": "app-sources/b0acbb6f579822b5328cba30bdc75650962b06a7157f28580499577742f899de.png"
+  },
+  {
+    "name": "Neovim",
+    "icon": "nvim",
+    "desktop": "/home/gusjengis/.local/share/applications/nvim.desktop",
+    "source": "/run/current-system/sw/share/icons/hicolor/128x128/apps/nvim.png",
+    "fingerprint": "6d66f99cc91507a3fbbbd554b6c09102180f41cbf40986f31e32ca2a8a38f2cf",
+    "artwork": "app-sources/8cdc7fb250205fa6d640cd2724a8a87c97d8ebbf5fe36c38a51023bfee563fa9.png"
+  },
+  {
+    "name": "nvtop",
+    "icon": "nvtop",
+    "desktop": "/home/gusjengis/.nix-profile/share/applications/nvtop.desktop",
+    "source": "/home/gusjengis/.nix-profile/share/icons/hicolor/scalable/apps/nvtop.svg",
+    "fingerprint": "063964f8e7f10ce865358575ce525c9b2e24372a29d9c283fa1ba38c5e9b67e7",
+    "artwork": "app-sources/1eaa9a64bb0bb1e37299db770235961353585512bcae4f23dd5fede58e68d8cc.png"
+  },
+  {
+    "name": "File Roller",
+    "icon": "org.gnome.FileRoller",
+    "desktop": "/home/gusjengis/.nix-profile/share/applications/org.gnome.FileRoller.desktop",
+    "source": "/home/gusjengis/.nix-profile/share/icons/hicolor/scalable/apps/org.gnome.FileRoller.svg",
+    "fingerprint": "87d0572557bc7d50d463e92511c2a9fd11911a96bd074afe4030fdeec6260198",
+    "artwork": "app-sources/1bf3f4d6260c6998a203e41fd1c16c482df45f89a4967399e85451f2bc6366f4.png"
+  },
+  {
+    "name": "Volume Control",
+    "icon": "org.pulseaudio.pavucontrol",
+    "desktop": "/home/gusjengis/.nix-profile/share/applications/org.pulseaudio.pavucontrol.desktop",
+    "source": "/home/gusjengis/.nix-profile/share/icons/hicolor/scalable/apps/org.pulseaudio.pavucontrol.svg",
+    "fingerprint": "cb3fec8aa451d7a2ec0a5d96aa0b67e940758a0522df0de6a6f57836cbe0edc8",
+    "artwork": "app-sources/cd32515ab09bb4460dc151578383fc9c68364b8053db4a45ebed2d95ff554a31.png"
+  },
+  {
+    "name": "Zathura",
+    "icon": "org.pwmt.zathura",
+    "desktop": "/home/gusjengis/.nix-profile/share/applications/org.pwmt.zathura.desktop",
+    "source": "/home/gusjengis/.nix-profile/share/icons/hicolor/256x256/apps/org.pwmt.zathura.png",
+    "fingerprint": "f60a61f6d6c62e2c94329bd92e6f5de891d75e2ae22f0e228be70a744fe803a3",
+    "artwork": "app-sources/1724b6eeceb5b9471f56aba9f190aa1366c60de349e4e298f0ac123a83086a2a.png"
+  },
+  {
+    "name": "Removable Drives and Media",
+    "icon": "org.xfce.volman",
+    "desktop": "/home/gusjengis/.nix-profile/share/applications/thunar-volman-settings.desktop",
+    "source": "/home/gusjengis/.nix-profile/share/icons/hicolor/128x128/apps/org.xfce.volman.png",
+    "fingerprint": "915587fe860bbffaf004c5e8d554470a09d54594f9fd78ef5f21c96ab1c22c54",
+    "artwork": "app-sources/11aa2a68e898ba4c0c71591dc97c45895f015085b628322714f94a0cfe761d97.png"
+  },
+  {
+    "name": "oxker",
+    "icon": "oxker",
+    "desktop": "/home/gusjengis/.nix-profile/share/applications/oxker.desktop",
+    "source": "/home/gusjengis/.nix-profile/share/icons/hicolor/scalable/apps/oxker.svg",
+    "fingerprint": "b95e48527297bc980444dd2c3433065876e2db85de7b8e27eef9f9881d11eb9b",
+    "artwork": "app-sources/f8dc38c6520d77fb71924ffe468de8ac73cf472fd4ddaf8ed5c66fcd3801f5e8.png"
+  },
+  {
+    "name": "GNOME-GTK-Theme-Setting",
+    "icon": "preferences-desktop-theme",
+    "desktop": "/home/gusjengis/.local/share/applications/org.gnome.GTK4ThemeSwitcher.desktop",
+    "source": "/home/gusjengis/.nix-profile/share/icons/Papirus/128x128/apps/preferences-desktop-theme.svg",
+    "fingerprint": "bd128d4edca250d5c776b4cd4215b303ddc49910240835977bab15e56f217d30",
+    "artwork": "app-sources/a0cc4efb91270b71e934719b25675315c6d7447732a674acdcf78f141bd5f2fe.png"
+  },
+  {
+    "name": "qimgv",
+    "icon": "qimgv",
+    "desktop": "/home/gusjengis/.nix-profile/share/applications/qimgv.desktop",
+    "source": "/home/gusjengis/.nix-profile/share/icons/hicolor/256x256/apps/qimgv.png",
+    "fingerprint": "041a42d154606e90732e7ade468d32266d31096e107e45b29eb469aaaf7946db",
+    "artwork": "app-sources/241b01ff5b997f10c343a357cb27793a3e415dd9e215312ef59be80df46085a7.png"
+  },
+  {
+    "name": "scrcpy (console)",
+    "icon": "scrcpy",
+    "desktop": "/home/gusjengis/.nix-profile/share/applications/scrcpy-console.desktop",
+    "source": "/home/gusjengis/.nix-profile/share/icons/hicolor/256x256/apps/scrcpy.png",
+    "fingerprint": "df89d81edec8dabeda9190581893abba3787183baeb55f5dc317cbb564b52e6f",
+    "artwork": "app-sources/7d587b4941539054c41dfb4ff99831443ead88b60207173aea494b096409f27c.png"
+  },
+  {
+    "name": "Call of Duty: Black Ops II - Multiplayer",
+    "icon": "steam_icon_202990",
+    "desktop": "/home/gusjengis/.local/share/applications/Call of Duty Black Ops II - Multiplayer.desktop",
+    "source": "/home/gusjengis/.local/share/icons/hicolor/256x256/apps/steam_icon_202990.png",
+    "fingerprint": "56d1ac5f885dea25d540d0bdadc509edeae3a2fb69de25eac211c147b88ba0b1",
+    "artwork": "app-sources/64e26b5a23e041f660859376229db454a2831699c945a3be6aa9a8f111f489ed.png"
+  },
+  {
+    "name": "Call of Duty: Black Ops II - Zombies",
+    "icon": "steam_icon_212910",
+    "desktop": "/home/gusjengis/.local/share/applications/Call of Duty Black Ops II - Zombies.desktop",
+    "source": "/home/gusjengis/.local/share/icons/hicolor/256x256/apps/steam_icon_212910.png",
+    "fingerprint": "04a87d62021c99bacd57583f41b522d3ae0703de389dbe38f7f93f175638f552",
+    "artwork": "app-sources/a8ff62a8d07c2b81263fba483aa7a63a9ce4b268bd14ea6f4ec863f2df4e90ce.png"
+  },
+  {
+    "name": "Overwatch\u00ae",
+    "icon": "steam_icon_2357570",
+    "desktop": "/home/gusjengis/.local/share/applications/Overwatch.desktop",
+    "source": "/home/gusjengis/.local/share/icons/hicolor/256x256/apps/steam_icon_2357570.png",
+    "fingerprint": "27c1da0bfec9b137fb15c8a918a88d6eff4fb277a256e6919e7e54e7859dfa76",
+    "artwork": "app-sources/6cce7232c108ec69e9d4a59adc1283f6b9e25328094a5328cd1fc91d52bdd281.png"
+  },
+  {
+    "name": "Syncthing Web UI",
+    "icon": "syncthing",
+    "desktop": "/run/current-system/sw/share/applications/syncthing-ui.desktop",
+    "source": "/run/current-system/sw/share/icons/hicolor/512x512/apps/syncthing.png",
+    "fingerprint": "31f7fa4b15983ed1bab2b5bf9fb408ddc08783d6adffaec40e3524eea45a0d00",
+    "artwork": "app-sources/0b8a215550d6eb35dbbf090cefd0ef9c513933d84ea75ed8806fe161d0f38e5e.png"
+  },
+  {
+    "name": "Vicinae",
+    "icon": "vicinae",
+    "desktop": "/home/gusjengis/.nix-profile/share/applications/vicinae.desktop",
+    "source": "/home/gusjengis/.nix-profile/share/icons/hicolor/512x512/apps/vicinae.png",
+    "fingerprint": "f7419477629f653602c784763dc33431ea924c0af20f7879ce4aca2050887d0c",
+    "artwork": "app-sources/296efacfc48b71b099558944d56a5faefd2a8d5908f0dc8272228fbb2f2719ea.png"
+  },
+  {
+    "name": "Virtual Machine Manager",
+    "icon": "virt-manager",
+    "desktop": "/run/current-system/sw/share/applications/virt-manager.desktop",
+    "source": "/run/current-system/sw/share/icons/hicolor/256x256/apps/virt-manager.png",
+    "fingerprint": "1a2b19c9a2399c5f18af170bc16f3400fd4ea8444af4889ee025f1c12c38b2b6",
+    "artwork": "app-sources/9cae5b8e088d2aa73eca8d3da2292492ab8d59f0b42933de13979f5b289a0587.png"
+  },
+  {
+    "name": "Remote Viewer",
+    "icon": "virt-viewer",
+    "desktop": "/run/current-system/sw/share/applications/remote-viewer.desktop",
+    "source": "/run/current-system/sw/share/icons/hicolor/256x256/apps/virt-viewer.png",
+    "fingerprint": "55064a5d1aa2d45693c2be18d9c8883b805cf868208ab48a9064260ed6a64c15",
+    "artwork": "app-sources/533441b806c42fbc87661940f6af722d4721aacdc3bc1c5a4afc2c91e7b99a70.png"
+  },
+  {
+    "name": "Google Calendar",
+    "icon": "webapp-calendar",
+    "desktop": "/home/gusjengis/.local/share/applications/webapp-calendar.desktop",
+    "source": "/home/gusjengis/.local/share/icons/hicolor/128x128/apps/webapp-calendar.png",
+    "fingerprint": "20bd18581eb93426ee7643d7783d3a330bab2f375e3f4702d7bb3bbe20fb8920",
+    "artwork": "app-sources/34c295fef28e595ba849675b54096bd8b1e843fb58c519db44c673461002a9cd.png"
+  },
+  {
+    "name": "Excel Web",
+    "icon": "webapp-excel",
+    "desktop": "/home/gusjengis/.local/share/applications/webapp-excel.desktop",
+    "source": "/home/gusjengis/.local/share/icons/hicolor/128x128/apps/webapp-excel.png",
+    "fingerprint": "d633adb44b1d3392f770a8bb1c0f2070265d71e9553320bee280c09352b545ef",
+    "artwork": "app-sources/693d28e53ed2410114f4ba4c960cf20ff83eedcd8a0bdcc0fb293d104167ca29.png"
+  },
+  {
+    "name": "Google Photos",
+    "icon": "webapp-google-photos",
+    "desktop": "/home/gusjengis/.local/share/applications/webapp-google-photos.desktop",
+    "source": "/home/gusjengis/.local/share/icons/hicolor/128x128/apps/webapp-google-photos.png",
+    "fingerprint": "899296c8420b3d4a760e370b102279c9ba795782d570cb1c13ba3fd5f8d39c6f",
+    "artwork": "app-sources/7bbb468807494742353cbba67865cb06e32e65e43ead78e42666c2547f277849.png"
+  },
+  {
+    "name": "Home Assistant",
+    "icon": "webapp-home-assistant",
+    "desktop": "/home/gusjengis/.local/share/applications/webapp-home-assistant.desktop",
+    "source": "/home/gusjengis/.local/share/icons/hicolor/128x128/apps/webapp-home-assistant.png",
+    "fingerprint": "a9b3d93b1c70946177987076257772f5a36b2f17197dac01461baee136b8d47a",
+    "artwork": "app-sources/6e306a1b7ade7e374d69b384dc1bc286a8f275514421783e30b127d5b8b202f3.png"
+  },
+  {
+    "name": "Music Assistant",
+    "icon": "webapp-music-assistant",
+    "desktop": "/home/gusjengis/.local/share/applications/webapp-music-assistant.desktop",
+    "source": "/home/gusjengis/.local/share/icons/hicolor/128x128/apps/webapp-music-assistant.png",
+    "fingerprint": "73936ac5443754f3d750e672d60ac614d043c29bd08cebe5506450ef3413124f",
+    "artwork": "app-sources/6f4b7413dff69e45ce3b3451bfcf02716e13bd7d50f2379345d9520d12fc94d6.png"
+  },
+  {
+    "name": "Nextcloud",
+    "icon": "webapp-nextcloud",
+    "desktop": "/home/gusjengis/.local/share/applications/webapp-nextcloud.desktop",
+    "source": "/home/gusjengis/.local/share/icons/hicolor/128x128/apps/webapp-nextcloud.svg",
+    "fingerprint": "335c889ea225d1f4706764de774727aa70d63b85f2a06b794fb3c53ecd834454",
+    "artwork": "app-sources/a590944df4f9cce50ed08ebdadd1a095b910e3729719714573e7c127a99fcf80.png"
+  },
+  {
+    "name": "Qobuz",
+    "icon": "webapp-qobuz",
+    "desktop": "/home/gusjengis/.local/share/applications/webapp-qobuz.desktop",
+    "source": "/home/gusjengis/.local/share/icons/hicolor/128x128/apps/webapp-qobuz.png",
+    "fingerprint": "77f14648ee5044168a47d2bdee6518f135005d487da24070706c6cd78161e850",
+    "artwork": "app-sources/20ce563407ce3d2a06130d0dba5c02bd849e40b3da4cf8a2e85575a3aeb9eb72.png"
+  },
+  {
+    "name": "Supernote Mirror",
+    "icon": "webapp-supernote",
+    "desktop": "/home/gusjengis/.local/share/applications/webapp-supernote.desktop",
+    "source": "/home/gusjengis/.local/share/icons/hicolor/128x128/apps/webapp-supernote.svg",
+    "fingerprint": "3f7eb7de7534dcbf557b5a6664f89b30f2fd2783720bd337e0d16ba629d8465b",
+    "artwork": "app-sources/9ece3918843df202274574c4b003b793e24bf595fa95380fd6dcd0429312ff00.png"
+  },
+  {
+    "name": "OG",
+    "icon": "windows-logo",
+    "desktop": "/home/gusjengis/.local/share/applications/og-vm.desktop",
+    "source": "/home/gusjengis/.local/share/icons/hicolor/256x256/apps/windows-logo.png",
+    "fingerprint": "55764263a0e1e09a97120af2163d5d9bdbc62904cf8c52f9c530e1145b574286",
+    "artwork": "app-sources/40fce4c4c5a8fe3444786f0356c0b0dd093274addb7601615879beccf7fdc03c.png"
+  }
+]

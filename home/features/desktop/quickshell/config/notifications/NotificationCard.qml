@@ -18,6 +18,7 @@ Item {
     property bool showTimestamp: true
     readonly property bool hovered: hover.hovered
     signal dismissRequested()
+    signal activationRequested()
 
     readonly property var current: entry.notification
     readonly property string appIconSource: current.appIcon ? Quickshell.iconPath(current.appIcon, true) : ""
@@ -55,10 +56,17 @@ Item {
     function activate() {
         for (const action of current.actions || []) {
             if (action.identifier === "default") {
-                action.invoke();
+                invokeAction(action);
                 return;
             }
         }
+    }
+
+    function invokeAction(action) {
+        // Release the center's focus grab before the application tries to focus.
+        // Invoking may destroy this card, so notify the owner first.
+        activationRequested();
+        action.invoke();
     }
 
     implicitHeight: card.implicitHeight
@@ -194,7 +202,7 @@ Item {
                                 id: actionMouse
                                 anchors.fill: parent
                                 hoverEnabled: true
-                                onClicked: modelData.invoke()
+                                onClicked: root.invokeAction(modelData)
                             }
                         }
                     }

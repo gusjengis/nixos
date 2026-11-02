@@ -1,0 +1,80 @@
+arrow_navigation_scoped = false
+browser_column_width = 300
+browser_density = "compact"
+browser_mode = "columns"
+check_for_updates = true
+columns_mirror_selection = true
+columns_show_sizes = false
+corner_roundness = 100
+cross_volume_drop_strategy = "always-ask"
+date_format = "relative"
+element_glow = false
+explorer_file_clicks = 2
+explorer_folder_clicks = 2
+file_icon_colors = "native"
+filter_include_subfolders = true
+folder_peeking = false
+folders_first = true
+grid_file_clicks = 2
+grid_folder_clicks = 2
+group_by_type = false
+icons_thumbnail_size = 64
+interface_font = "SF Pro Text"
+interface_renderer = "system"
+language = "auto"
+list_file_clicks = 2
+list_folder_clicks = 1
+mode = "theme"
+omarchy_variant = "original"
+open_folder_after_drop = false
+preview_autoplay = false
+preview_muted = false
+preview_text_wrap = false
+preview_volume = 1.0
+reduce_motion = false
+release_channel = "stable"
+remember_folder_views = true
+render_documents_by_default = true
+restore_tabs = true
+search_entry_limit = 200000
+search_open_files_directly = false
+search_time_limit = 10
+show_hidden = false
+show_keybinding_hints = true
+show_thumbnails = true
+sidebar_compact = false
+sidebar_expanded = true
+sidebar_order = [
+    "home",
+    "trash",
+    "network",
+    "recent",
+    "desktop",
+    "documents",
+    "downloads",
+    "music",
+    "pictures",
+    "videos",
+]
+sidebar_show_desktop = true
+sidebar_show_documents = true
+sidebar_show_downloads = true
+sidebar_show_home = true
+sidebar_show_music = true
+sidebar_show_network = true
+sidebar_show_pictures = true
+sidebar_show_recent = true
+sidebar_show_trash = true
+sidebar_show_videos = true
+single_click_previews = true
+sort_direction = "ascending"
+sort_key = "name"
+tenxer_mode = false
+text_size = 13
+theme = "finder-dark"
+thumbnail_workers = 4
+type_to_search = true
+video_preview_backend = "automatic"
+window_show_close = true
+window_show_maximize = true
+window_show_minimize = true

@@ -1,0 +1,236 @@
+diff --git a/src/server/src/ui/qml/views/RootSearchList.qml b/src/server/src/ui/qml/views/RootSearchList.qml
+--- a/src/server/src/ui/qml/views/RootSearchList.qml
++++ b/src/server/src/ui/qml/views/RootSearchList.qml
+@@ -83,3 +83,3 @@
+-                height: 58
++                height: 57
+                 itemAlias: delegateLoader.alias
+                 itemShortcutTokens: delegateLoader.shortcutTokens
+diff --git a/src/server/src/ui/qml/launcher/LauncherWindowLayerShell.qml b/src/server/src/ui/qml/launcher/LauncherWindowLayerShell.qml
+--- a/src/server/src/ui/qml/launcher/LauncherWindowLayerShell.qml
++++ b/src/server/src/ui/qml/launcher/LauncherWindowLayerShell.qml
+@@ -15,3 +15,5 @@
+-        rowInset: compositorGlass ? 10 : 6
++        rowInset: compositorGlass ? 9 : 6
+-        rowRadius: compositorGlass ? 17 : 10
++        rowRadius: 18.5
++        rowLeftPadding: 16
++        rowRightPadding: compositorGlass ? 19 : 12
+         searchBarHeight: 52
+diff --git a/src/server/src/ui/qml/launcher/SearchBar.qml b/src/server/src/ui/qml/launcher/SearchBar.qml
+--- a/src/server/src/ui/qml/launcher/SearchBar.qml
++++ b/src/server/src/ui/qml/launcher/SearchBar.qml
+@@ -19,3 +19,3 @@
+-        if (searchInput.text.length === 0 || searchInput.cursorPosition !== searchInput.text.length || searchInput.selectedText !== "")
++        if (searchInput.cursorPosition !== searchInput.text.length || searchInput.selectedText !== "")
+             return "";
+         // qmllint disable missing-property
+@@ -115,5 +115,5 @@
+-                visible: root.suggestionSuffix !== "" && !(root.appearance?.keyboardSelection ?? true)
++                visible: root.suggestionSuffix !== ""
+                 x: suggestionText.x
+-                width: suggestionText.implicitWidth + 6
++                width: Math.min(suggestionText.implicitWidth + 6, suggestionText.width)
+                 height: 32
+                 anchors.verticalCenter: parent.verticalCenter
+@@ -223,3 +223,3 @@
+-                    visible: !searchInput.displayText && Launcher.searchInteractive
++                    visible: !searchInput.displayText && Launcher.searchInteractive && root.suggestionSuffix === ""
+                 }
+ 
+@@ -529,8 +529,10 @@
+             id: suggestionIconImage
+             visible: root.suggestionIcon !== ""
+-            Layout.preferredWidth: 30
+-            Layout.preferredHeight: 30
++            Layout.preferredWidth: 28
++            Layout.preferredHeight: 28
+             Layout.alignment: Qt.AlignVCenter
++            Layout.rightMargin: 1
++            Layout.topMargin: -1
+             source: root.suggestionIcon
+-            safetyMargins: true
++            safetyMargins: false
+         }
+diff --git a/src/server/src/ui/qml/list/ListItemDelegate.qml b/src/server/src/ui/qml/list/ListItemDelegate.qml
+--- a/src/server/src/ui/qml/list/ListItemDelegate.qml
++++ b/src/server/src/ui/qml/list/ListItemDelegate.qml
+@@ -8,3 +8,3 @@
+-    height: featured ? 52 : 38
++    height: featured ? 57 : 38
+ 
+     Accessible.role: Accessible.ListItem
+@@ -19,3 +19,3 @@
+-    property bool featured: false
++    property bool featured: true
+     required property string itemAlias
+     property var itemShortcutTokens: []
+@@ -30,3 +30,3 @@
+-        spacing: 10
++        spacing: root.featured ? 15 : 10
+ 
+         Item {
+@@ -34,3 +34,3 @@
+-            Layout.preferredWidth: root.featured ? 40 : 32
+-            Layout.preferredHeight: root.featured ? 40 : 32
++            Layout.preferredWidth: root.featured ? 39 : 32
++            Layout.preferredHeight: root.featured ? 39 : 32
+             Layout.alignment: Qt.AlignVCenter
+@@ -59,4 +59,7 @@
+             Layout.minimumWidth: 100
+-            implicitHeight: titleText.implicitHeight + (root.featured && subtitleText.visible ? subtitleText.implicitHeight + 2 : 0)
++            implicitHeight: titleText.implicitHeight
++            // Fix the glyph origin to whole pixels across selected/accessory states.
++            Layout.alignment: Qt.AlignTop
++            Layout.topMargin: Math.round((root.height - implicitHeight) / 2) - (root.featured ? 1 : 0)
+ 
+             readonly property real spacing: root.appearance.rowTextSpacing
+@@ -79,5 +82,7 @@
+                 text: root.itemTitle
+-                color: root.strongSelected ? root.appearance.selectedText : root.hovered || root.softSelected ? root.appearance.hoveredText : Theme.foreground
+-                font.pointSize: root.featured ? Theme.regularFontSize * 1.14 : Theme.regularFontSize
++                // Spotlight titles retain the same opaque ink and glyph coverage on selection.
++                color: "#ffffff"
++                font.family: root.featured ? "SF Pro" : Theme.fontFamily
++                font.pixelSize: root.featured ? 18 : Math.round(Theme.regularFontSize * 96 / 72)
+-                font.weight: root.featured ? Font.DemiBold : Font.Normal
++                font.weight: root.featured ? Font.Medium : Font.Normal
+                 elide: Text.ElideRight
+@@ -94,3 +99,3 @@
+-                visible: root.itemSubtitle !== ""
++                visible: false
+                 anchors.left: root.featured ? parent.left : titleText.right
+                 anchors.leftMargin: visible && !root.featured ? textRow.spacing : 0
+diff --git a/src/server/src/ui/qml/list/SelectableDelegate.qml b/src/server/src/ui/qml/list/SelectableDelegate.qml
+--- a/src/server/src/ui/qml/list/SelectableDelegate.qml
++++ b/src/server/src/ui/qml/list/SelectableDelegate.qml
+@@ -49,3 +49,4 @@
+         radius: root.appearance.rowRadius
++        continuousCorners: true
+         backgroundColor: root.appearance.delegateBackdrop
+         color: {
+diff --git a/src/server/src/ui/qml/launcher/LauncherAppearance.qml b/src/server/src/ui/qml/launcher/LauncherAppearance.qml
+--- a/src/server/src/ui/qml/launcher/LauncherAppearance.qml
++++ b/src/server/src/ui/qml/launcher/LauncherAppearance.qml
+@@ -9,3 +9,3 @@
+-    property int searchBarHeight: 60
++    property int searchBarHeight: 55
+     property bool searchDividerVisible: true
+     property bool overlaySearchBar: false
+@@ -16,5 +16,5 @@
+-    property int rowInset: 6
+-    property int rowRadius: 10
+-    property int rowLeftPadding: 12
+-    property int rowRightPadding: 12
++    property int rowInset: 9
++    property real rowRadius: 18.5
++    property int rowLeftPadding: 16
++    property int rowRightPadding: 19
+     property int rowTextSpacing: 6
+diff --git a/src/server/src/ui/qml/views/ClipboardHistoryView.qml b/src/server/src/ui/qml/views/ClipboardHistoryView.qml
+--- a/src/server/src/ui/qml/views/ClipboardHistoryView.qml
++++ b/src/server/src/ui/qml/views/ClipboardHistoryView.qml
+@@ -182,3 +182,4 @@
+                                     Text {
++                                        visible: false
+                                         text: delegateLoader.subtitle
+                                         color: Theme.textMuted
+diff --git a/src/server/src/ui/qml/views/StoreListingView.qml b/src/server/src/ui/qml/views/StoreListingView.qml
+--- a/src/server/src/ui/qml/views/StoreListingView.qml
++++ b/src/server/src/ui/qml/views/StoreListingView.qml
+@@ -106,3 +106,4 @@
+                             Text {
++                                visible: false
+                                 text: delegateLoader.subtitle
+                                 color: Theme.textMuted
+diff --git a/src/server/src/ui/quick/source-blend-rect.hpp b/src/server/src/ui/quick/source-blend-rect.hpp
+--- a/src/server/src/ui/quick/source-blend-rect.hpp
++++ b/src/server/src/ui/quick/source-blend-rect.hpp
+@@ -23,3 +23,4 @@
+   bool sourceBlend = false;
++  bool continuousCorners = false;
+ };
+ 
+@@ -39,3 +40,4 @@
+   Q_PROPERTY(bool cornerMask READ cornerMask WRITE setCornerMask NOTIFY cornerMaskChanged)
++  Q_PROPERTY(bool continuousCorners READ continuousCorners WRITE setContinuousCorners NOTIFY continuousCornersChanged)
+ 
+ signals:
+@@ -50,3 +52,4 @@
+   void cornerMaskChanged();
++  void continuousCornersChanged();
+ 
+ public:
+@@ -72,3 +75,5 @@
+   void setCornerMask(bool v);
++  bool continuousCorners() const { return m_continuousCorners; }
++  void setContinuousCorners(bool v);
+ 
+ protected:
+@@ -86,2 +91,3 @@
+   bool m_cornerMask = false;
++  bool m_continuousCorners = false;
+ };
+diff --git a/src/server/src/ui/quick/source-blend-rect.cpp b/src/server/src/ui/quick/source-blend-rect.cpp
+--- a/src/server/src/ui/quick/source-blend-rect.cpp
++++ b/src/server/src/ui/quick/source-blend-rect.cpp
+@@ -61,3 +61,6 @@
+     memcpy(buf->data() + 164, &mode, 4);
+ 
++    int continuousCorners = mat->continuousCorners ? 1 : 0;
++    memcpy(buf->data() + 168, &continuousCorners, 4);
++
+     return true;
+@@ -92,3 +95,4 @@
+   if (sourceBlend != o->sourceBlend) return sourceBlend ? -1 : 1;
++  if (continuousCorners != o->continuousCorners) return continuousCorners ? -1 : 1;
+   if (mode != o->mode) return mode - o->mode;
+   if (color != o->color) return color.rgba() < o->color.rgba() ? -1 : 1;
+@@ -177,3 +181,11 @@
++void SourceBlendRect::setContinuousCorners(bool v) {
++  if (m_continuousCorners != v) {
++    m_continuousCorners = v;
++    emit continuousCornersChanged();
++    update();
++  }
++}
++
+ QSGNode *SourceBlendRect::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *) {
+   if (width() <= 0 || height() <= 0) {
+     delete oldNode;
+@@ -210,3 +222,4 @@
+   material->secondaryHeight = static_cast<float>(m_secondaryHeight);
++  material->continuousCorners = m_continuousCorners;
+ 
+   if (m_cornerMask)
+diff --git a/src/server/src/ui/quick/shaders/sourceblend.vert b/src/server/src/ui/quick/shaders/sourceblend.vert
+--- a/src/server/src/ui/quick/shaders/sourceblend.vert
++++ b/src/server/src/ui/quick/shaders/sourceblend.vert
+@@ -19,3 +19,4 @@
+     int u_mode;
++    int u_continuousCorners;
+ };
+ 
+diff --git a/src/server/src/ui/quick/shaders/sourceblend.frag b/src/server/src/ui/quick/shaders/sourceblend.frag
+--- a/src/server/src/ui/quick/shaders/sourceblend.frag
++++ b/src/server/src/ui/quick/shaders/sourceblend.frag
+@@ -17,3 +17,4 @@
+     int u_mode;
++    int u_continuousCorners;
+ };
+ 
+@@ -20,3 +21,14 @@
+ float roundedRectSDF(vec2 p, vec2 halfSize, float radius) {
++    if (u_continuousCorners != 0 && radius > 0.0) {
++        // Same continuous-corner fit as the Spotlight glass compositor.
++        const float exponent = 2.238;
++        vec2 reach = min(vec2(radius * (30.94 / 28.5)), halfSize);
++        vec2 q = max(abs(p) - halfSize + reach, vec2(0.0)) / reach;
++        float level = pow(pow(q.x, exponent) + pow(q.y, exponent), 1.0 / exponent);
++        // Convert the implicit level to pixel distance for uniform edge antialiasing.
++        vec2 gradient = pow(max(q, vec2(0.00001)), vec2(exponent - 1.0))
++            * pow(max(level, 0.00001), 1.0 - exponent) / reach;
++        return (level - 1.0) / max(length(gradient), 0.00001);
++    }
+     vec2 d = abs(p) - halfSize + radius;
+     return min(max(d.x, d.y), 0.0) + length(max(d, 0.0)) - radius;

@@ -11,6 +11,7 @@ RowLayout {
     id: root
 
     required property var barScreen
+    signal launcherRequested()
     readonly property var monitor: Hyprland.monitorFor(barScreen)
     property var workspaceState: []
     readonly property var windowState: Hyprland.toplevels.values.map(toplevel => toplevel.lastIpcObject)
@@ -168,23 +169,48 @@ RowLayout {
         }
     }
 
+    // macOS reference at 1x: Apple center x=27, app-title ink starts x=53.
+    // BarWindow supplies the first 10px; this item supplies the next 34px.
+    Rectangle {
+        implicitWidth: 34
+        implicitHeight: Theme.barItemHeight
+        Layout.rightMargin: -4
+        radius: Theme.radius
+        color: appleMouse.containsMouse ? Theme.barHoverFill : "transparent"
+        Accessible.role: Accessible.Button
+        Accessible.name: "Open launcher"
+        Accessible.onPressAction: root.launcherRequested()
+
+        Text {
+            anchors.centerIn: parent
+            text: "\uf8ff"
+            color: Theme.barText
+            font { family: Theme.fontFamily; pixelSize: 20 }
+        }
+        MouseArea {
+            id: appleMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            onClicked: root.launcherRequested()
+        }
+    }
+
     Rectangle {
         visible: DesktopFeatures.contexts
-        implicitWidth: Math.min(110, sessionLabel.implicitWidth + 16)
-        implicitHeight: 26
+        implicitWidth: sessionLabel.implicitWidth + 22
+        implicitHeight: Theme.barItemHeight
         radius: Theme.radius
         color: sessionMouse.containsMouse ? Theme.barHoverFill : "transparent"
         Text {
             id: sessionLabel
             anchors.fill: parent
-            anchors.leftMargin: 8
-            anchors.rightMargin: 8
+            anchors.leftMargin: 9
+            anchors.rightMargin: 13
             verticalAlignment: Text.AlignVCenter
             text: DesktopSessions.activeName
             textFormat: Text.PlainText
-            elide: Text.ElideRight
             color: DesktopSessions.error ? Theme.danger : Theme.barText
-            font { family: Theme.fontFamily; pixelSize: 13; weight: Font.DemiBold }
+            font { family: Theme.fontFamily; pixelSize: 13; weight: Font.Bold }
         }
         MouseArea {
             id: sessionMouse

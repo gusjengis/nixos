@@ -51,6 +51,9 @@ Item {
         // Transparent surface: only the cards carry material.
         glassNamespace: "quickshell-inbox"
         backgroundVisible: false
+        // Cards are separate layer surfaces and may be stacked below this host.
+        // Only the header belongs to the host; don't swallow card pointer input.
+        mask: Region { item: header }
         shadowPadding: 0
         focusWindows: [popup].concat(root.cardWindows)
         popupX: root.popupAnchor.width
@@ -147,6 +150,7 @@ Item {
                 Component.onCompleted: root.registerCard(window)
                 Component.onDestruction: root.unregisterCard(window)
                 onDismissRequested: root.notificationService.dismiss(entry.key)
+                onActivationRequested: popup.visible = false
                 onCloseRequested: popup.visible = false
                 onScrollRequested: delta => root.scrollCards(delta)
             }

@@ -67,13 +67,32 @@ After an explicit future rebuild/restart, verify `hyprctl -j hyprglass status`
 reports `features.layers.active = true`, open Vicinae/QuickShell glass surfaces,
 and check popups, close snapshots, config reload, and plugin unload/reload.
 
+## Apple glass for app windows (`apple-glass.patch`)
+
+A port of QuartzCore's `glass_background` shader (macOS 27, decompiled in the
+MacOS Theme session's `23-sidebar-glass`), applied under part of an app
+window. The client names a built-in material (`apple-sidebar`: Finder's
+sidebar, fitted to 1.2/255 on 44 wallpapers) and an explicit shape on its
+toplevel surface through `hyprglass_item_v1`. The plugin then draws that
+material beneath the surface, disables Hyprland's own blur for that window,
+and gives shape corners on the window's corners the window rounding.
+No config switch is involved; window glass and `subsurfaces` can stay off.
+
+The manager global is now version 2. Clients (Strata) leave the area
+transparent only at version 2. The protocol helper survives plugin reloads,
+so a running Hyprland keeps advertising version 1 until it restarts.
+Layer glass (Vicinae, QuickShell) still uses the fitted `macglass` shader.
+
+Offline shader check: `24-apple-glass-hyprglass/harness.py` runs
+`appleglass.frag` headless against the numpy model and the Mac captures.
+
 ## Manual application and build
 
 In a separate Hyprglass checkout at the pinned upstream revision:
 
 ```sh
 git checkout --detach a54e7cd0232ca62a394aebebd553358dc6592652
-for patch in experimental hdr-encoding linear-shadow refraction launcher-shape config-lifecycle layer-shadow surface-material portable-backend; do
+for patch in experimental hdr-encoding linear-shadow refraction launcher-shape config-lifecycle layer-shadow surface-material portable-backend apple-glass; do
     git apply --check "/etc/nixos/home/features/desktop/hyprland/glass/$patch.patch"
     git apply "/etc/nixos/home/features/desktop/hyprland/glass/$patch.patch"
 done
@@ -82,7 +101,7 @@ done
 Apply the complete patch once; do not separately reverse `b14733f` first.
 Build the patched source against the matching fork, not generic Hyprland headers.
 `package.nix` provides the reproducible build recipe: fixed upstream revision
-and source hash, all nine patches in the order above, and an explicit matching
+and source hash, all ten patches in the order above, and an explicit matching
 `hyprland` argument.
 The Hyprland Home Manager module imports it and deploys the immutable compiled
 library at `~/.local/share/hyprglass/libhyprglass.so`. Its owning Lua configuration

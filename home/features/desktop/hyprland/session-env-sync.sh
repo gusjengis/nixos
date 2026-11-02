@@ -7,8 +7,7 @@
 # WAYLAND_DISPLAY and HYPRLAND_INSTANCE_SIGNATURE were current when it was first
 # populated. After a Hyprland restart those point at a dead socket, so a GUI
 # service started from that environment finds no Wayland display, silently falls
-# back to X11, and dies on a stale DISPLAY. thunar.service hit exactly this and
-# crash-looped on Restart=on-failure.
+# back to X11, and dies on a stale DISPLAY.
 #
 # Run from autostart.lua before any graphical user service is started.
 
@@ -41,13 +40,17 @@ fi
 systemctl --user import-environment "${present[@]}"
 
 # Services activated by D-Bus rather than by systemd read this environment
-# instead, so it has to be updated as well or Thunar's org.xfce.FileManager
-# activation inherits the stale display.
+# instead, so it has to be updated as well to avoid inheriting a stale display.
 dbus-update-activation-environment --systemd "${present[@]}"
 
 # Restart rather than start: after a compositor restart the unit is usually
 # either failed or still bound to the previous display.
+status=0
 for unit in "$@"; do
   systemctl --user reset-failed "$unit" 2>/dev/null || true
-  systemctl --user restart --no-block "$unit"
+  if ! systemctl --user restart --no-block "$unit"; then
+    echo "session-env-sync: failed to restart $unit" >&2
+    status=1
+  fi
 done
+exit "$status"

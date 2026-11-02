@@ -16,6 +16,7 @@ Item {
     readonly property bool hovered: card.hovered
     readonly property NotificationSurface window: surface
     signal dismissRequested()
+    signal activationRequested()
     signal closeRequested()
     signal scrollRequested(real delta)
 
@@ -51,6 +52,7 @@ Item {
             compositorGlass: root.compositorGlass
             showTimestamp: root.showTimestamp
             onDismissRequested: root.dismissRequested()
+            onActivationRequested: root.activationRequested()
         }
 
         // Card windows cover the ListView: forward wheel input to its owner.

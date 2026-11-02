@@ -12,6 +12,13 @@ let
   hyprlandPackages = inputs.hyprland.packages.${pkgs.stdenv.hostPlatform.system};
   hyprpickerPackage = inputs.hyprpicker.packages.${pkgs.stdenv.hostPlatform.system}.hyprpicker;
   configRoot = "${repoRoot}/home/features/desktop/quickshell/config";
+  desktopFiles = pkgs.writeShellApplication {
+    name = "context-desktop-files";
+    runtimeInputs = [ pkgs.python3 pkgs.glib ];
+    text = ''
+      exec python3 "${configRoot}/../desktop-files.py" "$@"
+    '';
+  };
   wallpaperDir = "${repoRoot}/home/features/desktop/wallpaper";
   python = pkgs.python3.withPackages (ps: [ ps.pygobject3 ]);
   # Shared with the GTK theme module, which needs the same family for Thunar.
@@ -232,6 +239,7 @@ in
     home.packages = [
       pkgs.quickshell
       pkgs.wl-clipboard
+      desktopFiles
       pkgs.libnotify
       sfPro
       remoteApps
@@ -248,6 +256,8 @@ in
       pkgs.xwayland-satellite
     ]
     ++ lib.optionals config.dev.enable [
+      pkgs.python3
+      pkgs.tmux
       aiUsage
       aiAccount
       universalSearch

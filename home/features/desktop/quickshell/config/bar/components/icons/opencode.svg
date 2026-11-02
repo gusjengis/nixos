@@ -1,0 +1,8 @@
+<!-- OpenCode brand mark: https://opencode.ai/brand
+     Geometry from packages/console/app/src/asset/brand/opencode-logo-dark.svg.
+     Neutral template treatment retains the recessed interior through alpha,
+     allowing the menu bar's wallpaper-aware tint to supply foreground color. -->
+<svg width="240" height="300" viewBox="0 0 240 300" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M180 240H60V120H180V240Z" fill="white" fill-opacity="0.3"/>
+  <path d="M180 60H60V240H180V60ZM240 300H0V0H240V300Z" fill="white"/>
+</svg>
