@@ -24,13 +24,13 @@ Host og
   IdentitiesOnly yes
   IdentityFile ~/.config/secrets/ssh/fleet_ed25519
 
-Host trevornomad
+Host trevornomad trevornomad.tail29bd65.ts.net
   HostName trevornomad.tail29bd65.ts.net
   User Anthony
   IdentitiesOnly yes
   IdentityFile ~/.config/secrets/ssh/fleet_ed25519
 
-Host macos
+Host macos macbook macos.tail29bd65.ts.net
   HostName macos.tail29bd65.ts.net
   User anthonygreen
   IdentitiesOnly yes
