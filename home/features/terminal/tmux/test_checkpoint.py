@@ -181,6 +181,39 @@ class NativeCheckpointTests(unittest.TestCase):
         self.assertEqual(self.tmux("list-sessions", "-F", "#{session_name}").stdout,
                          "anchor\n")
 
+    def test_originating_attached_client_can_switch_and_type_during_tab_close(self):
+        self.tmux("respawn-pane", "-k", "-t", "anchor:0", "/bin/sh")
+        self.tmux("new-window", "-d", "-t", "anchor:1", "sleep 60")
+        self.tmux("bind-key", "q", "kill-window", "-t", "anchor:1")
+        self.tmux("bind-key", "w", "select-window", "-t", "anchor:0")
+        self.configure()
+        self.tmux("set-option", "-s", "@persistence-close-command", self.command)
+        master, slave = pty.openpty()
+        client = subprocess.Popen(self.base + ["attach-session", "-t", "anchor:1"],
+                                  env=self.env, stdin=slave, stdout=slave, stderr=slave)
+        os.close(slave)
+        self.children.append(client)
+        try:
+            deadline = time.monotonic() + 3
+            while not self.tmux("list-clients", "-F", "#{client_session}").stdout.strip():
+                self.assertLess(time.monotonic(), deadline)
+                time.sleep(.01)
+            os.write(master, b"\x02q")
+            self.snapshot()
+            marker = self.root / "same-client-input"
+            os.write(master, b"\x02w")
+            os.write(master, ("printf ready > " + shlex.quote(str(marker)) + "\r").encode())
+            deadline = time.monotonic() + 2
+            while not marker.exists():
+                self.assertLess(time.monotonic(), deadline, "originating client queue froze")
+                time.sleep(.01)
+            self.assertEqual(marker.read_text(), "ready")
+            self.assertFalse((self.root / "release").exists(), "input must work while helper is waiting")
+        finally:
+            (self.root / "release").touch()
+            self.tmux("set-option", "-su", "@persistence-close-command", check=False)
+            os.close(master)
+
     def test_kill_session_group(self):
         self.tmux("new-session", "-d", "-t", "victim", "-s", "grouped")
         before = self.panes()

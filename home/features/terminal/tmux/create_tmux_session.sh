@@ -22,6 +22,11 @@ if ! tmux has-session -t "=$session" 2>/dev/null; then
   tmux select-window -t "$session:1"
 fi
 
+# A restored session may have been created in its context's state directory.
+# A short-lived control client updates the native default without moving panes
+# or switching any attached terminal. -E preserves the session environment.
+TMUX= tmux -C attach-session -E -t "=$session" -c "${project//#/##}" \; detach-client </dev/null >/dev/null
+
 if [[ ${3:-} == --attach ]]; then
   exec tmux attach-session -t "=$session"
 fi

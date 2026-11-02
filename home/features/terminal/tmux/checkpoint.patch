@@ -23,7 +23,7 @@
 +	free(item->checkpoint_topology);
  	free(item);
  }
-@@ -592,4 +599,116 @@
+@@ -592,4 +599,147 @@
  	free(tmp);
  }
  
@@ -90,6 +90,37 @@
 +		return (CMD_RETURN_NORMAL);
 +	if (entry == &cmd_kill_session_entry && args_has(args, 'C'))
 +		return (CMD_RETURN_NORMAL);
++	if (entry == &cmd_kill_session_entry && !args_has(args, 'a') &&
++	    !args_has(args, 'g') && fs->s != NULL &&
++	    options_get(fs->s->options, "@persistence-close-staging") != NULL)
++		return (CMD_RETURN_NORMAL);
++
++	/* Explicit tab closure is independently owned, never a client queue wait.
++	 * Only the helper's private staging targets may bypass final capture. */
++	if (entry == &cmd_kill_window_entry || entry == &cmd_kill_pane_entry) {
++		if (!args_has(args, 'a') && fs->wl != NULL &&
++		    options_get(fs->wl->window->options, "@persistence-close-staged") != NULL)
++			return (CMD_RETURN_NORMAL);
++		command = options_get(global_options, "@persistence-close-command") == NULL ?
++		    "" : options_get_string(global_options, "@persistence-close-command");
++		if (*command != '\0') {
++			ft = format_create_from_target(item);
++			format_add(ft, "checkpoint_operation", "%s", entry->name);
++			format_add(ft, "checkpoint_all", "%d", !!args_has(args, 'a'));
++			expanded = format_expand(ft, command);
++			format_free(ft);
++			job = job_run(expanded, 0, NULL, NULL, NULL, "/", NULL,
++			    NULL, NULL, NULL, JOB_NOWAIT, -1, -1);
++			free(expanded);
++			if (job == NULL) {
++				cmdq_error(item, "cannot start tab close; targets intact");
++				return (CMD_RETURN_ERROR);
++			}
++			/* STOP skips entry->exec but completes this queue item. The
++			 * helper reports failures and keeps recovery processes alive. */
++			return (CMD_RETURN_STOP);
++		}
++	}
 +	command = options_get_string(global_options, "@persistence-checkpoint");
 +	if (*command == '\0')
 +		return (CMD_RETURN_NORMAL);
