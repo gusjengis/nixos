@@ -51,7 +51,7 @@
     "overlay_style": "live",
     "paste_delay_after_ms": 60,
     "paste_delay_ms": 60,
-    "paste_method": "direct",
+    "paste_method": "shift_insert",
     "post_process_api_keys": {
       "anthropic": "",
       "bedrock_mantle": "",

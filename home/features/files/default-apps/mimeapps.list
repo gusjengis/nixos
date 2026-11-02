@@ -35,7 +35,7 @@ model/vnd.usdz+zip=f3d-plugin-usd.desktop;
 image/svg+xml=org.pwmt.zathura-pdf-mupdf.desktop;
 
 [Default Applications]
-inode/directory=thunar.desktop;
+inode/directory=io.github.lgse.Strata.desktop;
 application/pdf=org.pwmt.zathura.desktop;
 image/png=qimgv.desktop;
 image/webp=qimgv.desktop;

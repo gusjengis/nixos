@@ -8,7 +8,8 @@
 let
   configRoot = "${repoRoot}/home/features/files/thunar";
   sfPro = pkgs.callPackage ../../../packages/sf-pro.nix { };
-  iconThemeName = "Colloid-Dark-Remote";
+  iconThemeName = config.gtk.iconTheme.name;
+  remoteIconThemeName = "Colloid-Dark-Remote";
   # Wayland's GTK3 backend reads org.gnome.desktop.interface/icon-theme from
   # GSettings at XSETTING priority, above gtk-3.0/settings.ini. Thunar's private
   # XDG_CONFIG_HOME has no dconf user DB, so it otherwise gets Adwaita's schema
@@ -27,7 +28,7 @@ let
   remoteIcons = pkgs.runCommand "colloid-dark-remote-icon-theme" {
     nativeBuildInputs = [ pkgs.gtk3 ];
   } ''
-    theme="$out/share/icons/${iconThemeName}"
+    theme="$out/share/icons/${remoteIconThemeName}"
     mkdir -p "$out/share/icons"
     # A tiny child icon theme made GTK fall through to Papirus for ordinary
     # folders. Copy Colloid's full index and icons before overriding one glyph
@@ -43,26 +44,9 @@ let
     rm -f "$theme/icon-theme.cache"
     gtk-update-icon-cache -f "$theme"
   '';
-  launch = pkgs.writeShellApplication {
-    name = "thunar-launch";
-    text = builtins.replaceStrings
-      [ "@THUNAR@" "@CSS@" ]
-      [ "${pkgs.thunar}" "${configRoot}/github-dark.css" ]
-      (builtins.readFile ./thunar-launch.sh);
-  };
-  themedThunar = pkgs.symlinkJoin {
-    name = "thunar-themed";
-    paths = [ pkgs.thunar ];
-    postBuild = ''
-      rm "$out/bin/thunar" "$out/bin/Thunar"
-      ln -s ${launch}/bin/thunar-launch "$out/bin/thunar"
-      ln -s thunar "$out/bin/Thunar"
-    '';
-  };
 in
 {
   home.packages = [
-    themedThunar
     pkgs.adw-gtk3
     pkgs.colloid-icon-theme
     remoteIcons
@@ -75,8 +59,7 @@ in
     pkgs.udiskie
   ];
 
-  # Only this config tree advertises GitHub Dark, Colloid and SF Pro. Global GTK
-  # stays on Adwaita-dark/Papirus for Chromium and other apps.
+  # Private application styling; icons follow the shared desktop selection.
   home.activation.thunarGtkSettings = lib.hm.dag.entryBetween [ "reloadSystemd" ] [ "writeBoundary" ] ''
     privateHome="${config.xdg.stateHome}/thunar-gtk/gtk-3.0"
     run mkdir -p "$privateHome"
@@ -116,16 +99,4 @@ in
     fi
   '';
 
-  systemd.user.services.thunar = {
-    Unit.Description = "Thunar file manager daemon";
-
-    Service = {
-      Type = "dbus";
-      ExecStart = "${themedThunar}/bin/Thunar --daemon";
-      BusName = "org.xfce.FileManager";
-      KillMode = "process";
-      Restart = "on-failure";
-      RestartSec = 2;
-    };
-  };
 }
