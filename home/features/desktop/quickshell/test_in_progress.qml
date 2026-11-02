@@ -6,6 +6,7 @@ import "config" as Desktop
 ShellRoot {
     id: root
     property int stage: 0
+    property var widgetComponent: Qt.createComponent("config/InProgressWidget.qml")
     Desktop.InProgressModel {
         id: notebook
         contextId: Quickshell.env("TEST_CONTEXT_FIRST")
@@ -21,12 +22,17 @@ ShellRoot {
         running: true
         onTriggered: {
             try {
+                check(widgetComponent.status !== Component.Error, widgetComponent.errorString());
                 if (!notebook.loaded || notebook.busy) return;
                 check(!notebook.error, notebook.error);
                 if (root.stage === 0) {
                     check(notebook.cards.length === 91, "Must collect every paginated In-Progress and Todo card");
-                    check(notebook.cards.slice(0, 90).every(card => card.status === "In-Progress"), "In-Progress must come first");
-                    check(notebook.cards[90].status === "Todo", "Todo must follow In-Progress");
+                    check(notebook.cards[0].status === "Todo", "Todo must be above In-Progress");
+                    check(notebook.cards.slice(1).every(card => card.status === "In-Progress"), "Every In-Progress card must remain below Todo");
+                    if (Quickshell.env("TEST_CONTEXT_CHILD")) {
+                        check(notebook.cards.every(card => card.owner_context_id === Quickshell.env("TEST_CONTEXT_CHILD")), "Nested cards retain their original owner");
+                        check(notebook.cards.every(card => card.context === "Parent / Child" && card.path.startsWith("Child/")), "Nested cards expose context labels and mounted paths");
+                    }
                     root.stage = 1;
                     notebook.contextId = Quickshell.env("TEST_CONTEXT_SECOND");
                     check(notebook.cards.length === 0 && !notebook.loaded, "Switch must clear previous cards immediately");

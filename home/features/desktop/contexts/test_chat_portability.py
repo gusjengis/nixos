@@ -6,6 +6,7 @@ Native imports/exports require PERSISTENCE_NATIVE_TESTS=1 and opencode on PATH:
 """
 
 import copy
+from contextlib import closing
 import importlib.util
 import json
 import os
@@ -125,6 +126,42 @@ class IsolatedChatTest(unittest.TestCase):
 @unittest.skipUnless(os.environ.get("PERSISTENCE_NATIVE_TESTS") == "1", "set PERSISTENCE_NATIVE_TESTS=1")
 @unittest.skipUnless(shutil.which("opencode"), "opencode unavailable")
 class NativeChatPortabilityTests(IsolatedChatTest):
+    def test_native_crash_after_parent_import_resumes_same_family(self):
+        import chat_recovery as recovery
+        root = self.base / "work"
+        root.mkdir()
+        parent = {"info": native_fixture(root)["info"], "messages": []}
+        child = copy.deepcopy(parent)
+        child["info"].update(id="ses_recoverychild", parentID=parent["info"]["id"])
+        for item in (parent, child):
+            seed = self.base / (item["info"]["id"] + ".json")
+            chat._write(seed, item)
+            chat._cli(["import", str(seed)], str(root))
+        bundle = self.base / "crash-bundle"
+        chat.capture({"session_id": parent["info"]["id"], "directory": str(root)}, bundle, str(root))
+        self.environment("crash-destination")
+        chat._cli(["db", "SELECT 1"], str(root))
+        original = chat._cli
+        imported = []
+        def crash(args, cwd):
+            result = original(args, cwd)
+            if args[0] == "import":
+                imported.append(json.loads(Path(args[1]).read_text())["info"]["id"])
+                raise SystemExit("after native parent commit")
+            return result
+        with patch.object(chat, "_cli", crash):
+            with self.assertRaises(SystemExit):
+                chat.restore(bundle, str(root))
+        self.assertEqual(len(imported), 1)
+        self.assertTrue(recovery.pending_native_ids(Path(os.environ["OPENCODE_DB"])))
+        selected = chat.restore(bundle, str(root))
+        self.assertEqual(selected, imported[0])
+        self.assertEqual(len(chat._descendants(selected, str(root))), 2)
+        self.assertEqual(chat.restore(bundle, str(root)), selected)
+        with closing(chat._database(str(root))) as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM session").fetchone()[0], 2)
+        self.assertFalse(recovery.pending_native_ids(Path(os.environ["OPENCODE_DB"])))
+
     def test_historical_missing_files_keep_messages_and_report_loss(self):
         root = Path(os.environ["HOME"]) / "context"
         root.mkdir()

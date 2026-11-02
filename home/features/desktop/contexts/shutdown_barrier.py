@@ -12,11 +12,13 @@ import os
 import signal
 import stat
 
+from session_exit import event_log, report
+
 from dbus_next import BusType
 from dbus_next.aio import MessageBus
 
 LOG = logging.getLogger("context-shutdown-barrier")
-CHECKPOINT_TIMEOUT = 90
+CHECKPOINT_TIMEOUT = 30
 DBUS_TIMEOUT = 10
 NAME = "org.freedesktop.login1"
 PATH = "/org/freedesktop/login1"
@@ -81,17 +83,23 @@ class ShutdownBarrier:
 
     async def checkpoint(self):
         process = None
+        stream = event_log()
         try:
             LOG.info("Shutdown announced; saving context (maximum %ss)", CHECKPOINT_TIMEOUT)
             async with asyncio.timeout(CHECKPOINT_TIMEOUT):
                 process = await asyncio.create_subprocess_exec(
                     "context-checkpoint", "save", "--reason", "shutdown",
                     start_new_session=True,
+                    stdout=stream, stderr=stream,
                 )
                 status = await process.wait()
                 if status:
                     raise RuntimeError(f"context-checkpoint exited with status {status}")
             LOG.info("Shutdown checkpoint complete")
+        except Exception as exc:
+            detail = str(exc) or type(exc).__name__
+            report(f"Shutdown checkpoint failed: {detail}; shutdown continues; previous checkpoint retained", stream)
+            raise
         finally:
             # Release BEFORE cleanup/notifications, including timeout, cancellation
             # and spawn failure. logind also enforces its independent 120s ceiling.
@@ -103,6 +111,8 @@ class ShutdownBarrier:
                     pass
                 if process.returncode is None:
                     await asyncio.wait_for(process.wait(), 2)
+            if stream is not None:
+                stream.close()
 
 
 async def run():

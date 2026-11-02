@@ -10,10 +10,11 @@ import sys
 import tempfile
 from contextlib import contextmanager
 from pathlib import Path
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 
 import contextctl as ctl
 import notebook
+import notebook_hierarchy
 import organization
 
 START = "<!-- context-notebook:work-state -->"
@@ -36,10 +37,16 @@ def phase(value):
 def resolve(identifier):
     if not identifier:
         raise ctl.ContextError("No owning saved context; notebook integration is inactive")
-    contexts = ctl.scan()
-    context = next((item for item in contexts if item["id"] == identifier), None)
+    if identifier in ("global", notebook_hierarchy.GLOBAL_ID):
+        directory = ctl.root() / ".context/notes"
+        if not directory.is_dir():
+            raise ctl.ContextError("Global notebook is unavailable; run contextctl setup-notebooks")
+        return Vault(directory, notebook_hierarchy.GLOBAL_ID, "All contexts")
+    # Notebook identity needs local metadata, never access to job/repository roots.
+    context = ctl.selected_context(identifier)
     if context is None:
         raise ctl.ContextError("Owning context is unavailable; no fallback to another notebook")
+    contexts = [context if item["id"] == identifier else item for item in ctl.known_contexts()]
     node = next(item for item in organization.resolve(contexts) if item["id"] == identifier)
     return Vault(Path(context["path"]) / ".context/notes", identifier, node["breadcrumb"])
 
@@ -50,11 +57,21 @@ class Vault:
         self.identifier = identifier
         self.label = label or identifier
 
-    def path(self, name):
+    def owner(self, name):
         relative = Path(name)
         if (relative.is_absolute() or ".." in relative.parts or relative.suffix != ".md"
                 or not relative.parts or not notebook.eligible(relative, {})):
             raise ctl.ContextError("Use an ordinary vault-relative Markdown note path")
+        directory, identifier, label, name = notebook_hierarchy.owner(self.directory, self.identifier, name)
+        if identifier != self.identifier:
+            return Vault(directory, identifier, label).owner(name)
+        return self, name
+
+    def path(self, name):
+        owner, name = self.owner(name)
+        if owner is not self:
+            return owner.path(name)
+        relative = Path(name)
         path = ctl.contained(self.directory, self.directory / relative)
         if path.is_symlink():
             raise ctl.ContextError("Notebook API does not edit symlinked notes")
@@ -70,12 +87,14 @@ class Vault:
 
     def card(self, name):
         _, text, metadata = self.load(name)
+        owner, owner_path = self.owner(name)
         match = WORK.search(text)
         return {"path": name, "title": Path(name).stem, "status": phase(metadata),
                 "created": metadata.get("created"), "revision": revision(text),
+                "owner_context_id": owner.identifier, "owner_path": owner_path, "context": owner.label,
                 "work_state": match[1] if match else "", "content": text}
 
-    def cards(self, query="", status=None):
+    def cards(self, query="", status=None, local_only=False):
         words = set(re.findall(r"[\w-]{3,}", query.casefold())) - {
             "the", "and", "this", "that", "with", "what", "have", "should", "let", "continue",
         }
@@ -98,15 +117,21 @@ class Vault:
             card["last_phase_at"] = notebook.json_default(history[-1].get("at", "")) if history else ""
             card["score"] = score
             rows.append(card)
+        if not local_only:
+            for prefix in notebook_hierarchy.manifest(self.directory).get("mounts", {}):
+                child, _ = self.owner(prefix + "/_owner.md")
+                for card in child.cards(query, status):
+                    card["path"] = prefix + "/" + card["path"]
+                    rows.append(card)
         rows.sort(key=lambda row: (-row["score"], row["title"].casefold(), row["path"]))
         return rows
 
     def listing(self, request):
-        rows = self.cards(request.get("query", ""), request.get("status"))
+        rows = self.cards(request.get("query", ""), request.get("status"), request.get("local_only", False))
         offset = max(0, int(request.get("offset", 0)))
         result, used = [], 0
         for row in rows[offset:]:
-            summary = {key: row[key] for key in ("path", "title", "status")}
+            summary = {key: row[key] for key in ("path", "title", "status", "owner_context_id", "owner_path", "context")}
             size = len(json.dumps(summary, ensure_ascii=False))
             if used + size > 6000:
                 break
@@ -131,7 +156,7 @@ class Vault:
         result = {"context_id": self.identifier, "context": self.label, "vault": str(self.directory),
                   "snapshot_at": notebook.timestamp(), "counts": counts, "notes": [], "omitted": 0}
         for row in cards:
-            item = {key: row[key] for key in ("path", "title", "status")}
+            item = {key: row[key] for key in ("path", "title", "status", "owner_context_id", "owner_path", "context")}
             if row["status"] != "Thoughts" and row["work_state"]:
                 item["return_point"] = row["work_state"][:300]
             if len(json.dumps(result, ensure_ascii=False)) + len(json.dumps(item, ensure_ascii=False)) > 5000:
@@ -145,16 +170,22 @@ class Vault:
 
     def open(self, request):
         """Open a card in its context's isolated Obsidian profile."""
-        path, _, _ = self.load(request["path"])
-        item = ctl.launch_context()
+        self.load(request["path"])
+        # Keep the lexical mounted path: its canonical path belongs to a different
+        # vault, but this command opens the note in the active parent's profile.
+        path = self.directory / request["path"]
+        item = ctl.launch_context(metadata_only=True, check_working_directory=False)
         if item is None or item["id"] != self.identifier or not item.get("runtime_id"):
             raise ctl.ContextError("Active context changed; select the card again")
         ctl.notes(item["runtime_id"])
         profile = ctl.state_root() / "obsidian" / self.identifier
-        uri = "obsidian://open?" + urlencode({"path": str(path)})
+        # Obsidian URI parameters use percent decoding, not HTML form decoding:
+        # '+' is a literal filename character, so spaces must be encoded as %20.
+        uri = "obsidian://open?" + urlencode({"path": str(path)}, quote_via=quote)
         ctl.spawn(["obsidian", f"--user-data-dir={profile}",
-                   f"--class=context-notes-{self.identifier}", uri])
-        if (ctl.launch_context() or {}).get("id") == self.identifier:
+                   f"--class=context-notes-{self.identifier}", uri],
+                  env=ctl.obsidian_environment(self.identifier))
+        if (ctl.launch_context(metadata_only=True, check_working_directory=False) or {}).get("id") == self.identifier:
             ctl.evaluate("require('sessions').show_special('notes')")
         return {"context_id": self.identifier, "path": request["path"]}
 
@@ -215,6 +246,10 @@ class Vault:
         return self.read({"path": name})
 
     def update(self, request):
+        owner, name = self.owner(request["path"])
+        if owner is not self:
+            owner.update(request | {"path": name})
+            return self.read({"path": request["path"]})
         with self.lock():
             path, text, metadata = self.load(request["path"])
             expected = request["revision"]
@@ -257,19 +292,37 @@ class Vault:
                 self.publish(path, updated, expected)
         return self.read({"path": request["path"]})
 
+    def observe(self, request):
+        """Serialize Obsidian metadata observation across all views of one owner."""
+        owner, name = self.owner(request["path"])
+        if owner is not self:
+            return owner.observe(request | {"path": name})
+        with self.lock():
+            path, _, _ = self.load(name)
+            notebook.update_note(path, notebook.timestamp(), is_new=bool(request.get("is_new")))
+        return {"path": name}
+
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--context", default=os.environ.get("CONTEXT_ID"))
-    parser.add_argument("command", choices=("info", "brief", "list", "search", "read", "open", "create", "update"))
+    parser.add_argument("command", choices=("info", "brief", "list", "search", "read", "open", "create", "update", "observe", "capture-owner", "capture", "title-capture"))
     args = parser.parse_args(argv)
     try:
+        if args.command == "capture-owner":
+            owner = ctl.launch_context(metadata_only=True, check_working_directory=False)
+            print(json.dumps({"context_id": owner["id"] if owner else ""}))
+            return 0
         request = json.loads(sys.stdin.read() or "{}")
         if not isinstance(request, dict):
             raise TypeError("Expected a JSON object on stdin")
         vault = resolve(args.context)
         command = "listing" if args.command in ("list", "search") else args.command
-        result = vault.brief(request.get("query", "")) if command == "brief" else getattr(vault, command)(request)
+        if command in ("capture", "title-capture"):
+            import context_dictation
+            result = getattr(context_dictation, command.replace("-", "_"))(vault, request)
+        else:
+            result = vault.brief(request.get("query", "")) if command == "brief" else getattr(vault, command)(request)
         print(json.dumps(result, ensure_ascii=False, default=notebook.json_default))
         return 0
     except (ctl.ContextError, OSError, ValueError, KeyError, TypeError) as exc:

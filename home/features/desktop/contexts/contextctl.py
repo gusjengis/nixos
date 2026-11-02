@@ -4,6 +4,7 @@
 import argparse
 from contextlib import contextmanager, nullcontext
 import fcntl
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -11,6 +12,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import uuid
 
@@ -117,7 +119,107 @@ def working_path(directory, value):
     return contained(directory, directory / value)
 
 
-def scan():
+def read_context(directory, check_working_directory=False):
+    """Validate one local owner without inspecting any other context or work root."""
+    directory = contained(root(), Path(directory).absolute())
+    relative = directory.relative_to(root()).as_posix()
+    relative_name(relative)
+    metadata = contained(directory, directory / ".context/context.json")
+    data = read_json(metadata)
+    if not isinstance(data, dict) or data.get("version") != 1:
+        raise ContextError(f"Invalid context metadata: {metadata}")
+    try:
+        identifier = str(uuid.UUID(data["id"]))
+    except (KeyError, ValueError, TypeError, AttributeError):
+        raise ContextError(f"Invalid context UUID: {metadata}") from None
+    if identifier != data["id"] or data.get("name") != directory.name:
+        raise ContextError(f"Context metadata/name conflict: {metadata}")
+    vault = contained(directory, directory / ".context/notes")
+    if not vault.is_dir() or not (vault / ".obsidian").is_dir():
+        raise ContextError(f"Incomplete note vault: {vault}")
+    cwd = working_path(directory, data.get("working_directory"))
+    item = {"id": identifier, "name": relative, "label": relative,
+            "path": str(directory), "cwd": str(cwd.absolute()),
+            "working_directory": data["working_directory"],
+            "working_directory_path": str(cwd.absolute()),
+            "working_directory_available": None}
+    return check_directory(item) if check_working_directory else item
+
+
+def check_directory(item):
+    item = dict(item)
+    cwd = Path(item["working_directory_path"])
+    result = []
+
+    def probe():
+        try:
+            result.append(cwd.is_dir())
+        except BaseException as exc:
+            result.append(exc)
+
+    # A selected offline mount can also hang in stat(). Bound foreground waiting;
+    # daemon probe never holds a mutation lock or delays process exit.
+    thread = threading.Thread(target=probe, daemon=True)
+    thread.start()
+    thread.join(.15)
+    available = result[0] if result else None
+    if isinstance(available, BaseException):
+        raise available
+    item["working_directory_available"] = available
+    item["cwd"] = str(cwd) if available else item["path"]
+    if not available and cwd not in missing_directories:
+        print(f"contextctl: Missing working directory {cwd}; using {item['path']}; notebook remains available", file=sys.stderr)
+        missing_directories.add(cwd)
+    elif available:
+        missing_directories.discard(cwd)
+    return item
+
+
+def index_path():
+    # Root-specific, machine-local; never sync absolute paths between devices.
+    key = uuid.uuid5(uuid.NAMESPACE_URL, str(root())).hex
+    return state_root() / f"index-{key}.json"
+
+
+def index_stamp():
+    try:
+        stat = index_path().stat()
+        return stat.st_ino, stat.st_mtime_ns
+    except FileNotFoundError:
+        return None
+
+
+def remember_contexts(contexts, replace=False, expected_stamp=None):
+    state_root().mkdir(parents=True, exist_ok=True)
+    with index_path().with_suffix(".lock").open("a") as stream:
+        fcntl.flock(stream, fcntl.LOCK_EX)
+        # Discovery may overlap a foreground create/rename. Never publish its
+        # older snapshot over a newer owner registration.
+        if replace and index_stamp() != expected_stamp:
+            return
+        _remember_contexts(contexts, replace)
+
+
+def _remember_contexts(contexts, replace):
+    path = index_path()
+    previous = read_json(path, {})
+    entries = {} if replace else previous.get("paths", {})
+    metadata = {} if replace else previous.get("contexts", {})
+    entries.update({item["id"]: item["path"] for item in contexts})
+    metadata.update({item["id"]: item for item in contexts})
+    value = {"paths": entries, "contexts": metadata}
+    if read_json(path, {}) != value:
+        atomic_json(path, value)
+
+
+def known_contexts():
+    """Cached discovery metadata for hierarchy calculations, not launch authority."""
+    value = read_json(index_path(), {})
+    return list(value["contexts"].values()) if "contexts" in value else scan(check_working_directories=False)
+
+
+def scan(check_working_directories=True):
+    previous_index = index_stamp()
     contexts = []
     seen = set()
     checkouts = set()
@@ -125,7 +227,9 @@ def scan():
         return contexts
     for directory, children, _ in os.walk(root(), followlinks=False):
         directory = Path(directory)
-        if ".context" in children:
+        # The sessions root owns the explicit global notebook, not a saved
+        # context. Its hidden metadata must not be parsed as context.json.
+        if ".context" in children and directory != root():
             relative = directory.relative_to(root()).as_posix()
             relative_name(relative)
             metadata = contained(directory, directory / ".context/context.json")
@@ -151,8 +255,10 @@ def scan():
                 raise ContextError(f"Incomplete note vault: {vault}")
             cwd = working_path(directory, data.get("working_directory"))
             configured_cwd = cwd
-            available = cwd.is_dir()
-            if not available:
+            # Metadata consumers must not stat external roots: an offline SMB
+            # share can block a harmless context listing for several minutes.
+            available = cwd.is_dir() if check_working_directories else None
+            if available is False:
                 if cwd not in missing_directories:
                     print(f"contextctl: Missing working directory {cwd}; using {directory}; notebook remains available", file=sys.stderr)
                     missing_directories.add(cwd)
@@ -166,7 +272,9 @@ def scan():
                              "working_directory_available": available})
         children[:] = sorted(child for child in children if not child.startswith(".")
                              and directory / child not in checkouts and not (directory / child).is_symlink())
-    return sorted(contexts, key=lambda item: item["name"])
+    contexts = sorted(contexts, key=lambda item: item["name"])
+    remember_contexts(contexts, replace=True, expected_stamp=previous_index)
+    return contexts
 
 
 def local_state():
@@ -195,8 +303,9 @@ def snapshot():
     return value
 
 
-def catalog():
-    contexts, local, live = scan(), local_state(), snapshot()
+def catalog(contexts=None):
+    contexts, local, live = ([dict(item) for item in contexts] if contexts is not None
+                             else scan(check_working_directories=False)), local_state(), snapshot()
     sessions = {item["id"]: item for item in live["sessions"]}
     active = None
     for item in contexts:
@@ -212,8 +321,8 @@ def catalog():
             "nodes": organization.resolve(contexts), "can_undo": organization.can_undo()}
 
 
-def publish(record_activation=False):
-    value = catalog()
+def publish(record_activation=False, contexts=None):
+    value = catalog(contexts)
     path = runtime_path("desktop-contexts")
     if read_json(path, {}) != value:
         atomic_json(path, value)
@@ -226,27 +335,30 @@ def publish(record_activation=False):
 
 
 def find_context(identifier):
-    for item in scan():
-        if item["id"] == identifier:
-            return item
+    item = selected_context(identifier)
+    if item is not None:
+        return check_directory(item)
     raise ContextError(f"Unknown context: {identifier}")
 
 
 def set_working_directory(identifier, value):
     """Caller holds mutation_lock; update configuration without moving live panes."""
-    item = find_context(identifier)
+    item = selected_context(identifier)
+    if item is None:
+        raise ContextError(f"Unknown context: {identifier}")
     directory = Path(item["path"])
     working_path(directory, value)
     metadata = contained(directory, directory / ".context/context.json")
     data = read_json(metadata)
     data["working_directory"] = value
     atomic_json(metadata, data)
+    remember_contexts([read_context(directory)])
 
 
 def create(name, working_directory=".", locked=False):
     """Create without launching applications. Safe for migration callers."""
     with nullcontext() if locked else mutation_lock():
-        scan()  # Never mutate a conflicted or incomplete synced tree.
+        scan(check_working_directories=False)  # Never mutate a conflicted synced tree.
         directory = contained(root(), root() / relative_name(name))
         if any(directory.resolve().is_relative_to(item["path"].resolve()) for item in repositories.registered(root())):
             raise ContextError("Contexts cannot be created inside a registered Git checkout")
@@ -266,6 +378,7 @@ def create(name, working_directory=".", locked=False):
         data = {"version": 1, "id": str(uuid.uuid4()), "name": directory.name,
                 "working_directory": working_directory, "repositories": []}
         atomic_json(metadata, data)
+        remember_contexts([read_context(directory)])
         return data
 
 
@@ -349,9 +462,13 @@ def reconcile_notes(contexts):
 
 
 def open_context(identifier, background=False):
+    item = selected_context(identifier)
+    if item is None:
+        raise ContextError(f"Unknown context: {identifier}")
+    # External availability checks must not hold the global mutation lock.
+    item = check_directory(item)
     with mutation_lock():
-        item, runtime_id, created = prepare_open(identifier)
-        publish()
+        item, runtime_id, created = prepare_open(identifier, item)
     import persistence
     # Lifecycle bookkeeping uses only the short publication lock. Application
     # startup must never run while holding the global catalog/launcher lock.
@@ -367,15 +484,17 @@ def restore_context(identifier, runtime_id):
     import persistence
     with runtime_operation(runtime_id):
         with mutation_lock():
-            item = launch_context(runtime_id)
+            item = launch_context(runtime_id, metadata_only=True, check_working_directory=False)
             if item is None or item["id"] != identifier:
                 raise ContextError("Context/runtime mapping changed before restoration")
-        persistence.restore(item, runtime_id)
+        persistence.restore(check_directory(item), runtime_id)
 
 
-def prepare_open(identifier):
+def prepare_open(identifier, item=None):
     """Create/switch runtime and save mapping; caller holds mutation_lock."""
-    item = find_context(identifier)
+    item = item or selected_context(identifier)
+    if item is None:
+        raise ContextError(f"Unknown context: {identifier}")
     local, live = local_state(), snapshot()
     runtime_id = local["mappings"].get(identifier)
     session = next((entry for entry in live["sessions"] if entry["id"] == runtime_id), None)
@@ -406,7 +525,9 @@ def prepare_open(identifier):
 
 def rename_context(identifier, new_name):
     relative_name(new_name, leaf=True)
-    item = find_context(identifier)
+    item = selected_context(identifier)
+    if item is None:
+        raise ContextError(f"Unknown context: {identifier}")
     directory = Path(item["path"])
     affected = [entry for entry in catalog()["contexts"]
                 if Path(entry["path"]).is_relative_to(directory)]
@@ -428,25 +549,78 @@ def rename_context(identifier, new_name):
     except OSError:
         target.rename(directory)
         raise
+    remember_contexts([read_context(target / Path(entry["path"]).relative_to(directory)) for entry in affected])
 
 
-def launch_context(runtime_id=None):
-    if runtime_id is not None and not any(entry["id"] == runtime_id for entry in snapshot()["sessions"]):
+def selected_context(identifier):
+    # The published catalog is a local UUID -> directory index, not launch-time
+    # authority for settings. Read only the selected context's current metadata.
+    index = read_json(index_path(), {})
+    directory = index.get("paths", {}).get(identifier)
+    if not directory and os.environ.get("CONTEXT_ID") == identifier:
+        candidate = os.environ.get("CONTEXT_DIRECTORY")
+        if candidate and Path(candidate).absolute().is_relative_to(root()):
+            directory = candidate
+    if directory:
+        try:
+            item = read_context(directory)
+        except ContextError:
+            raise ContextError(f"Context {identifier} is unavailable; wait for catalog reconciliation") from None
+        if item["id"] != identifier:
+            raise ContextError("Context path changed ownership; wait for catalog reconciliation")
+        return item
+    # One cold discovery before the watcher has built the local index. Once it
+    # exists, misses/stale paths never trigger a foreground tree walk.
+    if not index:
+        return next((item for item in scan(check_working_directories=False)
+                     if item["id"] == identifier), None)
+    return None
+
+
+def launch_context(runtime_id=None, metadata_only=False, check_working_directory=True):
+    live = snapshot()
+    runtime_id = runtime_id or live.get("active")
+    if runtime_id is not None and not any(entry["id"] == runtime_id for entry in live["sessions"]):
         raise ContextError(f"Runtime session has closed: {runtime_id}")
-    value = catalog()
-    if runtime_id is None:
-        identifier = value["active_context"]
-        return next((item for item in value["contexts"] if item["id"] == identifier), None)
-    return next((item for item in value["contexts"] if item["runtime_id"] == runtime_id), None)
+    identifier = next((key for key, value in local_state()["mappings"].items()
+                       if value == runtime_id), None)
+    if identifier is None:
+        return None
+    item = selected_context(identifier)
+    if item is None:
+        raise ContextError(f"Mapped context is unavailable: {identifier}")
+    item["runtime_id"] = runtime_id
+    return check_directory(item) if check_working_directory else item
 
 
-def spawn(arguments):
+def spawn(arguments, *, env=None):
     subprocess.Popen(arguments, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                     stderr=subprocess.DEVNULL, start_new_session=True)
+                     stderr=subprocess.DEVNULL, start_new_session=True, env=env)
 
 
-def notes(runtime_id=None):
-    item = launch_context(runtime_id)
+def obsidian_environment(identifier):
+    """Give each profile its own Obsidian CLI socket, preserving Wayland access."""
+    environment = os.environ.copy()
+    runtime = Path(environment.get("XDG_RUNTIME_DIR", f"/tmp/runtime-{os.getuid()}"))
+    # Obsidian 1.14.5 unlinks/rebinds .obsidian-cli.sock even with a separate
+    # --user-data-dir. Keep paths short enough for Unix domain sockets.
+    key = hashlib.sha256(identifier.encode()).hexdigest()[:16]
+    directory = runtime / f"obsidian-{key}"
+    directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+    display = environment.get("WAYLAND_DISPLAY")
+    if display and not Path(display).is_absolute():
+        environment["WAYLAND_DISPLAY"] = str(runtime / display)
+    environment["XDG_RUNTIME_DIR"] = str(directory)
+    return environment
+
+
+def notes(runtime_id=None, global_notebook=False):
+    if global_notebook:
+        import notebook_hierarchy
+        reconcile_notebooks()
+        item = {"id": notebook_hierarchy.GLOBAL_ID, "path": str(root())}
+    else:
+        item = launch_context(runtime_id, metadata_only=True, check_working_directory=False)
     if item is None:
         # Runtime-only sessions retain the original general-notebook shortcut.
         spawn(["obsidian"])
@@ -459,7 +633,11 @@ def notes(runtime_id=None):
     window_class = f"context-notes-{item['id']}"
     for client in clients():
         if note_context(client, [item]) is not None:
-            route_note(client, item)
+            if global_notebook:
+                spawn(["obsidian", f"--user-data-dir={state_root() / 'obsidian' / item['id']}",
+                       f"--class={window_class}"], env=obsidian_environment(item["id"]))
+            else:
+                route_note(client, item)
             return
     profile = state_root() / "obsidian" / item["id"]
     config_path = profile / "obsidian.json"
@@ -477,11 +655,12 @@ def notes(runtime_id=None):
     if not vault_state.exists():
         atomic_json(vault_state, {})
     notebook.enable_profile(profile, vault_id)
-    spawn(["obsidian", f"--user-data-dir={profile}", f"--class={window_class}"])
+    spawn(["obsidian", f"--user-data-dir={profile}", f"--class={window_class}"],
+          env=obsidian_environment(item["id"]))
 
 
 def terminal(runtime_id=None):
-    item = launch_context(runtime_id)
+    item = launch_context(runtime_id, metadata_only=True)
     cwd = item["cwd"] if item else str(Path.home())
     if item:
         name = f"context-{item['id']}"
@@ -551,41 +730,84 @@ def close_context(runtime_id):
     # applications may take seconds and must not block the catalog or launchers.
     with runtime_operation(runtime_id):
         with mutation_lock():
-            item = launch_context(runtime_id)
+            item = launch_context(runtime_id, metadata_only=True, check_working_directory=False)
         # Barrier still completes before compositor receives any close request.
-        persistence.checkpoint("close", item["id"] if item else None)
+        if item:
+            persistence.checkpoint("close", item["id"])
+        else:
+            persistence.checkpoint("close", runtime_id=runtime_id)
         with mutation_lock():
             # Runtime IDs are never reused. Do not close another session if the
             # original disappeared while its applications were being captured.
-            launch_context(runtime_id)
-            handled = close_kitty_windows(runtime_id)
-            persistence.set_lifecycle(item, "closed")
-            addresses = "{" + ",".join("[" + lua_string(address) + "]=true" for address in handled) + "}"
-            evaluate("require('context-terminals').close_checkpointed(" + lua_string(runtime_id) + "," + addresses + ")")
-            publish()
+            current = launch_context(runtime_id, metadata_only=True, check_working_directory=False)
+            if (current or {}).get("id") != (item or {}).get("id"):
+                raise ContextError("Context/runtime mapping changed during checkpoint")
+        handled = close_kitty_windows(runtime_id)
+        persistence.set_lifecycle(item, "closed" if item else "open")
+        addresses = "{" + ",".join("[" + lua_string(address) + "]=true" for address in handled) + "}"
+        evaluate("require('context-terminals').close_checkpointed(" + lua_string(runtime_id) + "," + addresses + ")")
 
 
 def watch():
     previous_stamp = object()
     next_scan = 0
+    contexts = []
+    previous_scopes = None
+    previous_index = None
+    previous_notebooks = None
     while True:
         try:
             try:
                 stamp = runtime_path("hyprland-sessions").stat().st_mtime_ns
             except FileNotFoundError:
                 stamp = None
-            # Periodic full scans also catch remote sync without runtime changes.
-            if stamp != previous_stamp or time.monotonic() >= next_scan:
+            # Discovery is metadata-only and never holds the foreground lock.
+            discovery_changed = index_stamp() != previous_index
+            discovery_due = time.monotonic() >= next_scan
+            if stamp != previous_stamp or discovery_changed or discovery_due:
                 previous_stamp = stamp
-                next_scan = time.monotonic() + 1
+                if discovery_changed or time.monotonic() >= next_scan:
+                    contexts = scan(check_working_directories=False)
+                    next_scan = time.monotonic() + 10
+                    previous_index = index_stamp()
                 with mutation_lock():
-                    value = publish(record_activation=True)
+                    value = publish(record_activation=True, contexts=contexts)
+                notebook_stamp = [(node["id"], node["path"], node["label"], node["parent_id"])
+                                  for node in value["nodes"]]
+                if notebook_stamp != previous_notebooks or discovery_changed or discovery_due:
+                    reconcile_notebooks()
+                    previous_notebooks = notebook_stamp
                 import context_chat_library
-                context_chat_library.refresh_scopes(value["contexts"])
+                scope_stamp = [(item["id"], item["path"], item["working_directory_path"]) for item in contexts], organization_stamp()
+                if scope_stamp != previous_scopes:
+                    if context_chat_library.refresh_scopes(value["contexts"]):
+                        previous_scopes = scope_stamp
                 reconcile_notes(value["contexts"])
         except (ContextError, OSError, ValueError, subprocess.TimeoutExpired) as exc:
             print(f"contextctl: {exc}", file=sys.stderr)
         time.sleep(0.2)
+
+
+def organization_stamp():
+    import organization
+    return organization.load()
+
+
+def reconcile_notebooks():
+    import notebook_hierarchy
+    import organization
+    # Separate from foreground catalog publication and its global mutation lock.
+    # Serialize simultaneous CLI/watcher reconciliation using a dedicated lock.
+    state_root().mkdir(parents=True, exist_ok=True)
+    with (state_root() / "notebook-hierarchy.lock").open("a") as stream:
+        fcntl.flock(stream, fcntl.LOCK_EX)
+        # Re-read hierarchy after acquiring the lock, avoiding an older watcher
+        # snapshot restoring links removed by a more recent organizer command.
+        nodes = organization.resolve(known_contexts())
+        errors = notebook_hierarchy.reconcile(nodes)
+    for error in errors:
+        print(f"contextctl: notebook hierarchy: {error}", file=sys.stderr)
+    return errors
 
 
 def main(argv=None):
@@ -612,7 +834,16 @@ def main(argv=None):
     command.add_argument("--runtime", required=True)
     for name in ("notes", "terminal", "files"):
         command = commands.add_parser(name)
-        command.add_argument("--runtime")
+        if name == "notes":
+            target = command.add_mutually_exclusive_group()
+            target.add_argument("--runtime")
+            target.add_argument("--global", dest="global_notebook", action="store_true",
+                                help="Open the global notebook with every context nested beneath it")
+        else:
+            command.add_argument("--runtime")
+        if name == "files":
+            command.add_argument("--session-directory", action="store_true",
+                                 help="Open the session directory instead of its working directory")
     commands.add_parser("watch")
     commands.add_parser("setup-notebooks")
     command = commands.add_parser("organize")
@@ -640,11 +871,29 @@ def main(argv=None):
         if args.command == "setup-notebooks":
             import notebook
             with mutation_lock():
-                for item in scan():
+                for item in scan(check_working_directories=False):
                     print(json.dumps(notebook.setup(Path(item["path"]) / ".context/notes", force=True)))
+            reconcile_notebooks()
             return 0
         if args.command == "close":
             close_context(args.runtime)
+            print("ok")
+            return 0
+        if args.command == "terminal":
+            terminal(args.runtime)
+            print("ok")
+            return 0
+        if args.command in ("notes", "files"):
+            if args.command == "notes":
+                if args.global_notebook:
+                    notes(global_notebook=True)
+                else:
+                    notes(args.runtime)
+            else:
+                item = launch_context(args.runtime, metadata_only=True,
+                                      check_working_directory=not args.session_directory)
+                directory = item["path" if args.session_directory else "cwd"] if item else str(Path.home())
+                spawn(["strata", directory])
             print("ok")
             return 0
         if args.command == "open":
@@ -671,6 +920,7 @@ def main(argv=None):
                 else:
                     organization.undo()
                 publish()
+            reconcile_notebooks()
             print(json.dumps({"id": identifier}) if args.action in ("create", "promote") else "ok")
             return 0
         if args.command == "create":
@@ -689,14 +939,9 @@ def main(argv=None):
                     rename_context(args.id, args.name)
                 elif args.command == "set-working-directory":
                     set_working_directory(args.id, args.path)
-                elif args.command == "notes":
-                    notes(args.runtime)
-                elif args.command == "terminal":
-                    terminal(args.runtime)
-                elif args.command == "files":
-                    item = launch_context(args.runtime)
-                    spawn(["thunar", item["cwd"] if item else str(Path.home())])
                 publish()
+        if args.command in ("create", "rename"):
+            reconcile_notebooks()
         print("ok")
         return 0
     except (ContextError, repositories.RepositoryError, OSError, ValueError, subprocess.TimeoutExpired) as exc:

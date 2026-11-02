@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import base64
 import copy
-import fcntl
 import hashlib
 import json
 import mimetypes
@@ -18,7 +17,6 @@ import os
 import socket
 import sqlite3
 import struct
-import subprocess
 import tempfile
 from contextlib import closing
 from contextvars import ContextVar
@@ -45,15 +43,13 @@ def _cli(args, cwd):
     # before stdout drains (observed: successful exit with 64 KiB of JSON).
     # A regular file makes native stdout synchronous. Anonymous scratch closes
     # on every exit path; unchanged captures still avoid invoking the CLI.
-    with tempfile.TemporaryFile(mode="w+", encoding="utf-8") as output:
-        result = subprocess.run(["opencode", *args], cwd=cwd, text=True,
-                                stdout=output, stderr=subprocess.PIPE, timeout=30, check=False,
-                                 env=dict(os.environ, OPENCODE_CONTEXT_HELPER="1",
-                                          **({"OPENCODE_DB": _source_database.get()} if _source_database.get() else {})))
-        if result.returncode:
-            raise RuntimeError(f"opencode {args[0]} failed: {result.stderr[-2000:]}")
-        output.seek(0)
-        return output.read()
+    from context_chat_worker import run_child
+    result = run_child(["opencode", *args], cwd=cwd, timeout=30, check=False,
+                       env=dict(os.environ, OPENCODE_CONTEXT_HELPER="1",
+                                **({"OPENCODE_DB": _source_database.get()} if _source_database.get() else {})))
+    if result.returncode:
+        raise RuntimeError(f"opencode {args[0]} failed: {result.stderr[-2000:]}")
+    return result.stdout
 
 
 def _export(sid, cwd):
@@ -331,16 +327,32 @@ def _safe(bundle, relative):
 
 
 def restore(bundle: Path, cwd: str, context_root: str | None = None, work_root: str | None = None) -> str | None:
+    import chat_recovery as recovery
+    try:
+        return _restore(bundle, cwd, context_root, work_root)
+    except FileNotFoundError as exc:
+        raise recovery.RecoveryWaiting("Missing chat artifact; wait for sync", path=str(exc.filename)) from exc
+    except recovery.RecoveryError:
+        raise
+    except (ValueError, KeyError, TypeError) as exc:
+        raise recovery.RecoveryConflict(f"Invalid chat bundle: {exc}") from exc
+
+
+def _restore(bundle: Path, cwd: str, context_root: str | None = None, work_root: str | None = None) -> str | None:
+    import chat_recovery as recovery
     bundle = Path(bundle)
     manifest = json.loads((bundle / "manifest.json").read_text())
     if manifest["format"] not in (1, 2):
         raise ValueError("Unsupported chat bundle")
     for relative, info in manifest["files"].items():
         if hashlib.sha256(_safe(bundle, relative).read_bytes()).hexdigest() != info["sha256"]:
-            raise ValueError(f"Corrupt chat artifact: {relative}")
+            raise recovery.RecoveryConflict(f"Corrupt chat artifact: {relative}")
     selected = manifest["selection"].get("session_id")
     if not selected:
         return None
+    for directory in (cwd, work_root):
+        if directory is not None and not Path(directory).is_dir():
+            raise recovery.RecoveryUnavailable(f"Missing session directory: {directory}", directory=str(directory))
     root = Path(context_root or cwd).resolve()
 
     def relocate(value):
@@ -383,7 +395,8 @@ def restore(bundle: Path, cwd: str, context_root: str | None = None, work_root: 
                 state.mkdir(parents=True, exist_ok=True, mode=0o700)
                 local = state / manifest["files"][reference["path"]]["sha256"]
                 if not local.exists():
-                    local.write_bytes(blob.read_bytes())
+                    import checkpoint_store
+                    checkpoint_store.atomic(local, blob.read_bytes())
                     local.chmod(0o600)
                 elif hashlib.sha256(local.read_bytes()).hexdigest() != local.name:
                     raise ValueError("Corrupt machine-local chat blob")
@@ -394,7 +407,8 @@ def restore(bundle: Path, cwd: str, context_root: str | None = None, work_root: 
         item = _walk(item, paths)
         directories[entry["id"]] = item["info"]["directory"]
         if not Path(directories[entry["id"]]).is_dir():
-            raise ValueError(f"Missing session directory: {directories[entry['id']]}")
+            raise recovery.RecoveryUnavailable(f"Missing session directory: {directories[entry['id']]}",
+                                               directory=directories[entry['id']])
         data[entry["id"]] = item
     if selected not in data:
         raise ValueError("Selected session absent from bundle")
@@ -403,16 +417,23 @@ def restore(bundle: Path, cwd: str, context_root: str | None = None, work_root: 
     # are ever imported, so native conflict behavior cannot overwrite local data.
     state = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local/state")) / "context-chat"
     state.mkdir(parents=True, exist_ok=True, mode=0o700)
-    with (state / "restore.lock").open("a") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
+    from context_chat_worker import scoped_lock
+    with closing(_database(cwd)) as db:
+        database = Path(db.execute("PRAGMA database_list").fetchone()[2])
+    marker = data[selected]["info"].get("metadata", {}).get("desktop_context", {})
+    owner = marker.get("id") or str(root)
+    origin = marker.get("chat") or selected
+    with scoped_lock(owner, database=database, conversation=origin, kind="restore", timeout=30):
         with closing(_database(cwd)) as db:
             existing = {row[0] for row in db.execute("SELECT id FROM session")}
+            database = Path(db.execute("PRAGMA database_list").fetchone()[2])
         exact = all(sid in existing and _equivalent(_export(sid, directories[sid])) == _equivalent(item)
                     for sid, item in data.items())
         if exact:
             return selected
         digest = _hash({sid: _equivalent(item) for sid, item in data.items()})
-        mapping_file = state / f"{digest}.json"
+        mapping_file = recovery.journal_root(database) / f"{digest}.json"
+        previous = recovery.read_intent(mapping_file)
         identifiers = set(data)
         def identify(value, trail):
             if trail and trail[-1] == "id" and isinstance(value, str) and value.startswith(("msg_", "prt_", "ses_")):
@@ -422,12 +443,16 @@ def restore(bundle: Path, cwd: str, context_root: str | None = None, work_root: 
             _walk(item, identify)
         # Keep native ID ordering (parts are exported by ID, messages use ID as
         # a timestamp tie-breaker), including nested tool attachment IDs.
-        for revision in range(1000):
+        interrupted = previous is not None and not previous.get("complete", False)
+        start = previous.get("revision", 0) if previous else 0
+        for revision in range(start, 1000):
             namespace = digest if revision == 0 else _hash([digest, revision])
             mapping = {old: old + "_" + namespace[:32] for old in identifiers}
             rewritten = {sid: _walk(item, lambda value, trail, mapping=mapping: mapping.get(value, value)
                                    if isinstance(value, str) and "desktop_context" not in trail else value)
                          for sid, item in data.items()}
+            if interrupted and mapping != previous.get("ids"):
+                raise recovery.RecoveryConflict("Interrupted import identity mismatch", journal=str(mapping_file))
             # A selected child whose parent was not captured must not link to
             # an unrelated local parent generation.
             for item in rewritten.values():
@@ -437,9 +462,18 @@ def restore(bundle: Path, cwd: str, context_root: str | None = None, work_root: 
                    or _equivalent(_export(mapping[sid], directories[sid])) == _equivalent(item)
                    for sid, item in rewritten.items()):
                 break
+            if interrupted:
+                raise recovery.RecoveryConflict("Interrupted import has divergent or partial native data; preserved untouched",
+                                                journal=str(mapping_file), native_ids=list(mapping.values()))
         else:
             raise RuntimeError("Too many divergent local snapshot versions")
-        _write(mapping_file, {"content_hash": digest, "ids": mapping, "complete": False})
+        record = {"version": 1, "content_hash": digest, "ids": mapping,
+                  "revision": revision, "complete": False, "verified": [],
+                  "preserved": list((previous or {}).get("preserved", []))}
+        if previous and mapping != previous.get("ids"):
+            record["preserved"].append({"ids": previous["ids"], "revision": previous["revision"],
+                                        "reason": "completed native copy changed locally"})
+        recovery.atomic_json(mapping_file, record)
         # Parents first. Abort cycles before any native writes.
         pending = dict(rewritten)
         ordered = []
@@ -454,7 +488,9 @@ def restore(bundle: Path, cwd: str, context_root: str | None = None, work_root: 
             target = mapping[sid]
             if target in existing:
                 if _equivalent(_export(target, directories[sid])) != _equivalent(item):
-                    raise RuntimeError("Snapshot ID exists with divergent or partial data; preserved untouched")
+                    raise recovery.RecoveryConflict("Snapshot ID exists with divergent or partial data; preserved untouched")
+                record["verified"].append(target)
+                recovery.atomic_json(mapping_file, record)
                 continue
             with tempfile.TemporaryDirectory(prefix="context-chat-") as temp:
                 native = Path(temp) / "native.json"
@@ -462,6 +498,14 @@ def restore(bundle: Path, cwd: str, context_root: str | None = None, work_root: 
                 _cli(["import", str(native)], directories[sid])
             actual = _export(target, directories[sid])
             if _equivalent(actual) != _equivalent(item):
-                raise RuntimeError("Native import lost or changed data; partial snapshot retained, restore failed")
-        _write(mapping_file, {"content_hash": digest, "ids": mapping, "complete": True})
+                raise recovery.RecoveryConflict("Native import lost or changed data; partial snapshot retained, restore failed",
+                                                native_id=target, journal=str(mapping_file))
+            record["verified"].append(target)
+            recovery.atomic_json(mapping_file, record)
+        # Verify the whole family again before exposing it to callers.
+        if any(_equivalent(_export(mapping[sid], directories[sid])) != _equivalent(item)
+               for sid, item in rewritten.items()):
+            raise recovery.RecoveryConflict("Imported family changed before verification; preserved untouched")
+        record["complete"] = True
+        recovery.atomic_json(mapping_file, record)
         return mapping[selected]

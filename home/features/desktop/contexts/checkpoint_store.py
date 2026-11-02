@@ -270,7 +270,7 @@ class Store:
         journal.unlink()
         fsync_dir(self.local)
 
-    def publish(self, tree, metadata, expected):
+    def publish(self, tree, metadata, expected, *, discard_prefixes=()):
         current = self.load()
         if current != expected:
             raise ValueError("Checkpoint changed during capture; retry (no stale publication)")
@@ -307,7 +307,13 @@ class Store:
         if list((self.directory / "conflicts").glob("*.json")):
             raise ValueError("Divergent checkpoint preserved in conflicts; resolve before saving")
         if current:
-            self.validate(current)
+            # Only absent, explicitly disposable artifacts may bypass validation
+            # of the previous root. The entire new root is validated below.
+            removed = {name for name in current["artifacts"]
+                       if name.startswith(discard_prefixes) and name not in tree.files}
+            previous = dict(current, artifacts={name: info for name, info in current["artifacts"].items()
+                                               if name not in removed})
+            self.validate(previous)
         self._recover(current)
         objects, artifacts = {}, {}
         for name in sorted(tree.files):

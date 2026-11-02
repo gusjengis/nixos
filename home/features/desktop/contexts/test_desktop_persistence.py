@@ -327,15 +327,14 @@ class DesktopPersistenceTests(unittest.TestCase):
         for editor in editors:
             buffers = json.loads(self.rpc(editor["@persistence-editor-socket"],
                 "vim.json.encode((function() local r={} for _,b in ipairs(vim.api.nvim_list_bufs()) do "
-                "if vim.b[b].context_recovery then r[#r+1]={original=vim.b[b].context_original_file,"
+                 "if vim.api.nvim_buf_get_name(b):match('/original.txt$') then vim.fn.bufload(b); r[#r+1]={original=vim.api.nvim_buf_get_name(b),"
                 "lines=vim.api.nvim_buf_get_lines(b,0,-1,false),modified=vim.bo[b].modified} end end return r end)())"))
-            self.assertEqual(len(buffers), 2)
-            self.assertTrue(all(b["modified"] for b in buffers))
-            suffix = self.editor_suffix[editor["@persistence-editor"]]
+            self.assertEqual(len(buffers), 1)
+            self.assertTrue(all(not b["modified"] for b in buffers))
             self.assertEqual({tuple(b["lines"]) for b in buffers},
-                             {("modified-" + suffix,), ("unnamed-" + suffix,)})
+                              {("original on disk",)})
             self.assertEqual({b["original"] for b in buffers},
-                             {str(Path(self.context["cwd"]) / "original.txt"), "[unnamed]"})
+                              {str(Path(self.context["cwd"]) / "original.txt")})
         routes = self.wait("actual restored TUI routes", lambda: self.selections(self.destination), timeout=60)
         self.assertEqual({r["session_id"] for _, r in routes}, self.chat_ids)
         for _, route in routes:
@@ -372,7 +371,6 @@ class DesktopPersistenceTests(unittest.TestCase):
                          "opencode", "--session", sid)
         editors = self.wait("two real Neovim adapters", lambda: self.ready_editors(self.tm))
         self.assertEqual(len({q["@persistence-editor"] for q in editors}), 2)
-        self.editor_suffix = {q["@persistence-editor"]: str(i) for i, q in enumerate(editors, 1)}
         for index, editor in enumerate(editors, 1):
             self.rpc(editor["@persistence-editor-socket"],
                      "(function() vim.cmd('edit original.txt'); "

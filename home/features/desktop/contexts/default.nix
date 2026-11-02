@@ -28,7 +28,7 @@ let
       pkgs.kitty
       pkgs.tmux
       pkgs.obsidian
-      pkgs.thunar
+      pkgs.strata
       pkgs.glib
       checkpoint
       inputs.hyprland.packages.${pkgs.stdenv.hostPlatform.system}.hyprland
@@ -71,6 +71,13 @@ let
       exec python3 -B "${featureDir}/shutdown_barrier.py"
     '';
   };
+  sessionExit = pkgs.writeShellApplication {
+    name = "context-session-exit";
+    runtimeInputs = [ python checkpoint inputs.hyprland.packages.${pkgs.stdenv.hostPlatform.system}.hyprland ];
+    text = ''
+      exec python3 -B "${featureDir}/session_exit.py"
+    '';
+  };
 in
 {
   options.desktopContexts.enable =
@@ -84,6 +91,7 @@ in
       checkpoint
       shutdownBarrier
       contextNotes
+      sessionExit
     ]
     ++ lib.optionals config.desktopEnv.enable [ contextctl ];
     home.activation.createSessionsDirectory = lib.mkIf config.desktopEnv.enable (

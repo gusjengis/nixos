@@ -119,7 +119,9 @@ def _walk_contexts(root):
 
     for name, children, files in os.walk(root, followlinks=False, onerror=failed):
         directory = Path(name)
-        if ".context" in children or ".context" in files:
+        # The share root may contain the global notebook, but is not itself a
+        # saved context or repository owner.
+        if directory != root and (".context" in children or ".context" in files):
             metadata = directory / ".context/context.json"
             _contained(directory, metadata)
             data = _read(metadata)

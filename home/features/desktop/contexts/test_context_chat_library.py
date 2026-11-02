@@ -6,6 +6,7 @@ import sqlite3
 import subprocess
 import sys
 import unittest
+from pathlib import Path
 from contextlib import closing
 from unittest.mock import Mock, patch
 
@@ -19,6 +20,7 @@ from test_chat_portability import IsolatedChatTest, native_fixture
 class ScopeTests(IsolatedChatTest):
     def setUp(self):
         super().setUp()
+        os.environ.pop("CONTEXT_ID", None)
         os.environ["CONTEXT_ROOT"] = str(self.base / "contexts")
         self.work = self.base / "repo"
         self.work.mkdir()
@@ -116,6 +118,43 @@ class ScopeTests(IsolatedChatTest):
             library.sync_context(context, database)
         self.assertEqual(accessed, ["index.json"])
 
+    def test_local_publication_before_ledger_commit_never_publishes_outdated(self):
+        context = ctl.find_context(self.child["id"])
+        database = self.base / "fixture.db"
+        database.touch()
+        origin = "ses_localcheckpoint"
+        rows = {origin: {"id": origin, "owner": context["id"], "chat": origin,
+                         "member": origin, "parent": None}}
+        old = {"local_id": origin, "source": "r1", "native": "r1"}
+        new = {"local_id": origin, "source": "r2", "native": "r2"}
+        ledger = library.ledger_path(context, database)
+        library.write_json(ledger, {"chats": {origin: old}})
+        entry = {"fingerprint": "r2", "source_device": library.socket.gethostname()}
+        library.recovery.begin_publication(ledger.with_suffix(".publication.json"), "head1",
+                                           {"chats": {origin: new}}, {origin: entry})
+        path = library.state_file(context, database)
+        head = self.base / "head.json"
+        head.write_text("head2")
+        token = library.chat_state.head_token(head)
+        library.chat_state.publish(path, context["id"], origin, selected_root=origin,
+                                   members={origin: origin}, base_revision="r1", known_revision="r1",
+                                   freshness="current_as_known", availability="local")
+        original = library.chat_state._write
+        published = []
+        def capture(path, snapshot):
+            published.append(snapshot["conversations"][library.chat_state.key(context["id"], origin)].copy())
+            return original(path, snapshot)
+        with patch.object(library.chat_state, "_write", side_effect=capture):
+            state = library.observe_conversation(context, database, origin, entry, {}, str(head), token, rows)
+        self.assertEqual(state["base_revision"], "r2")
+        self.assertEqual(state["freshness"], "current_as_known")
+        self.assertEqual(len(published), 1)
+        self.assertTrue(all(row["known_revision"] == row["base_revision"] for row in published))
+        # Same hostname is not an exemption: only our durable publication matches.
+        remote = dict(entry, fingerprint="r3")
+        state = library.observe_conversation(context, database, origin, remote, {}, str(head), token, rows)
+        self.assertEqual(state["freshness"], "outdated")
+
     def test_checkpoint_batch_reuses_successful_sync_but_not_failures_or_future_saves(self):
         database = self.base / "fixture.db"
         database.touch()
@@ -140,10 +179,100 @@ class ScopeTests(IsolatedChatTest):
     def test_periodic_checkpoint_does_not_import_archived_history(self):
         with patch.object(ctl, "scan", return_value=[]), \
                 patch.object(persistence, "sockets", return_value=[]), \
-                patch.object(library, "sync_all") as sync:
+                patch.object(library, "sync_dirty") as sync:
             persistence.checkpoint(reason="periodic")
-        self.assertFalse(sync.call_args.kwargs["hydrate"])
-        self.assertIsNone(sync.call_args.kwargs["only"], "Closed chats must still be saved")
+        self.assertEqual(sync.call_args.args[0], [])
+
+    def test_launch_never_probes_work_roots_or_waits_for_library(self):
+        context = ctl.find_context(self.child["id"])
+        original_resolve, original_is_dir = Path.resolve, Path.is_dir
+        roots = [self.work, self.base / "offline"]
+
+        def guard(method):
+            def checked(path, *args, **kwargs):
+                if any(path == root or path.is_relative_to(root) for root in roots):
+                    raise AssertionError("Launch accessed a working directory: " + str(path))
+                return method(path, *args, **kwargs)
+            return checked
+
+        with patch.dict(os.environ, {"CONTEXT_DIRECTORY": context["path"]}), \
+                patch.object(Path, "resolve", guard(original_resolve)), \
+                patch.object(Path, "is_dir", guard(original_is_dir)), \
+                patch.object(library, "sync_all", side_effect=AssertionError("Launch synchronized history")), \
+                patch.object(library.os, "execv") as execute, library.library_lock():
+            os.environ.pop("TMUX", None)
+            os.environ.pop("OPENCODE_CONTEXT_HELPER", None)
+            library.launch("/native/opencode", [])
+            execute.assert_called_once_with("/native/opencode", ["/native/opencode"])
+            self.assertEqual(os.environ["CONTEXT_ID"], context["id"])
+            scope = ctl.read_json(Path(os.environ["OPENCODE_CONTEXT_SCOPE_FILE"]))
+            self.assertEqual(scope["ids"], [context["id"]])
+
+    def test_cli_helpers_do_not_scan_or_synchronize(self):
+        for arguments in (["db", "path"], ["--version"], ["export", "ses_fixture"]):
+            with patch.object(ctl, "scan", side_effect=AssertionError("Helper scanned contexts")), \
+                    patch.object(library.os, "execv", side_effect=SystemExit) as execute:
+                with self.assertRaises(SystemExit):
+                    library.launch("/native/opencode", arguments)
+                execute.assert_called_once_with("/native/opencode", ["/native/opencode", *arguments])
+
+    def test_prepare_discovers_without_hydration_or_workroot_probes(self):
+        child = ctl.find_context(self.child["id"])
+        original = Path.is_dir
+
+        def checked(path):
+            if path == self.base / "offline" or path == self.work:
+                raise AssertionError("Discovery probed a working root")
+            return original(path)
+
+        with patch.dict(os.environ, {"CONTEXT_ID": child["id"]}), \
+                patch.object(Path, "is_dir", checked), \
+                patch.object(library, "sync_all", side_effect=AssertionError("Discovery synchronized")), \
+                patch.object(library.chats, "fingerprint", side_effect=AssertionError("Discovery fingerprinted")):
+            result = library.prepare()
+        self.assertTrue(all(row["owner"] == child["id"] for row in result["conversations"]))
+
+    def test_portable_summaries_only_read_index_and_scope_failures(self):
+        context = ctl.find_context(self.child["id"])
+        archive = library.storage(context)
+        origin = "ses_portableonly"
+        tree = library.store.Tree({"index.json": library.store.canonical({"version": 1, "chats": {
+            origin: {"fingerprint": "rev", "deleted": False, "title": "Portable title", "updated": 100}}}),
+            "conversations/" + origin + "/history.json": b"not needed"})
+        archive.publish(tree, {"context_id": context["id"], "device": "other"}, None)
+        sibling_archive = library.storage(ctl.find_context(self.sibling["id"]))
+        sibling_archive.directory.mkdir(parents=True)
+        (sibling_archive.directory / "current.json").write_text("incomplete incoming manifest")
+        original = library.store.Store.view
+        reads = []
+        def index_only(archive, current):
+            view = original(archive, current)
+            loader = view.tree.loader
+            def read(name):
+                reads.append(name)
+                self.assertEqual(name, "index.json")
+                return loader(name)
+            view.tree.loader = read
+            return view
+        with patch.dict(os.environ, {"CONTEXT_ID": self.parent["id"]}), \
+                patch.object(library.store.Store, "view", index_only), \
+                patch.object(library.chats, "restore", side_effect=AssertionError("Summary imported")):
+            result = library.list_summaries()
+        self.assertEqual(reads, ["index.json"])
+        self.assertEqual(result["conversations"][0]["title"], "Portable title")
+        self.assertEqual(result["conversations"][0]["state"]["availability"], "portable_only")
+        self.assertEqual(result["errors"][0]["owner"], self.sibling["id"])
+        with patch.dict(os.environ, {"CONTEXT_ID": self.parent["id"]}), \
+                patch.object(library.store.Store, "view", side_effect=AssertionError("Warm summary loaded artifacts")), \
+                patch.object(library.chat_state, "publish", side_effect=AssertionError("Warm summary rewrote state")):
+            library.list_summaries()
+        (archive.directory / "conflicts").mkdir()
+        (archive.directory / "conflicts/incoming.json").write_text("{}")
+        with patch.dict(os.environ, {"CONTEXT_ID": self.parent["id"]}):
+            conflicted = library.list_summaries()
+        portable = next(row for row in conflicted["conversations"] if row["chat"] == origin)
+        self.assertEqual(portable["state"]["freshness"], "conflict")
+        self.assertEqual(portable["state"]["availability"], "waiting_data")
 
     @unittest.skipUnless(shutil.which("tmux"), "tmux unavailable")
     def test_launcher_uses_tmux_owner_despite_shared_cwd_and_stale_environment(self):
@@ -262,6 +391,32 @@ class NativeLibraryTests(ScopeTests):
         self.assertEqual(archive.load()["id"], incoming)
         self.assertEqual(library.chats._export(self.sid, str(self.work))["info"]["title"], "Local edit")
 
+    def test_local_checkpoint_discovered_before_ledger_commit_stays_current(self):
+        context = self.child_context()
+        database = library.database_path()
+        with patch.dict(os.environ, {"CONTEXT_ID": context["id"]}):
+            library.sync_context(context, database)
+            before = library.check_conversation(context["id"], self.sid)
+            self.edit_title(self.sid, "Locally checkpointed update")
+            publish = library.store.Store.publish
+            observed = []
+
+            def discover_after_head(archive, *args, **kwargs):
+                result = publish(archive, *args, **kwargs)
+                # Exact window: head visible, durable intent present, ledger old.
+                observed.append(library.check_conversation(context["id"], self.sid))
+                return result
+
+            with patch.object(library.store.Store, "publish", discover_after_head):
+                library.sync_context(context, database)
+            after = library.check_conversation(context["id"], self.sid)
+        self.assertEqual(len(observed), 1)
+        self.assertNotEqual(before["known_revision"], after["known_revision"])
+        for state in [*observed, after]:
+            self.assertEqual(state["freshness"], "current_as_known")
+            self.assertEqual(state["known_revision"], state["base_revision"])
+            self.assertEqual(state["selected_root"], self.sid)
+
     def test_parent_pane_stores_only_child_library_reference_and_restores_subagent(self):
         child_id = "ses_ownedsubagent"
         child = {"info": dict(self.fixture["info"], id=child_id, parentID=self.sid), "messages": []}
@@ -302,3 +457,94 @@ class NativeLibraryTests(ScopeTests):
         sid, directory = library.restore_reference(reference)
         self.assertTrue(library.database_path().is_file())
         self.assertEqual(library.chats._export(sid, directory)["info"]["metadata"]["desktop_context"]["session"], self.sid)
+
+    def test_prepare_lists_local_history_without_publishing_or_importing(self):
+        with patch.dict(os.environ, {"CONTEXT_ID": self.child["id"]}):
+            result = library.prepare()
+        self.assertIsNone(self.index()[1])
+        self.assertEqual(result["conversations"][0]["chat"], self.sid)
+
+    def test_selected_restore_ignores_missing_unselected_artifacts_and_warm_path_is_cheap(self):
+        second = {"info": dict(self.fixture["info"], id="ses_unselected", title="Unselected"), "messages": []}
+        second["info"]["metadata"] = {"desktop_context": {
+            "id": self.child["id"], "chat": "ses_unselected", "session": "ses_unselected"}}
+        self.import_chat(second)
+        library.sync_all()
+        archive, current = self.index()
+        self.assertEqual(json.loads((archive.view(current) / "index.json").read_bytes())["chats"][self.sid]["title"], self.fixture["info"]["title"])
+        # Missing sibling objects must never be validated/materialized for selected import.
+        selected_chunks = {key for name, info in current["artifacts"].items()
+                           if not name.startswith("conversations/ses_unselected/") for key in info["chunks"]}
+        for name, info in current["artifacts"].items():
+            if name.startswith("conversations/ses_unselected/"):
+                for key in set(info["chunks"]) - selected_chunks:
+                    archive.object(key).unlink(missing_ok=True)
+        self.environment("selected-destination")
+        reference = {"owner": self.child["id"], "chat": self.sid, "member": self.sid}
+        imported = []
+        original_restore = library.chats.restore
+        def restore(bundle, *args, **kwargs):
+            imported.append(Path(bundle).name)
+            return original_restore(bundle, *args, **kwargs)
+        with patch.object(library.chats, "restore", side_effect=restore), \
+                library.worker.scoped_lock(self.child["id"]):
+            sid, directory = library.restore_reference(reference)
+        self.assertEqual(imported, [self.sid])
+        self.assertEqual({row["chat"] for row in library.native_rows(library.database_path()).values()}, {self.sid})
+        with patch.object(library.chats, "fingerprint", side_effect=AssertionError("Warm path fingerprinted transcript")), \
+                patch.object(library.chats, "restore", side_effect=AssertionError("Warm path imported")), \
+                patch.object(library, "sync_all", side_effect=AssertionError("Warm path synchronized library")), \
+                patch.object(library, "library_lock", side_effect=AssertionError("Warm path took global lock")):
+            state = library.check_conversation(self.child["id"], self.sid, sid)
+            result = library.ensure_conversation(self.child["id"], self.sid, self.sid)
+        self.assertEqual(state["freshness"], "current_as_known")
+        self.assertEqual(result["session_id"], sid)
+        self.assertEqual(result["directory"], directory)
+        response = subprocess.run([sys.executable, "-B", library.__file__, "ensure", "--owner", self.child["id"],
+                                   "--chat", self.sid, "--member", self.sid,
+                                   "--expected-revision", state["known_revision"]],
+                                  env=dict(os.environ, CONTEXT_ID=self.child["id"]), text=True, capture_output=True, check=True)
+        self.assertEqual(json.loads(response.stdout)["session_id"], sid)
+
+    def test_publication_crash_recovers_matching_ledger_without_reexport(self):
+        context = self.child_context()
+        with patch.object(library.recovery, "finish_publication", side_effect=RuntimeError("simulated crash after archive commit")):
+            with self.assertRaisesRegex(RuntimeError, "simulated crash"):
+                library.sync_context(context, library.database_path(), only_chat=self.sid)
+        current = self.index()[1]
+        self.assertIsNotNone(current)
+        with patch.object(library.chats, "capture", side_effect=AssertionError("Recovery reexported verified history")):
+            library.sync_context(context, library.database_path(), only_chat=self.sid)
+        self.assertEqual(self.index()[1]["id"], current["id"])
+        ledger = ctl.read_json(library.ledger_path(context, library.database_path()))
+        self.assertEqual(ledger["chats"][self.sid]["local_id"], self.sid)
+        self.assertFalse(library.ledger_path(context, library.database_path()).with_suffix(".publication.json").exists())
+
+    def test_missing_selected_workdir_never_acknowledges_import(self):
+        library.sync_all()
+        self.environment("missing-workdir-device")
+        ctl.set_working_directory(self.child["id"], str(self.base / "unavailable-work"))
+        with patch.object(library.chats, "restore", side_effect=AssertionError("Missing root imported")):
+            with self.assertRaisesRegex(ValueError, "working directory is unavailable"):
+                library.ensure_conversation(self.child["id"], self.sid)
+        context = ctl.find_context(self.child["id"])
+        state = library.chat_state.get(library.state_file(context, library.database_path()), self.child["id"], self.sid)
+        self.assertEqual(state["availability"], "missing_workdir")
+        self.assertIsNone(state["selected_root"])
+
+    def test_selected_completion_cannot_overwrite_newer_authoritative_generation(self):
+        library.sync_all()
+        self.environment("generation-race-device")
+        publish = library.chat_state.publish
+        def race(path, owner, chat, **fields):
+            if fields.get("expected_generation") is not None and fields.get("freshness") == "current_as_known":
+                publish(path, owner, chat, known_revision="new-arrival", freshness="outdated", operation={"phase": "idle"})
+            return publish(path, owner, chat, **fields)
+        with patch.object(library.chat_state, "publish", side_effect=race):
+            with self.assertRaises(library.chat_state.StateChanged):
+                library.ensure_conversation(self.child["id"], self.sid)
+        context = self.child_context()
+        state = library.chat_state.get(library.state_file(context, library.database_path()), self.child["id"], self.sid)
+        self.assertEqual(state["known_revision"], "new-arrival")
+        self.assertEqual(state["freshness"], "outdated")
+        self.assertIsNone(state["selected_root"])

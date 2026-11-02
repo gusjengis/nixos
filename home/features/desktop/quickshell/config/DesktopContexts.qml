@@ -3,6 +3,7 @@ import Quickshell
 import Quickshell.Io
 
 Scope {
+    ContextDesktop {}
     InProgressWidget {}
 
     IpcHandler {

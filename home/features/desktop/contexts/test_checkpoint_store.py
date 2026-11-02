@@ -54,6 +54,24 @@ class StoreTests(unittest.TestCase):
     def publish(self, expected=None, storage=None):
         return (storage or self.store).publish(self.tree, self.metadata, expected)
 
+    def test_explicit_disposable_editor_corruption_can_be_dropped_but_chat_cannot(self):
+        self.tree.files["nvim/editor/session.vim"] = b"broken editor fixture"
+        current, _ = self.publish()
+        key = current["artifacts"]["nvim/editor/session.vim"]["chunks"][0]
+        self.store.object(key).unlink()
+        del self.tree.files["nvim/editor/session.vim"]
+        with self.assertRaises(ValueError):
+            self.publish(current)
+        saved, changed = self.store.publish(self.tree, self.metadata, current, discard_prefixes=("nvim/",))
+        self.assertTrue(changed)
+        self.store.validate(saved)
+        self.assertNotIn("nvim/editor/session.vim", saved["artifacts"])
+        key = saved["artifacts"]["chat/part.json"]["chunks"][0]
+        self.store.object(key).unlink()
+        del self.tree.files["chat/part.json"]
+        with self.assertRaises(ValueError):
+            self.store.publish(self.tree, self.metadata, saved, discard_prefixes=("nvim/",))
+
     def test_noop_has_no_transient_writes_or_mtime_changes(self):
         current, _ = self.publish()
         before = stats(self.base)

@@ -133,7 +133,7 @@ def commit(before, after, description):
 
 def change(identifiers, parent=None, new_label=None):
     before = load()
-    contexts = ctl.scan()
+    contexts = ctl.scan(check_working_directories=False)
     nodes = {node["id"]: node for node in resolve(contexts, before)}
     identifiers = list(dict.fromkeys(identifiers))
     if not identifiers or any(identifier not in nodes for identifier in identifiers):
@@ -171,7 +171,7 @@ def change(identifiers, parent=None, new_label=None):
 def create(name, parent=None):
     label(name)
     before = load()
-    nodes = resolve(ctl.scan(), before)
+    nodes = resolve(ctl.scan(check_working_directories=False), before)
     if parent is not None and not any(node["id"] == parent for node in nodes):
         raise ctl.ContextError("Destination no longer exists")
     if any(node["parent_id"] == parent and node["label"].casefold() == name.casefold() for node in nodes):
@@ -194,7 +194,7 @@ def create(name, parent=None):
 def promote(identifier):
     """Give a legacy directory-only group a notebook and persistent identity."""
     before = load()
-    node = next((node for node in resolve(ctl.scan(), before) if node["id"] == identifier), None)
+    node = next((node for node in resolve(ctl.scan(check_working_directories=False), before) if node["id"] == identifier), None)
     if not node or not node["is_group"]:
         raise ctl.ContextError("Select a directory-only group to make into a context")
     relative = str(Path(node["path"]).relative_to(ctl.root()))
@@ -216,7 +216,7 @@ def undo():
         raise ctl.ContextError("No organizational changes to undo")
     if records[-1]["after"] != load():
         raise ctl.ContextError("Layout changed elsewhere; cannot undo over those changes")
-    resolve(ctl.scan(), records[-1]["before"])
+    resolve(ctl.scan(check_working_directories=False), records[-1]["before"])
     ctl.atomic_json(layout_path(), records[-1]["before"])
     ctl.atomic_json(history_path(), {"entries": records[:-1]})
 

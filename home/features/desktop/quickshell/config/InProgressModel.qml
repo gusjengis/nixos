@@ -87,6 +87,10 @@ QtObject {
                     });
                     return;
                 }
+                // Top-to-bottom layout: future work above the active work nearest
+                // the bottom edge. Never cap the In-Progress collection.
+                collected = collected.filter(card => card.status === "Todo")
+                    .concat(collected.filter(card => card.status === "In-Progress"));
                 // Avoid rebuilding delegates on every poll of an unchanged board.
                 if (JSON.stringify(root.cards) !== JSON.stringify(collected))
                     root.cards = collected;

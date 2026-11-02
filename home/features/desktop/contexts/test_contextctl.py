@@ -275,10 +275,10 @@ class ContextTests(unittest.TestCase):
         result, sender = processes.Pipe(duplex=False)
         saved = self.base / "checkpoint"
         saved.mkdir()
-        ctl.atomic_json(saved / "tmux.json", [{"id": "saved-session"}])
+        ctl.atomic_json(saved / "tmux.json", [{"id": "saved-session", "windows": []}])
         real_restore = persistence.restore
 
-        def adapter(*_args):
+        def adapter(*_args, **_kwargs):
             entered.set()
             if not release.wait(10):
                 raise RuntimeError("Test restore was not released")
@@ -549,6 +549,18 @@ class ContextTests(unittest.TestCase):
         ctl.notes("s2")
         self.spawn.assert_not_called()
 
+    def test_obsidian_profiles_have_independent_sockets_and_absolute_wayland_display(self):
+        with patch.dict(os.environ, {"WAYLAND_DISPLAY": "wayland-1"}):
+            first = ctl.obsidian_environment("first")
+            second = ctl.obsidian_environment("second")
+            self.assertNotEqual(first["XDG_RUNTIME_DIR"], second["XDG_RUNTIME_DIR"])
+            self.assertEqual(first, ctl.obsidian_environment("first"))
+            self.assertEqual(first["WAYLAND_DISPLAY"], str(self.base / "wayland-1"))
+            self.assertEqual(Path(first["XDG_RUNTIME_DIR"]).stat().st_mode & 0o777, 0o700)
+            self.assertEqual(os.environ["XDG_RUNTIME_DIR"], str(self.base))
+        with patch.dict(os.environ, {"WAYLAND_DISPLAY": "/other/wayland-2"}):
+            self.assertEqual(ctl.obsidian_environment("first")["WAYLAND_DISPLAY"], "/other/wayland-2")
+
     def test_notes_routes_existing_window_silently(self):
         item = self.mapped()
         self.run.side_effect = [
@@ -732,6 +744,147 @@ class ContextTests(unittest.TestCase):
         self.runtime([{"id": "s99", "name": "Runtime only"}], "s99")
         ctl.terminal("s99")
         self.assertIn("desktop-test-signature-s99", self.spawn.call_args.args[0])
+
+    def test_terminal_cli_ignores_unrelated_offline_root_and_catalog_lock(self):
+        item = self.mapped()
+        ctl.create("Offline", "/mnt/offline-office")
+        original = Path.is_dir
+
+        def directory(path):
+            if str(path).startswith("/mnt/offline-office"):
+                raise AssertionError("Terminal launch probed unrelated network share")
+            return original(path)
+
+        with patch.object(Path, "is_dir", directory), \
+                patch.object(ctl, "mutation_lock", side_effect=AssertionError("Catalog lock")), \
+                patch.object(ctl, "publish", side_effect=AssertionError("Catalog publication")), \
+                contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(ctl.main(["terminal", "--runtime", "s2"]), 0)
+        self.assertIn(f"context-{item['id']}", self.spawn.call_args.args[0])
+
+    def test_terminal_selected_missing_directory_falls_back_to_context(self):
+        item = self.mapped()
+        ctl.set_working_directory(item["id"], "/nonexistent-terminal-working-directory")
+        ctl.terminal("s2")
+        self.assertEqual(self.spawn.call_args.args[0][2], str(ctl.root() / "Projects/Alpha"))
+
+    def test_files_and_notes_use_only_selected_metadata_without_catalog_lock(self):
+        self.mapped()
+        ctl.create("Offline", "/mnt/offline-office")
+        ctl.publish()
+        # An unrelated incomplete sync must not break launching a healthy context.
+        (ctl.root() / "Offline/.context/context.json").write_text("incomplete")
+        original = Path.is_dir
+
+        def directory(path):
+            if str(path).startswith("/mnt/offline-office"):
+                raise AssertionError("Launch probed unrelated network share")
+            return original(path)
+
+        with patch.object(Path, "is_dir", directory), \
+                patch.object(ctl, "scan", side_effect=AssertionError("Full context scan")), \
+                patch.object(ctl, "mutation_lock", side_effect=AssertionError("Catalog lock")), \
+                patch.object(ctl, "publish", side_effect=AssertionError("Catalog publication")), \
+                contextlib.redirect_stdout(io.StringIO()):
+            for command in ("files", "notes"):
+                with self.subTest(command=command):
+                    self.assertEqual(ctl.main([command]), 0)
+        self.assertEqual(self.spawn.call_args_list[0].args[0],
+                         ["strata", str(ctl.root() / "Projects/Alpha")])
+        self.assertEqual(self.spawn.call_args_list[1].args[0][0], "obsidian")
+
+    def test_files_reads_current_working_directory_not_stale_catalog_setting(self):
+        self.mapped()
+        ctl.publish()
+        metadata = ctl.root() / "Projects/Alpha/.context/context.json"
+        data = ctl.read_json(metadata)
+        cwd = self.base / "new working directory"
+        cwd.mkdir()
+        data["working_directory"] = str(cwd)
+        ctl.atomic_json(metadata, data)
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(ctl.main(["files", "--runtime", "s2"]), 0)
+        self.assertEqual(self.spawn.call_args.args[0], ["strata", str(cwd)])
+
+    def test_files_cold_catalog_ignores_offline_working_directories(self):
+        self.mapped()
+        ctl.create("Offline", "/mnt/offline-office")
+        original = Path.is_dir
+
+        def directory(path):
+            if str(path).startswith("/mnt/offline-office"):
+                raise AssertionError("Cold launch probed unrelated network share")
+            return original(path)
+
+        with patch.object(Path, "is_dir", directory), contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(ctl.main(["files"]), 0)
+        self.assertEqual(self.spawn.call_args.args[0],
+                         ["strata", str(ctl.root() / "Projects/Alpha")])
+
+    def test_notes_does_not_probe_even_selected_working_directory(self):
+        item = self.mapped()
+        ctl.set_working_directory(item["id"], "/mnt/offline-office")
+        ctl.publish()
+        original = Path.is_dir
+
+        def directory(path):
+            if str(path).startswith("/mnt/offline-office"):
+                raise AssertionError("Notes do not need working directory access")
+            return original(path)
+
+        with patch.object(Path, "is_dir", directory), contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(ctl.main(["notes"]), 0)
+        self.assertEqual(self.spawn.call_args.args[0][0], "obsidian")
+
+    def test_files_fallback_and_closed_runtime(self):
+        item = self.mapped()
+        ctl.set_working_directory(item["id"], "/nonexistent-files-working-directory")
+        ctl.publish()
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(ctl.main(["files"]), 0)
+        self.assertEqual(self.spawn.call_args.args[0],
+                         ["strata", str(ctl.root() / "Projects/Alpha")])
+        self.runtime([{"id": "s99", "name": "Runtime only"}], "s99")
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(ctl.main(["files"]), 0)
+        self.assertEqual(self.spawn.call_args.args[0], ["strata", str(Path.home())])
+        self.spawn.reset_mock()
+        with contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(ctl.main(["files", "--runtime", "s2"]), 1)
+        self.spawn.assert_not_called()
+
+    def test_files_session_directory_ignores_different_offline_working_directory(self):
+        item = self.mapped()
+        ctl.publish()
+        metadata = ctl.root() / "Projects/Alpha/.context/context.json"
+        data = ctl.read_json(metadata)
+        data["working_directory"] = "/mnt/offline-office"
+        ctl.atomic_json(metadata, data)
+        original = Path.is_dir
+
+        def directory(path):
+            if str(path).startswith("/mnt/offline-office"):
+                raise AssertionError("Session directory launch probed working directory")
+            return original(path)
+
+        with patch.object(Path, "is_dir", directory), \
+                patch.object(ctl, "scan", side_effect=AssertionError("Full context scan")), \
+                patch.object(ctl, "mutation_lock", side_effect=AssertionError("Catalog lock")), \
+                contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(ctl.main(["files", "--session-directory", "--runtime", "s2"]), 0)
+        self.assertEqual(self.spawn.call_args.args[0],
+                         ["strata", str(ctl.root() / "Projects/Alpha")])
+
+    def test_files_session_directory_matches_normal_when_same_and_falls_back_without_context(self):
+        self.mapped()
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(ctl.main(["files"]), 0)
+            normal = self.spawn.call_args.args[0]
+            self.assertEqual(ctl.main(["files", "--session-directory"]), 0)
+            self.assertEqual(self.spawn.call_args.args[0], normal)
+            self.runtime([{"id": "s99", "name": "Runtime only"}], "s99")
+            self.assertEqual(ctl.main(["files", "--session-directory"]), 0)
+        self.assertEqual(self.spawn.call_args.args[0], ["strata", str(Path.home())])
 
     def test_catalog_atomic_unchanged_and_activation(self):
         item = self.mapped()

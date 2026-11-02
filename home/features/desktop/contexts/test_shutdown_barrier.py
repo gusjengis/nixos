@@ -9,6 +9,7 @@ import importlib.util
 import os
 from pathlib import Path
 import sys
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -59,6 +60,14 @@ async def until(predicate):
 
 @unittest.skipUnless(HAS_DBUS, "dbus_next unavailable")
 class ShutdownBarrierTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        environment = patch.dict(os.environ, XDG_STATE_HOME=directory.name)
+        environment.start()
+        self.addCleanup(environment.stop)
+        self.log = Path(directory.name) / "desktop-contexts/terminal/events.log"
+
     async def exercise(self, code, error=None, timeout=90):
         manager = Manager()
         barrier = barrier_module.ShutdownBarrier(manager)
@@ -83,6 +92,8 @@ class ShutdownBarrierTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(OSError):
             os.fstat(fd)
         self.assertEqual(os.read(manager.readers[-1], 1), b"")
+        if error:
+            self.assertIn("shutdown continues", self.log.read_text())
 
     async def test_success(self):
         await self.exercise("pass")

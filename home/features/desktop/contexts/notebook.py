@@ -80,10 +80,11 @@ def fields(text):
 
 def eligible(path, value):
     return (not any(part.startswith(".") for part in path.parts)
-            and path.parts[0] not in ("Templates", "Attachments") and value.get("kanban") is not False)
+            and not any(part in ("Templates", "Attachments") for part in path.parts)
+            and value.get("kanban") is not False)
 
 
-def update_note(path, now):
+def update_note(path, now, is_new=False):
     text = read(path)
     _, value, _ = fields(text)
     status = value.get("status")
@@ -97,12 +98,12 @@ def update_note(path, now):
         stat = path.stat()
         birth = getattr(stat, "st_birthtime", None)
         changes["created"] = timestamp(birth if birth is not None else stat.st_mtime)
-        changes["created-source"] = "filesystem-birthtime" if birth is not None else "filesystem-mtime-estimate"
+        changes["created-source"] = "obsidian-create" if is_new else "filesystem-birthtime" if birth is not None else "filesystem-mtime-estimate"
     history = value.get("kanban-history", [])
     if not isinstance(history, list) or any(not isinstance(event, dict) for event in history):
         raise ctl.ContextError(f"Invalid kanban-history in {path}")
     if not history or history[-1].get("status") != status:
-        changes["kanban-history"] = [*history, {"status": status, "at": now, "event": "observed"}]
+        changes["kanban-history"] = [*history, {"status": status, "at": now, "event": "entered" if is_new or history else "observed"}]
     if not changes:
         return False
     return write(path, edit_fields(text, changes))

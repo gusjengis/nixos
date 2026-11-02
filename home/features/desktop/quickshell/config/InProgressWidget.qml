@@ -1,6 +1,5 @@
 import QtQuick
 import QtQuick.Controls
-import QtQuick.Effects
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
@@ -48,17 +47,23 @@ Scope {
         delegate: PanelWindow {
             id: window
             required property var modelData
+            readonly property int shadowPadding: Theme.glassShadowPadding
+            readonly property int bodyHeight: Math.min(Math.max(120, screen.height - Theme.barHeight - 104),
+                62 + Math.max(1, notebook.cards.length) * 64 + 28 * root.sectionCount
+                    + (root.sectionCount > 1 ? 12 : 0))
             screen: modelData
             visible: preferences.shown && root.contextId !== ""
             color: "transparent"
             exclusionMode: ExclusionMode.Ignore
             focusable: false
-            anchors { top: true; right: true }
-            margins { top: Theme.barHeight + 12; right: 8 }
-            implicitWidth: 360
-            implicitHeight: Math.min(560, Math.max(160, screen.height - Theme.barHeight - 64),
-                136 + Math.max(1, notebook.cards.length) * 64 + 28 * root.sectionCount)
-            WlrLayershell.layer: WlrLayer.Bottom
+            anchors { bottom: true; left: true }
+            margins { bottom: 28 - window.shadowPadding; left: 28 - window.shadowPadding }
+            implicitWidth: 320 + 2 * shadowPadding
+            // Grow to fit active work instead of stopping after roughly seven
+            // rows. Oversized boards scroll, initially showing In-Progress.
+            implicitHeight: bodyHeight + 2 * shadowPadding
+            // Render after workspace blur, like a fixed, pinned window.
+            WlrLayershell.layer: WlrLayer.Top
             WlrLayershell.namespace: "quickshell-in-progress"
             // Only the rounded card receives input; shadow margins pass through.
             mask: Region { item: panel; radius: panel.radius }
@@ -66,44 +71,16 @@ Scope {
             Rectangle {
                 id: panel
                 anchors.fill: parent
-                anchors.margins: 20
+                anchors.margins: window.shadowPadding
                 radius: 24
-                color: "#cf252932"
-                border.width: 1
+                color: Theme.glassActive ? "transparent" : Theme.background
+                border.width: Theme.glassActive ? 0 : 1
                 border.color: "#30ffffff"
-                gradient: Gradient {
-                    GradientStop { position: 0; color: "#dc363a43" }
-                    GradientStop { position: 1; color: "#d121252d" }
-                }
-                layer.enabled: true
-                layer.effect: MultiEffect {
-                    shadowEnabled: true
-                    shadowColor: "#60000000"
-                    shadowBlur: 0.7
-                    shadowVerticalOffset: 5
-                }
 
                 Column {
                     id: header
                     anchors { top: parent.top; left: parent.left; right: parent.right; margins: 20 }
                     spacing: 5
-
-                    Row {
-                        width: parent.width
-                        Text {
-                            width: parent.width - count.width
-                            text: "Your Work"
-                            textFormat: Text.PlainText
-                            color: "#79b7ff"
-                            font { family: Theme.fontFamily; pixelSize: 21; weight: Font.Bold; letterSpacing: -0.5 }
-                        }
-                        Text {
-                            id: count
-                            text: notebook.loaded && !notebook.error ? notebook.cards.length : "–"
-                            color: "#79b7ff"
-                            font { family: Theme.fontFamily; pixelSize: 24; weight: Font.Bold; letterSpacing: -0.8 }
-                        }
-                    }
 
                     Text {
                         width: parent.width
@@ -121,17 +98,20 @@ Scope {
                     anchors { top: header.bottom; topMargin: 14; bottom: parent.bottom; bottomMargin: 12; left: parent.left; right: parent.right; leftMargin: 10; rightMargin: 10 }
                     clip: true
                     model: cardModel
+                    onCountChanged: Qt.callLater(() => list.positionViewAtEnd())
+                    onHeightChanged: Qt.callLater(() => list.positionViewAtEnd())
                     section.property: "status"
                     section.criteria: ViewSection.FullString
                     section.delegate: Text {
                         required property string section
+                        readonly property int sectionGap: section === "In-Progress" && root.sectionCount > 1 ? 12 : 0
                         width: list.width
-                        height: 28
+                        height: 28 + sectionGap
                         leftPadding: 10
-                        topPadding: 4
+                        topPadding: 4 + sectionGap
                         text: section === "In-Progress" ? "IN PROGRESS" : "TO DO"
-                        color: section === "In-Progress" ? "#79b7ff" : "#99ffffff"
-                        font { family: Theme.fontFamily; pixelSize: 10; weight: Font.Bold; letterSpacing: 0.7 }
+                        color: "#ffffff"
+                        font { family: Theme.fontFamily; pixelSize: 10; weight: Font.DemiBold; letterSpacing: 0.7 }
                     }
                     boundsBehavior: Flickable.StopAtBounds
                     ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded; width: 4 }
@@ -142,30 +122,45 @@ Scope {
                         required property string path
                         required property string status
                         required property int index
+                        readonly property string contextLabel: model.owner_context_id && model.owner_context_id !== root.contextId ? (model.context || "") : ""
                         width: list.width
-                        height: Math.max(56, cardTitle.implicitHeight + 24)
+                        height: 64
                         radius: 10
                         color: mouse.pressed ? "#20ffffff" : mouse.containsMouse ? "#10ffffff" : "transparent"
 
                         // Reminders-style ring is a status indicator, not a checkbox.
                         Rectangle {
-                            x: 10; y: 17
+                            x: 10
+                            anchors.verticalCenter: parent.verticalCenter
                             width: 17; height: 17; radius: 9
                             color: "transparent"
                             border { width: 1.5; color: "#77ffffff" }
-                            Rectangle { anchors.centerIn: parent; width: 5; height: 5; radius: 3; color: "#79b7ff"; visible: row.status === "In-Progress" }
+                            Rectangle { anchors.centerIn: parent; width: 5; height: 5; radius: 3; color: "#ffffff"; visible: row.status === "In-Progress" }
                         }
 
-                        Text {
-                            id: cardTitle
+                        Column {
                             anchors { left: parent.left; leftMargin: 38; right: parent.right; rightMargin: 12; verticalCenter: parent.verticalCenter }
-                            text: row.title
-                            textFormat: Text.PlainText
-                            color: "#f2ffffff"
-                            wrapMode: Text.Wrap
-                            maximumLineCount: 2
-                            elide: Text.ElideRight
-                            font { family: Theme.fontFamily; pixelSize: 14; weight: Font.Medium; letterSpacing: -0.15 }
+                            spacing: 3
+                            Text {
+                                id: cardTitle
+                                width: parent.width
+                                text: row.title
+                                textFormat: Text.PlainText
+                                color: "#f2ffffff"
+                                wrapMode: Text.Wrap
+                                maximumLineCount: 2
+                                elide: Text.ElideRight
+                                font { family: Theme.fontFamily; pixelSize: 14; weight: Font.Medium; letterSpacing: -0.15 }
+                            }
+                            Text {
+                                width: parent.width
+                                visible: row.contextLabel !== ""
+                                text: row.contextLabel
+                                textFormat: Text.PlainText
+                                color: "#99ffffff"
+                                elide: Text.ElideLeft
+                                font { family: Theme.fontFamily; pixelSize: 10 }
+                            }
                         }
 
                         Rectangle {

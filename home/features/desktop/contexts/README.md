@@ -41,7 +41,8 @@ Neovim, lazygit, and tmux remain core utilities with development disabled.
 Contexts are directories under `~/sessions`, identified by `.context/context.json`.
 Legacy nesting is inferred from directories. The organizer stores logical nesting
 independently, so a context's tree location need not match its storage location.
-Each has `.context/notes`, an independent Obsidian vault. Its default opening view
+Each has `.context/notes`, an independently openable Obsidian vault with nested
+links to its logical children's notebooks. Its default opening view
 is `Kanban.base`: **Thoughts → Todo → In-Progress → Done**. Obsidian saves edits
 automatically. There is no desktop Save step or generated Home dashboard.
 
@@ -64,7 +65,10 @@ configured working directory and `ls -al` output, including hidden files. Click
 the path to edit it; use `.` to reset to context home. Relative paths also show
 their full location, and unavailable targets show the fallback context folder.
 Changing this setting does not move existing terminal panes or override restored
-pane directories. Multiple contexts can share a working directory while keeping
+pane directories. Opening a context terminal or restoring its checkpoint refreshes
+tmux's session working directory, so new windows use the configured working
+directory rather than the directory used to stage restored panes.
+Multiple contexts can share a working directory while keeping
 separate UUID-keyed tmux sessions. Listings load
 asynchronously as selection changes. Workspace and Kanban previews remain deferred.
 
@@ -215,9 +219,16 @@ work in `/etc/nixos` without sharing their own chat lists or tmux sessions.
   local library changes; it does not import historical libraries in the background.
   Background checkpoint work is limited to 25% of one CPU, with a 15-minute overall
   deadline. Managed terminal checkpoint/close also saves selected owned chats
-  independently of that background CPU limit. Launch imports the visible
-  portable libraries, initializing a fresh native database when needed. The command
-  palette's **Sync portable context chat libraries** performs an explicit refresh.
+  independently of that background CPU limit. Launch publishes local metadata-only
+  visibility without probing external working directories or waiting for the library
+  lock. A server plugin imports visible portable libraries in the background,
+  initializing a fresh native database when needed. Fresh conversation families
+  created by this server send immediately; existing chats wait for preparation;
+  preparation errors and superseded conversation roots reject sends rather than
+  silently continuing stale history. The session picker queries the native index
+  when opened, including newly imported conversations. The command
+  palette's **Sync portable context chat libraries** refreshes the launching context's
+  visible libraries. CLI helper commands such as `db path` bypass launch preparation.
 - Library checks read the archive index before accessing conversation history.
   Unchanged history stays lazy; accessed objects and archive publication still
   receive integrity checks. Successful library checks are reused only within one
@@ -279,6 +290,68 @@ It records metadata while Obsidian is running and catches up on incoming notes a
 startup; intermediate edits made entirely outside a running notebook are not a
 historical audit log. Shared content/status/history sync; Electron profiles stay local.
 
+### Nested notebooks
+
+Each original notebook contains **relative directory symlinks to immediate child
+notebooks**, named with the labels in the context organizer. Following those links
+shows grandchildren at their proper depth; descendants are not mounted a second
+time at the parent root. Directory-only organizational groups become generated
+folders containing their children's links. Notes are never copied or rehomed.
+
+The main **Kanban** view includes descendants and displays a **Context** breadcrumb
+on each card. **This context** uses the same board with child folders excluded.
+New root notes still belong to the notebook where they were created. Templates,
+attachments and hidden support files remain excluded at every depth. Existing
+custom boards/views and presentation settings are preserved; hierarchy-owned
+Context formulas and the This context filter follow the current tree.
+
+`contextctl notes --global` opens `~/sessions/.context/notes` in its own isolated
+Obsidian profile, with the full hierarchy nested beneath it. This is an explicit
+global view, not a fallback for conversations without a saved owning context.
+
+Create, rename, move, promote, undo and delete commands reconcile notebook links
+after catalog publication, outside the global mutation lock. The existing catalog
+watcher handles incoming layout changes and periodically repairs generated entries.
+`.obsidian/context-hierarchy.json` records managed links and empty group folders;
+only matching managed symlinks and empty generated folders are removed. Colliding
+user files/folders and manually redirected links are retained and reported.
+
+The shared plugin refreshes Obsidian's index after mount changes, clearing stale
+nested watchers that otherwise prevent renamed symlinks from being indexed. This
+small adapter integration is covered by native Obsidian acceptance and must be
+rechecked when upgrading Obsidian. Metadata observations use `context-notes observe`
+and the original owner's lock, avoiding cached frontmatter writes from independent
+parent/child profiles racing over the same note.
+
+Agent list/search/brief and the desktop work widget include descendants with stable
+owner IDs, owner-relative paths and context labels. Agent updates use the original
+owner's lock/revision checks; opening a nested card keeps it in the active parent's
+Obsidian profile. Unmanaged symlink escapes and stale moved-child paths are rejected.
+The underlying list API also accepts `local_only: true`.
+
+Proof: `test_notebook_hierarchy.py` covers lifecycle reconciliation, groups, global
+aggregation, collisions, idempotence and owner routing. With `NOTEBOOK_NATIVE_TESTS=1`,
+`test_notebook_native.py` verifies nested indexing, recursive/local Kanban, context
+labels, two open profiles, phase history, external atomic edits, links/attachments,
+live rename/reparent/create, URI routing and reopen.
+
+### Context dictation
+
+Ctrl-dictation keeps Handy's existing transcription flow, but writes an ordinary
+Thoughts note into the focused saved context's `.context/notes/` root. The popup
+queries the live context at recording start and retains that UUID through saving;
+switching sessions during transcription does not redirect the note. No saved
+context means no note, with no fallback to the central vault.
+
+`context-notes capture` accepts JSON `{ "body": "..." }` with an explicit
+`--context UUID`. It saves immediately under a unique temporary title, then asks
+Omega's `qwen3.8:27b` for a title in a detached worker. Naming preserves note bytes,
+never replaces an existing filename, and skips notes manually edited or renamed.
+An unavailable model leaves the temporary note intact.
+
+Focused proof: `python3 -B -m unittest test_context_dictation test_context_notes`.
+The native popup writer test requires a running Wayland desktop.
+
 ### Agent-assisted notebook
 
 OpenCode's `context-notebook` skill and server plugin live beside its owning module
@@ -298,6 +371,13 @@ work. It uses normal external-directory/edit permissions; plan and delegated age
 cannot write. Unowned/unavailable contexts have no notebook fallback. Internal
 title/compaction prompts do not receive the notebook bootstrap.
 
+Active cards explicitly read or written in a conversation get a closeout reminder
+in subsequent primary-agent prompts and compaction context. Before finishing,
+the agent rereads relevant cards and explicitly writes `status: "Done"` for
+verified completed outcomes; changing only Work state or chat todos does not
+change notebook status. The coordinator reconciles delegated completion reports.
+Partial outcomes keep their blockers; no status is inferred automatically.
+
 Both tools call `context-notes --context UUID COMMAND`, a JSON-stdin/stdout helper.
 Writes work with Obsidian closed. Updates require the SHA-256 revision from a fresh
 read, use a machine-local writer lock, and check again immediately before atomic
@@ -306,11 +386,13 @@ note bodies and unrelated YAML are preserved; a delimited Work state section hol
 brief decisions, current state and next action. Phase/history update together;
 Obsidian observes an already-recorded transition without duplicating it.
 
-The right-side QuickShell desktop widget displays the active saved context's
-In-Progress cards followed by Todo cards, refreshing every five seconds.
-`Super+Shift+K` toggles it; visibility survives QuickShell reloads. It lives on the bottom layer,
-reserves no workspace space, and can be covered by applications or fullscreen.
-Long lists scroll; runtime-only sessions show no widget. Ownership comes from
+The bottom-right QuickShell desktop widget displays the active saved context's
+Todo cards above In-Progress cards, refreshing every five seconds. It grows to
+fit the board up to available screen height, without a fixed row/560px cap.
+`Super+Shift+K` toggles it; visibility survives QuickShell reloads. It lives on the top layer,
+reserves no workspace space, and follows workspace switches above application windows.
+Long lists scroll, initially positioned at the active-work end; In-Progress cards
+are never truncated. Runtime-only sessions show no widget. Ownership comes from
 `DesktopSessions.contextCatalog.active_context`, never the working directory.
 Card clicks use `context-notes --context UUID open` with a JSON `path`, targeting
 that context's isolated Obsidian profile and revealing its notes workspace.
@@ -319,11 +401,33 @@ Stale clicks after a context switch are rejected. Appearance and reader live in
 acceptance is `python3 -B -m unittest test_in_progress -q` from `quickshell/`,
 using a Python environment with PyYAML.
 
-The compositor's general `no_workspace_blur` layer rule exempts this widget from
-both workspace and special-workspace blur. Config feature-detects support so
-older running compositors can reload safely; a new compositor binary takes
-effect after restarting Hyprland. The feature branch is
-`feat/layer-workspace-blur-exemption`, merged into the fork's `personal` branch.
+The widget renders after workspace and special-workspace blur and uses the
+existing Hyprglass Liquid Glass material. It needs no `no_workspace_blur`
+exemption, which would also expose sharp wallpaper beneath its translucent body.
+
+Context desktop files live on a separate bottom-layer QuickShell surface, above
+wallpaper and behind application windows. `ContextDesktop.qml` reads the active
+saved context node's `path`, not `cwd` or `working_directory_path`; hidden entries
+including `.context` never appear. Listings refresh every 2.5 seconds, clear
+immediately on owner changes, and discard late previous-owner responses.
+`DesktopSurface.qml` uses the extracted MacOS-Native MIME/folder/application icons,
+48px icons and 12px labels by default, and columns arranged from the upper right.
+Selection supports click, Ctrl/Shift-click, marquee, Ctrl+A, arrow keys, and Escape;
+double-click or Enter opens selected entries, and Delete moves them to Trash.
+Application `.desktop` shortcuts launch only on explicit Open. Empty-space
+right-click offers New Folder (also Ctrl+Shift+N), Open Desktop Folder, wallpaper,
+sorting, and 32/48/64px icon sizes. File right-click offers Open and Trash. Sort
+and icon-size preferences survive shell reloads; placement is grid-based, with
+horizontal wheel scrolling when columns exceed screen width. Rename, arbitrary
+icon placement, and drag/drop file transfer remain file-manager operations.
+The packaged `context-desktop-files` helper takes literal argument arrays, creates
+uniquely named folders without replacing existing files, and uses `gio trash`
+instead of permanent deletion. Focused checks from `quickshell/`:
+
+```sh
+python3 -B -m unittest test_desktop_files -v
+quickshell -p test_desktop.qml
+```
 
 Example CLI read (the tools handle this automatically):
 
@@ -375,6 +479,17 @@ preserving the remaining saved workspace. No startup URI is needed, avoiding a v
 loading race observed during testing. Existing global Obsidian settings stay
 untouched. Profiles are not synced. Extra processes use more memory than multiple
 vault windows sharing one process.
+
+Each profile also gets a private `XDG_RUNTIME_DIR` under the session runtime,
+with `WAYLAND_DISPLAY` made absolute to preserve compositor access. Obsidian
+1.14.5 otherwise unlinks/rebinds one shared `.obsidian-cli.sock` regardless of
+`--user-data-dir`, so concurrent contexts can steal note-opening commands from
+each other. Both initial launches and later URI requests use the same private
+runtime. Already-running profiles need one normal restart after this change.
+Native tests use temporary private runtimes too; they must never replace the
+desktop's socket. `OBSIDIAN_TEST_ASAR` optionally tests a locally downloaded app
+update. Native coverage opens a note with another profile running and again
+after that profile exits, checking the actual active file each time.
 
 `migrate-repos.py` defaults to a dry run. `--apply` relocates ordinary clones from
 `~/Documents/Code`, preserving dirty/untracked files and old paths as compatibility
@@ -442,14 +557,14 @@ machine-local mirror of that current state. It does not create periodic history.
   as proof of a complete snapshot. Noninteractive commands and snapshot RPC clients
   disconnect inherited terminal stdin: otherwise Neovim can put its response on
   stderr and terminal control output on stdout. Empty/truncated JSON replies get
-  at most three RAM-only attempts within one 15-second deadline; normal capture
+  at most three attempts within one two-second deadline; normal capture
   uses one snapshot RPC. A bounded fast `nvim_get_mode` RPC checks readiness first,
   even when a pending key sequence blocks ordinary evaluation. An input-blocked
-  editor defers its context's periodic save without a failure popup, retaining the
-  previous checkpoint; the next scan retries automatically. Explicit saves and
-  managed close/shutdown still report failure while input remains blocked.
-  Persistent malformed replies, native errors and schema/identity mismatches retain
-  the previous checkpoint and cancel managed destruction.
+  editor is skipped without blocking the context's save or managed close.
+  Malformed replies, native errors and schema/identity mismatches likewise discard
+  only that editor's saved session. A subsequent healthy capture can save it again.
+  Background checkpoint/restore diagnostics go to the journal/events log, never
+  desktop notifications.
 - New chunks are flushed before atomic root replacement. A machine-local pending
   journal lists owned new/retired objects; recovery either keeps the valid committed
   root or reports missing/corrupt data explicitly. There is no older-root selection.
@@ -489,20 +604,22 @@ publication requires explicit review. Do not run old and new writers concurrentl
 against the same context; v1 binaries cannot read v2. Rollback requires an explicit
 format conversion/export, not silently selecting an older generation.
 
-Standalone Neovim periodic/exit saves use one current directory session at
-`.context/state/nvim/current/<directory-key>/editor.json` (or its XDG fallback).
-The last saving editor owns that directory session, as with the earlier latest
-directory pointer; coordinator checkpoints still capture every editor independently.
-Neovim uses immutable content-defined buffer chunks, a hashed atomic manifest,
-device counters, local witness/chunk mirror and bounded transaction journal.
-Unchanged saves write nothing. A nonblocking local publication lock protects
-changed saves; capture happens first and helpers never call back into a blocked
-exiting editor. Incomplete/conflicted state blocks replacement. Known superseded
-structured v1 editor roots are removed after directory-pointer migration; roots
-still referenced by other directories and unknown incoming roots remain intact.
-Original `neovim-sessions` session-manager files are never removed or overwritten.
-Editable recovery copies are application working files and are reclaimed after a
-successful exit save; failed saves preserve them.
+Neovim uses its built-in `:mksession`/`:source` support for file names, tabs,
+splits, folds and cursor positions. Standalone periodic/exit saves atomically
+replace `.context/state/nvim/sessions/<directory-key>.vim` (or its XDG fallback).
+The last saving editor owns that directory session; coordinator checkpoints still
+capture each editor independently as a version-3 `editor.json` plus `session.vim`.
+Unsaved text, unnamed-buffer contents, terminals and plugin options are not saved.
+No recovered-buffer copies or custom buffer-object stores are created.
+
+Failed saves remove the stale directory session; failed restores discard that
+session and start fresh. Explicit file/stdin launches take precedence over automatic
+restore. Errors are logged quietly to Neovim's `context-nvim/sessions.log`, with
+identical errors logged once per editor lifetime, never `vim.notify` or hit-enter
+prompts. Old version-1/2 buffer recovery is not loaded. Failed editor acknowledgement
+clears the pending marker and does not retain/block the whole terminal session.
+Only explicitly removed editor artifacts may bypass validation of the previous
+checkpoint; all remaining chat/workspace artifacts and the new root remain checked.
 
 Context/home paths are relocated on restore. External working roots require explicit
 machine-local mappings in `terminal/external-roots.json`, for example
@@ -570,12 +687,49 @@ success and clearing failed-restore retention. A forked tmux child is not yet pr
 that the requested process started. Missing/failed process acknowledgement remains
 an explicit, retained recovery failure.
 
-The Nix tmux overlay intercepts native `kill-session`, `kill-server`, `kill-window`,
-and `kill-pane`, including aliases, scripts, prompts, keybindings, and tree-mode
-tagged `X`. The originating queue waits while the event loop answers helper
-queries. Actual flags/targets select affected contexts, including linked windows.
-Failure, timeout, concurrent/recursive destruction, replacement targets, and a
-changed server topology cancel destruction. The helper has a 90-second limit.
+The Nix tmux overlay distinguishes explicit tab removal from session archival:
+
+- `kill-window` and `kill-pane` start an independently owned close worker. The
+  originating client queue does not wait for application capture. Only the target
+  session is inventoried; ordinary closes do not sweep chat libraries, checkpoint
+  other sessions, or check external working-directory availability.
+- Requested panes receive small, fsynced machine-local deletion records before
+  moving to a detached `__context_closing_<request>` session. The original client
+  immediately regains its remaining tabs. Shell/monitor panes require no exporter.
+  Editors/chats capture only their own recovery data before process teardown.
+  Private staging sessions/windows are excluded from periodic snapshots.
+- Local deletion records live under
+  `$XDG_STATE_HOME/desktop-contexts/terminal/closures/<context-id>/`; additive synced
+  records live in `<context>/.context/state/terminal/closed/<pane-uuid>.json`.
+  Both checkpoint merging and restoration filter these IDs, so a stale checkpoint
+  or legacy retained layout cannot resurrect explicitly closed tabs. Closing the
+  last tab has the same forgetting semantics. Native linked windows are related
+  targets: their links and deletion records are removed across their owners, but
+  those owners' application state is not captured.
+- Unsaved editor snapshots and chat recovery references are separate from window
+  restoration, under the machine-local `terminal/closed-work/<request>/` directory.
+  `request.json` records ownership; `status.json` records success/failure. Capture
+  failure preserves the private processes and reports a retry command:
+  `context-checkpoint retry-close --request <request>`. Recovery buffers are never
+  silently written over original editor files.
+- `kill-session` and `kill-server`, including tree-mode tagged `X`, still archive
+  remaining layout before destruction. Their originating queue waits while the
+  event loop answers helper queries. Targeted session archival captures only the
+  requested session/group on its server and preserves other sessions' last saved
+  records without contacting their adapters. Failure, timeout, replacement targets,
+  and changed server topology cancel destruction. The archive helper has a
+  90-second limit.
+
+Prefix `k`, `&`, and `x` use background close bindings so reloading `tmux.conf`
+also fixes existing servers. Notification-dismissal hooks run in the background.
+Native aliases, command-line calls and tree-mode window/pane deletion use the new
+dispatcher once the running server uses the rebuilt tmux executable; installing a
+package cannot replace an already-running server process.
+
+Regression proof includes actual originating-client keyboard input while a close
+helper is held pending, background capture after the tab is hidden, exporter failure
+and retry, stale/retained snapshot filtering, last-tab/pane deletion, linked-window
+removal, offline unrelated working directories, and scoped whole-session archival.
 
 Tmux inventory reads stable session/window/pane IDs directly in its three list
 formats. Missing IDs and ownership environment updates are sent in batches of at
@@ -602,6 +756,46 @@ the inhibitor. System configuration provides a 120-second delay ceiling; helper
 work is bounded to 90 seconds. A late user-service `ExecStop` is not used as proof
 that compositor APIs are still alive. Failures are logged/notified and cannot hold
 shutdown indefinitely. Compositor-exit and power hotkeys also checkpoint first.
+
+### Foreground latency and discovery boundaries
+
+Selected operations use a root-specific, machine-local UUID/path index in
+`desktop-contexts/index-*.json`. Each use validates the selected owner's current
+metadata and vault; changed UUIDs, redirected paths, and stale entries never claim
+another owner. Discovery reconciles synced/moved directories. Cold discovery and
+hierarchy validation remain metadata-only. Selected work-root checks wait at most
+150ms outside the shared mutation lock, falling back to context home when slow.
+
+The watcher discovers metadata outside the foreground lock every ten seconds.
+Runtime updates reuse that snapshot; discovery/layout changes trigger scope
+refresh. Open, close, terminal, notebook/card and selected-chat paths do not rebuild
+the catalog. Create/rename registrations invalidate cached discovery promptly.
+
+Targeted saves use the context/server ownership index, saved backing servers, and
+explicit sockets. Only owned sessions are inventoried; legacy unclaimed sessions
+may need local-ancestor inference. New managed terminals use the default server;
+custom-server saves can specify `--socket`. Runtime-only closure resolves terminal
+attachments before pane inventory, retaining other machine-local saved sessions.
+Close revalidates runtime ownership after saving and before destruction.
+Checkpoint publication is serialized per context. Lifecycle updates use a short
+metadata lock, so another context's large publication cannot block opening work
+or invalidate an unrelated snapshot.
+
+One-pane chat capture queries its selected native session/family and direct owner.
+Foreground close performs no closed-library sweep. Periodic maintenance compares
+lightweight native-owner/head tokens, handles at most eight dirty owners using four
+independent workers, and audits one owner per minute for dependencies not reflected
+in native timestamps. Affected scopes read only their visible owners' rows/ledgers.
+Pending recovery shells fail preflight before expensive adapter work, retaining
+their saved recovery data.
+
+Restore builds local loading panes and maps terminal windows before imports,
+external pane-directory checks, or app readiness. Up to sixteen pane startups
+run independently; pending markers clear only after real acknowledgement. Failures
+retain saved sessions instead of allowing recovery shells to replace their data.
+
+Regression gates: `test_context_performance.py` and isolated native persistence,
+chat-library and tab-close suites with `PERSISTENCE_NATIVE_TESTS=1`.
 
 ### Editors and chats
 
@@ -756,13 +950,15 @@ this source/configuration normally. Evidence is retained in
 Final boot and follow-up regression evidence is in
 `/tmp/opencode/tp-a19c7/final-summary.json`.
 
-Application launches are acknowledged before success is recorded. A failed editor
-or chat leaves an explicitly pending recovery pane; periodic saves and managed
-destruction refuse to replace its saved workspace with a blank shell. Fix the
-reported cause, exit that placeholder, then explicitly run
+Application launches are acknowledged before success is recorded. Failed editor
+sessions are now disposable: the pending marker clears, the failed session is
+dropped, and other windows continue. No unsaved-buffer recovery is attempted.
+A failed chat still leaves an explicitly pending recovery pane; periodic saves
+and managed destruction refuse to replace its saved workspace with a blank shell.
+Fix the logged cause, exit that placeholder, then explicitly run
 `context-checkpoint restore --context UUID --no-windows` or close/reopen the context.
-Opening an already-open context still only switches to it. Neovim also refuses
-autosave after failed startup recovery, preserving its prior directory session.
+Opening an already-open context still only switches to it. Neovim can save a fresh
+file/layout session immediately after discarding a failed restoration.
 
 Remaining implementation/rollout work:
 

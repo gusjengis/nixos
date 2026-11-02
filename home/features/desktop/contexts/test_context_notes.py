@@ -18,6 +18,7 @@ class ContextNotesTests(unittest.TestCase):
         self.base = Path(self.temp.name)
         self.env = patch.dict(os.environ, {
             "CONTEXT_ROOT": str(self.base / "contexts"), "XDG_STATE_HOME": str(self.base / "state"),
+            "XDG_RUNTIME_DIR": str(self.base / "runtime"),
         })
         self.env.start()
         self.addCleanup(self.env.stop)
@@ -32,6 +33,19 @@ class ContextNotesTests(unittest.TestCase):
             api.resolve(None)
         with self.assertRaisesRegex(ctl.ContextError, "unavailable"):
             api.resolve("missing")
+
+    def test_notebook_resolution_never_probes_external_working_directories(self):
+        external = self.base / "offline-share"
+        ctl.set_working_directory(self.second["id"], str(external))
+        original = Path.is_dir
+
+        def guarded(path):
+            if path == external or path == Path("/etc/nixos"):
+                raise AssertionError("Notebook lookup probed an external working directory")
+            return original(path)
+
+        with patch.object(Path, "is_dir", guarded):
+            self.assertEqual(api.resolve(self.first["id"]).identifier, self.first["id"])
 
     def test_cli_dispatches_all_read_actions_and_write_roundtrip(self):
         def command(action, request):
@@ -67,9 +81,9 @@ class ContextNotesTests(unittest.TestCase):
         self.assertEqual(path.stat().st_mtime_ns, before)
 
     def test_open_card_targets_own_profile_and_rejects_stale_context(self):
-        from urllib.parse import parse_qs, urlparse
+        from urllib.parse import unquote, urlparse
 
-        card = self.vault.create({"title": "A & B #1", "body": "Keep this"})
+        card = self.vault.create({"title": "A & B #1 + café", "body": "Keep this"})
         item = dict(self.first, runtime_id="s2")
         with patch.object(ctl, "launch_context", return_value=item), \
                 patch.object(ctl, "notes") as notes, patch.object(ctl, "spawn") as spawn, \
@@ -78,8 +92,10 @@ class ContextNotesTests(unittest.TestCase):
             notes.assert_called_once_with("s2")
             arguments = spawn.call_args.args[0]
             self.assertIn(f"--user-data-dir={ctl.state_root() / 'obsidian' / self.first['id']}", arguments)
-            self.assertEqual(parse_qs(urlparse(arguments[-1]).query)["path"],
-                             [str(self.vault.directory / card["path"])])
+            query = urlparse(arguments[-1]).query
+            self.assertEqual(unquote(query.removeprefix("path=")),
+                             str(self.vault.directory / card["path"]))
+            self.assertNotIn("+", query)
             evaluate.assert_called_once_with("require('sessions').show_special('notes')")
         with patch.object(ctl, "launch_context", return_value=self.second), \
                 patch.object(ctl, "spawn") as spawn:

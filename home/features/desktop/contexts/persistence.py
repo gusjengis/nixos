@@ -4,6 +4,7 @@
 # ruff: noqa: BLE001
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import base64
 import copy
 import fcntl
@@ -26,6 +27,7 @@ import chat_portability as chats
 import checkpoint_store as store
 import context_chat_library as chat_library
 import contextctl as ctl
+import window_close
 
 
 class CheckpointError(ctl.ContextError):
@@ -55,9 +57,12 @@ def local_root():
 
 def set_lifecycle(context, status):
     path = local_root() / "lifecycle.json"
-    with lock():
+    key = context["id"] if context else "local"
+    if ctl.read_json(path, {}).get(key) == status:
+        return
+    with context_lock(context), file_lock("lifecycle"):
         value = ctl.read_json(path, {})
-        value[context["id"] if context else "local"] = status
+        value[key] = status
         write_json(path, value)
 
 
@@ -81,19 +86,24 @@ def report(message):
 
 
 def notify(errors):
-    errors = sorted(set(errors))
+    # Workspace persistence is background convenience, not a call to action.
+    # Keep diagnostics available without desktop popups (including restore).
     if errors:
-        report("; ".join(errors))
-        identity = hashlib.sha256("\n".join(errors).encode()).hexdigest()
-        previous = ctl.read_json(local_root() / "notified.json", {})
-        if previous.get("identity") == identity and time.time() - previous.get("time", 0) < 900:
-            return
-        ctl.atomic_json(local_root() / "notified.json", {"identity": identity, "time": time.time()})
-        try:
-            subprocess.run(["notify-send", "Terminal recovery", "\n".join(errors)[:1500]], timeout=3,
-                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
-        except (OSError, subprocess.TimeoutExpired):
-            pass
+        report("; ".join(sorted(set(errors))))
+
+
+def discarded_editor(pane, discard=None):
+    """Remember failed editor restores until a healthy capture replaces them."""
+    path = local_root() / "discarded-editors.json"
+    with file_lock("discarded-editors"):
+        values = ctl.read_json(path, [])
+        if discard is True and pane["id"] not in values:
+            values.append(pane["id"])
+        elif discard is False:
+            values = [value for value in values if value != pane["id"]]
+        if discard is not None:
+            write_json(path, values)
+        return pane["id"] in values
 
 
 @contextmanager
@@ -219,12 +229,34 @@ def validate(base, manifest, prefix=""):
             raise CheckpointError(f"Latest checkpoint artifact missing/corrupt: {relative}; wait for sync")
 
 
+def validate_pane(base, manifest, pane):
+    if pane.get("editor"):
+        try:
+            validate(base, manifest, f"nvim/{pane['id']}/")
+        except Exception as exc:
+            report(f"Editor {pane['id']}: {exc}; reopening fresh")
+            discarded_editor(pane, True)
+            pane.pop("editor", None)
+            pane["command"] = "nvim"
+    validate(base, manifest, f"opencode/{pane['id']}/")
+
+
 class Tmux:
     def __init__(self, socket_path):
         self.socket = str(socket_path)
 
     def call(self, *args):
         return run([os.environ.get("PERSISTENCE_TMUX", "tmux"), "-S", self.socket, *args])
+
+    def set_working_directory(self, target, directory):
+        # attach-session -c is tmux's native session-cwd setter. A transient
+        # control client needs no terminal and leaves existing clients/panes
+        # alone. Do not inherit a nested-client marker or update session env.
+        environment = dict(os.environ)
+        environment.pop("TMUX", None)
+        run([os.environ.get("PERSISTENCE_TMUX", "tmux"), "-S", self.socket,
+             "-C", "attach-session", "-E", "-t", target,
+             "-c", str(directory).replace("#", "##"), ";", "detach-client"], env=environment)
 
     def reachable(self):
         # A socket inode can survive a crashed server. Let new-session perform
@@ -283,7 +315,7 @@ def sockets(extra=None):
     return result
 
 
-def owner(session, panes, contexts):
+def owner(session, panes, contexts, resolve_paths=True):
     explicit = session.get("@persistence-context")
     if not explicit and session["session_name"].startswith("context-"):
         explicit = session["session_name"][8:]
@@ -294,12 +326,39 @@ def owner(session, panes, contexts):
         return found
     owners = set()
     for pane in panes:
-        path = Path(pane["pane_current_path"]).resolve()
-        matching = [c for c in contexts if path.is_relative_to(Path(c["path"]).resolve())]
+        path = Path(pane["pane_current_path"])
+        path = path.resolve() if resolve_paths else path.absolute()
+        matching = [c for c in contexts if path.is_relative_to(
+            Path(c["path"]).resolve() if resolve_paths else Path(c["path"]).absolute())]
         owners.add(max(matching, key=lambda c: len(c["path"]))["id"] if matching else None)
     if len(owners) == 1 and None not in owners:
         return next(c for c in contexts if c["id"] in owners)
     return None
+
+
+def descendant(pid, ancestor):
+    seen = set()
+    while pid > 1 and pid not in seen:
+        if pid == ancestor:
+            return True
+        seen.add(pid)
+        try:
+            pid = int(Path(f"/proc/{pid}/stat").read_text().rsplit(") ", 1)[1].split()[1])
+        except (OSError, ValueError):
+            break
+    return False
+
+
+def runtime_targets(tm, runtime_id):
+    """Resolve runtime-only terminal attachments before inspecting any panes."""
+    live = next((item for item in ctl.snapshot()["sessions"] if item["id"] == runtime_id), {})
+    addresses = set(live.get("windows", []))
+    windows = [item for item in ctl.clients() if item.get("address") in addresses]
+    rows = tm.rows("list-clients", ["session_id", "client_pid"])
+    targets = {row["session_id"] for row in rows if any(descendant(int(row["client_pid"]), window["pid"]) for window in windows)}
+    name = f"desktop-{ctl.signature()}-{runtime_id}".replace(".", "_").replace(":", "_")
+    targets.update(row["session_id"] for row in tm.rows("list-sessions", ["session_id"], "-f", "#{==:#{session_name}," + name + "}"))
+    return sorted(targets)
 
 
 def inventory(context, sessions):
@@ -313,18 +372,6 @@ def inventory(context, sessions):
     for tm, session in sessions:
         for client in tm.rows("list-clients", ["client_pid", "session_id", "client_tty"], "-t", session["observed_id"]):
             attachments.append((client, session))
-
-    def descendant(pid, ancestor):
-        seen = set()
-        while pid > 1 and pid not in seen:
-            if pid == ancestor:
-                return True
-            seen.add(pid)
-            try:
-                pid = int(Path(f"/proc/{pid}/stat").read_text().rsplit(") ", 1)[1].split()[1])
-            except (OSError, ValueError):
-                break
-        return False
 
     runtime_id = ctl.local_state()["mappings"].get(context["id"]) if context else None
     remembered = next((s for s in ctl.snapshot()["sessions"] if s["id"] == runtime_id), {}) if runtime_id else {}
@@ -396,21 +443,30 @@ def inventory(context, sessions):
     return {"windows": result, "desktop": view, "warnings": warnings}
 
 
-def capture_tmux(tm, contexts):
+def capture_tmux(tm, contexts, session_targets=None):
     try:
         server_id = tm.call("show-options", "-s", "-v", "@persistence-server-id")
     except CheckpointError:
         server_id = str(uuid.uuid4())
         tm.call("set-option", "-s", "@persistence-server-id", server_id)
     uuid.UUID(server_id)
-    sessions = tm.rows("list-sessions", ["session_id", "session_name", "session_group", "@persistence-context",
-                                         "@persistence-session-id"])
-    all_panes = tm.rows("list-panes", ["session_id", "window_id", "pane_id", "pane_index", "pane_pid",
+    session_fields = ["session_id", "session_name", "session_group", "@persistence-context", "@persistence-session-id"]
+    pane_fields = ["session_id", "window_id", "pane_id", "pane_index", "pane_pid",
                       "pane_current_path", "pane_current_command", "pane_active", "pane_title",
                       "@persistence-editor", "@persistence-editor-socket", "@persistence-chat-socket",
-                      "@persistence-recovery-pending", "@persistence-id"], "-a")
-    windows = tm.rows("list-windows", ["session_id", "window_id", "window_index", "window_name",
-                      "window_layout", "window_active", "window_zoomed_flag", "@persistence-window-id"], "-a")
+                      "@persistence-recovery-pending", "@persistence-id"]
+    window_fields = ["session_id", "window_id", "window_index", "window_name",
+                      "window_layout", "window_active", "window_zoomed_flag", "automatic-rename", "@persistence-window-id", "@persistence-close-staged"]
+    if session_targets is None:
+        sessions = tm.rows("list-sessions", session_fields)
+        all_panes = tm.rows("list-panes", pane_fields, "-a")
+        windows = tm.rows("list-windows", window_fields, "-a")
+    else:
+        sessions, all_panes, windows = [], [], []
+        for target in session_targets:
+            sessions.extend(tm.rows("list-sessions", session_fields, "-f", "#{==:#{session_id}," + target + "}"))
+            all_panes.extend(tm.rows("list-panes", pane_fields, "-s", "-t", target))
+            windows.extend(tm.rows("list-windows", window_fields, "-t", target))
     # Read IDs in the inventory formats, not with two extra tmux processes per
     # object. Queue missing IDs and ownership metadata in bounded command batches.
     # Physical windows/panes can occur in several sessions or linked indices.
@@ -430,6 +486,8 @@ def capture_tmux(tm, contexts):
 
     result = []
     for session in sessions:
+        if session["session_name"].startswith(window_close.STAGING):
+            continue
         own_panes = list({p["pane_id"]: p for p in all_panes
                           if p["session_id"] == session["session_id"]}.values())
         explicit = session.get("@persistence-context") or (
@@ -438,7 +496,7 @@ def capture_tmux(tm, contexts):
         # A removed context must not block capture of every other session. Keep
         # its live panes in machine-local recovery, retaining claimed identity;
         # never infer ownership from a different checkout or recreate its vault.
-        context = None if orphaned else owner(session, own_panes, contexts)
+        context = None if orphaned else owner(session, own_panes, contexts, resolve_paths=False)
         if context:
             updates.extend([
                 ["set-option", "-t", session["session_id"], "@persistence-context", context["id"]],
@@ -451,9 +509,12 @@ def capture_tmux(tm, contexts):
         if orphaned:
             value["orphaned_context_id"] = orphaned
         for window in (w for w in windows if w["session_id"] == session["session_id"]):
+            if window.get("@persistence-close-staged"):
+                continue
             saved = {"id": identity(window, "window_id", "@persistence-window-id", ("-w",)), "index": int(window["window_index"]),
                      "name": window["window_name"], "layout": window["window_layout"],
-                     "active": window["window_active"] == "1", "zoom": window["window_zoomed_flag"] == "1", "panes": []}
+                      "active": window["window_active"] == "1", "zoom": window["window_zoomed_flag"] == "1",
+                      "automatic_rename": window["automatic-rename"] == "1", "panes": []}
             for pane in (p for p in own_panes if p["window_id"] == window["window_id"]):
                 saved["panes"].append({"id": identity(pane, "pane_id", "@persistence-id", ("-p",)),
                     "index": int(pane["pane_index"]), "observed_id": pane["pane_id"],
@@ -470,6 +531,39 @@ def capture_tmux(tm, contexts):
             arguments.extend(command)
         tm.call(*arguments)
     return result
+
+
+def context_servers(context, socket_path=None):
+    """Known backing servers only; never ping another context's custom server."""
+    locations = ctl.read_json(local_root() / "context-servers.json", {})
+    paths = list(locations.get(context["id"], []))
+    if not paths:
+        selected = latest(context)
+        if selected:
+            for session in ctl.read_json(selected[0] / "tmux.json"):
+                server = session["server"]
+                paths.append(str(Path(f"/tmp/tmux-{os.getuid()}") / ("default" if server["default"] else "context-" + server["id"])))
+        # Managed new sessions use the default server. Explicit sockets cover
+        # custom-server CLI saves before their first successful checkpoint.
+        paths.append(str(Path(f"/tmp/tmux-{os.getuid()}") / "default"))
+    if socket_path:
+        paths.append(str(socket_path))
+    return [Tmux(path) for path in dict.fromkeys(paths) if Path(path).is_socket() and Tmux(path).reachable()]
+
+
+def context_targets(tm, context):
+    identifier = context["id"]
+    owned = "#{||:#{==:#{@persistence-context}," + identifier + "},#{==:#{session_name},context-" + identifier + "}}"
+    targets = [row["session_id"] for row in tm.rows("list-sessions", ["session_id"], "-f", owned)]
+    # Older shells may not have acquired explicit ownership yet. Infer only
+    # their local ancestors; never infer an external checkout or inspect another
+    # explicitly owned session's panes.
+    unowned = "#{&&:#{==:#{@persistence-context},},#{!=:#{m:context-*,#{session_name}},1}}"
+    for row in tm.rows("list-sessions", ["session_id", "session_name"], "-f", unowned):
+        candidate = window_close.target_context(tm, row["session_id"], row["session_name"], None, None)
+        if candidate and candidate["id"] == identifier:
+            targets.append(row["session_id"])
+    return targets
 
 
 SUPPORTED = {"vi", "vim", "view", "emacs", "man", "less", "more", "tail", "top", "htop", "irssi", "weechat", "mutt", "btop"}
@@ -538,7 +632,7 @@ def editor_snapshot(endpoint):
     editor_ready(endpoint)
     expression = 'luaeval("require(\'context_persistence\').snapshot()")'
     args = ["nvim", "--server", endpoint, "--remote-expr", expression]
-    deadline = time.monotonic() + 15
+    deadline = time.monotonic() + 2
     detail = "empty reply"
     for attempt in range(3):
         remaining = deadline - time.monotonic()
@@ -561,39 +655,53 @@ def editor_snapshot(endpoint):
             if attempt < 2:
                 time.sleep(min(.05, remaining))
             continue
-        if (not isinstance(data, dict) or data.get("version") != 2
+        if (not isinstance(data, dict) or data.get("version") != 3
                 or not isinstance(data.get("editor_id"), str)
                 or data.get("contents_encoding") != "base64" or not isinstance(data.get("contents"), dict)):
-            raise CheckpointError("Neovim snapshot RPC identity/schema mismatch; previous checkpoint retained")
+            raise CheckpointError("Neovim session adapter identity/schema mismatch; editor session skipped")
         return data
     raise CheckpointError(f"Neovim snapshot RPC invalid after 3 attempts: {detail}; previous checkpoint retained")
 
 
 def adapter_capture(tm, pane, destination, context, errors):
     local = pane.pop("local")
-    if local.get("@persistence-recovery-pending") == "1":
+    if local.get("@persistence-recovery-pending") == "1" and pane["command"] != "nvim":
         raise CheckpointError(f"Pane {pane['id']} is an unresolved recovery shell; exit it and explicitly retry restoration. Previous checkpoint retained")
     command = pane["command"]
     cwd = str(decode_path(pane["cwd"], context))
     editor = local.get("@persistence-editor-socket")
     chat = local.get("@persistence-chat-socket")
     if command == "nvim":
-        if not editor:
-            raise CheckpointError("Neovim adapter absent; restart editor before protected destruction")
         directory = destination / "nvim" / pane["id"]
-        data = editor_snapshot(editor)
-        if data["editor_id"] != local["@persistence-editor"]:
-            raise CheckpointError("Editor identity changed during capture")
+        # A failed/old editor adapter must never veto another pane's save or close.
+        try:
+            if not editor:
+                raise CheckpointError("Neovim session adapter absent")
+            data = editor_snapshot(editor)
+            if data["editor_id"] != local["@persistence-editor"]:
+                raise CheckpointError("Editor identity changed during capture")
+            if data.get("session") != "session.vim" or set(data["contents"]) != {"session.vim"}:
+                raise CheckpointError("Invalid Neovim session snapshot")
+            session = base64.b64decode(data["contents"]["session.vim"], validate=True)
+        except Exception as exc:
+            report(f"Editor {pane['id']}: {exc}; reopening fresh next time")
+            pane.pop("editor", None)
+            discarded_editor(pane, True)
+            if local.get("@persistence-recovery-pending") == "1":
+                tm.call("set-option", "-pu", "-t", local["pane_id"], "@persistence-recovery-pending")
+            return
         if isinstance(destination, store.MemoryPath):
             for name in list(destination.tree.files):
                 if name.startswith(str(directory) + "/"):
                     del destination.tree.files[name]
-        if data.pop("contents_encoding") != "base64":
-            raise CheckpointError("Unsupported editor snapshot content encoding")
-        for relative, content in data.pop("contents").items():
-            (directory / relative).write_bytes(base64.b64decode(content, validate=True))
+        data.pop("contents_encoding")
+        data.pop("contents")
+        (directory / "session.vim").write_bytes(session)
         write_json(directory / "editor.json", data)
         pane["editor"] = {"id": data["editor_id"], "manifest": f"nvim/{pane['id']}/editor.json"}
+        discarded_editor(pane, False)
+        if local.get("@persistence-recovery-pending") == "1":
+            tm.call("set-option", "-pu", "-t", local["pane_id"], "@persistence-recovery-pending")
     elif command in ("opencode", "bun") or (chat and Path(chat).is_socket()):
         if not chat:
             raise CheckpointError("OpenCode TUI adapter absent; restart OpenCode before protected destruction")
@@ -721,13 +829,43 @@ def affected_owners(captured, socket_path, operation, target_session, target_win
 
 @chat_library.sync_batch()
 def checkpoint(reason="periodic", context_id=None, socket_path=None, operation=None,
-               target_session=None, target_window=None, all_targets=False, group=False):
+               target_session=None, target_window=None, all_targets=False, group=False, runtime_id=None):
     # Gather application state before taking any publication lock. An exiting
     # editor can finish its own save without a helper waiting on its blocked RPC.
-    contexts = ctl.scan()
+    # Private tab workers own their final teardown, including on older running
+    # servers whose native patch predates asynchronous tab-close dispatch.
+    if reason == "pre-kill" and socket_path and target_session:
+        name = Tmux(socket_path).call("display-message", "-p", "-t", target_session.removeprefix("x"), "#{session_name}")
+        if name.startswith(window_close.STAGING):
+            return
+    context = ctl.selected_context(context_id) if context_id else None
+    if context_id and context is None:
+        raise CheckpointError(f"Context is unavailable: {context_id}")
+    contexts = ([context] if context else ctl.known_contexts() if reason == "pre-kill" or runtime_id
+                else ctl.scan(check_working_directories=False))
     captured = []
-    for tm in sockets(socket_path):
-        captured.extend(capture_tmux(tm, contexts))
+    servers = (context_servers(context, socket_path) if context else
+               [Tmux(socket_path)] if reason == "pre-kill" and socket_path else sockets(socket_path))
+    for tm in servers:
+        targets = context_targets(tm, context) if context else runtime_targets(tm, runtime_id) if runtime_id else None
+        if reason == "pre-kill" and operation == "kill-session" and not all_targets:
+            targets = [target_session.removeprefix("x")]
+            if group:
+                name = tm.call("display-message", "-p", "-t", targets[0], "#{session_group}")
+                if name:
+                    targets = [r["session_id"] for r in tm.rows("list-sessions", ["session_id"], "-f", "#{==:#{session_group}," + name + "}")]
+        captured.extend(capture_tmux(tm, contexts, targets))
+    # Cache live ownership during ordinary background discovery. Subsequent
+    # selected saves do not need to discover or contact unrelated servers.
+    with file_lock("context-servers"):
+        locations_path = local_root() / "context-servers.json"
+        locations = ctl.read_json(locations_path, {})
+        for own, tm, _ in captured:
+            if own:
+                locations.setdefault(own["id"], [])
+                if tm.socket not in locations[own["id"]]:
+                    locations[own["id"]].append(tm.socket)
+        write_json(locations_path, locations)
     owners = {c["id"] if c else None for c, _, _ in captured}
     if reason == "pre-kill" and operation:
         owners = affected_owners(captured, socket_path, operation, target_session, target_window, all_targets, group)
@@ -735,33 +873,45 @@ def checkpoint(reason="periodic", context_id=None, socket_path=None, operation=N
         owners = {context_id}
     errors = []
     library_errors = []
-    # Background saving exports local changes; opening/restoring a context owns
-    # importing its history. Never make saving live terminals wait for importing
-    # every historical conversation on every machine.
-    chat_library.sync_all(contexts, hydrate=False, only=None if reason == "periodic" else owners, errors=library_errors)
-    for identifier, error in library_errors:
-        if reason == "periodic" and isinstance(error, chats.ChatChangedDuringCheckpoint):
-            report(f"{identifier}: {error}; library save deferred, previous library retained")
-        else:
-            errors.append(f"{identifier}: {error}")
+    # Selected pane references save their own family through OC2's reference()
+    # adapter below. Do not put whole-library maintenance ahead of unrelated
+    # terminal snapshots. Closed-chat maintenance runs after those snapshots.
     for identifier in owners:
         context = next((c for c in contexts if c["id"] == identifier), None)
         try:
             lifecycle = ctl.read_json(local_root() / "lifecycle.json", {})
             if reason in ("periodic", "shutdown") and lifecycle.get(identifier or "local") == "closed":
                 continue
+            selected = [(tm, value) for own, tm, value in captured if (own["id"] if own else None) == identifier]
+            pending = [pane["id"] for _, session in selected for window in session["windows"]
+                       for pane in window["panes"] if pane.get("local", {}).get("@persistence-recovery-pending") == "1"
+                       and pane["command"] != "nvim"]
+            if pending:
+                raise CheckpointError(f"Pane {pending[0]} is an unresolved recovery shell; exit it and explicitly retry restoration. Previous checkpoint retained")
             previous = latest(context)
             if previous:
-                validate(*previous)
-            selected = [(tm, value) for own, tm, value in captured if (own["id"] if own else None) == identifier]
+                # Editor artifacts are disposable. Corruption in one must not
+                # prevent a fresh capture; other adapters keep their guarantees.
+                for name in previous[1]["artifacts"]:
+                    if not name.startswith("nvim/"):
+                        validate(*previous, prefix=name)
             if not selected:
                 continue
             tree = store.Tree()
             destination = tree.path()
+            broken_editors = set()
             # Previous adapter data lives in RAM, allowing native exporters to be
             # skipped when read-only source fingerprints and dependencies match.
             if previous:
-                tree.copy_from(previous[0])
+                for artifact in previous[0].rglob("*"):
+                    if artifact.is_file():
+                        name = str(artifact.relative_to(previous[0]))
+                        try:
+                            tree.files[name] = artifact.read_bytes()
+                        except Exception:
+                            if not name.startswith("nvim/"):
+                                raise
+                            broken_editors.add(name.split("/")[1])
             warnings = [f"Context {value['orphaned_context_id']} is unavailable; session {value['name']} saved in machine-local recovery"
                         for _tm, value in selected if value.get("orphaned_context_id")]
             pane_adapters = {}
@@ -794,14 +944,39 @@ def checkpoint(reason="periodic", context_id=None, socket_path=None, operation=N
                 present = {w["id"] for w in desktop["windows"]}
                 desktop["windows"].extend(w for w in previous_desktop["windows"]
                                           if w["session"] in retained["sessions"] and w["id"] not in present)
+            if previous and (runtime_id or reason == "pre-kill" and operation == "kill-session"):
+                # A targeted archive replaces only its requested sessions. Keep
+                # other sessions' last saved records without contacting them.
+                observed = {s["id"] for s in values}
+                old_base, _ = previous
+                others = [s for s in ctl.read_json(old_base / "tmux.json") if s["id"] not in observed]
+                values.extend(others)
+                previous_desktop = ctl.read_json(old_base / "desktop.json")
+                present = {w["id"] for w in desktop["windows"]}
+                other_ids = {s["id"] for s in others}
+                desktop["windows"].extend(w for w in previous_desktop["windows"]
+                                          if w["session"] in other_ids and w["id"] not in present)
             if previous and not desktop["windows"]:
                 desktop = ctl.read_json(previous[0] / "desktop.json")
+            values = window_close.filter_closed(values, context)
+            desktop["windows"] = [w for w in desktop["windows"] if w["session"] in {s["id"] for s in values}]
             roots = set()
             for session in values:
                 for window in session["windows"]:
                     for pane in window["panes"]:
                         if pane.get("editor"):
-                            roots.add("nvim/" + pane["id"])
+                            try:
+                                metadata = ctl.read_json(destination / pane["editor"]["manifest"], {})
+                                if not isinstance(metadata, dict):
+                                    metadata = {}
+                            except Exception:
+                                metadata = {}
+                            if (metadata.get("version") == 3 and not discarded_editor(pane)
+                                    and pane["id"] not in broken_editors):
+                                roots.add("nvim/" + pane["id"])
+                            else:
+                                pane.pop("editor")
+                                pane["command"] = "nvim"
                         if pane.get("chat"):
                             roots.add(pane["chat"])
             # Prune only artifacts absent from the merged logical workspace.
@@ -811,18 +986,19 @@ def checkpoint(reason="periodic", context_id=None, socket_path=None, operation=N
             write_json(destination / "tmux.json", values)
             write_json(destination / "desktop.json", desktop)
             storage = checkpoint_store(context)
-            with context_lock(context), lock():
+            with context_lock(context):
                 now = latest(context)
                 if (now[1] if now else None) != (previous[1] if previous else None):
                     raise CheckpointError("Checkpoint changed during capture; retry")
-                if ctl.read_json(local_root() / "lifecycle.json", {}) != lifecycle:
+                if ctl.read_json(local_root() / "lifecycle.json", {}).get(identifier or "local") != lifecycle.get(identifier or "local"):
                     raise CheckpointError("Lifecycle changed during capture; retry")
                 manifest, changed = storage.publish(tree, {
                     "context_id": identifier, "created_ns": time.time_ns(), "device": device(),
                     "reason": reason, "warnings": sorted(set(warnings)),
                     "migrated_from": (previous[1]["id"] if previous and previous[1]["version"] == 1
                                       else previous[1].get("migrated_from") if previous else None),
-                }, previous[1] if previous and previous[1]["version"] == 2 else None)
+                }, previous[1] if previous and previous[1]["version"] == 2 else None,
+                    discard_prefixes=("nvim/",))
                 storage.remove_v1()
                 # Raw server-wide dumps are unnecessary: native normalized
                 # records already contain supported topology/program strategies.
@@ -844,9 +1020,39 @@ def checkpoint(reason="periodic", context_id=None, socket_path=None, operation=N
                 errors.append(f"{identifier or 'machine-local'}: {exc}")
         except Exception as exc:
             errors.append(f"{identifier or 'machine-local'}: {exc}")
+    # No imports here. Per-context library locks and bounded native children are
+    # supplied by context_chat_library/context_chat_worker. A slow closed library
+    # must not prevent other contexts' terminal snapshots from being published.
+    # Pane adapters already saved the selected families. Foreground destruction
+    # needs no sweep of closed histories. Periodic maintenance is dirty-driven.
+    if reason == "periodic":
+        chat_library.sync_dirty(contexts, errors=library_errors)
+    elif reason not in ("close", "pre-kill"):
+        chat_library.sync_all(contexts, hydrate=False, only=owners, errors=library_errors)
+    for identifier, error in library_errors:
+        if reason == "periodic" and isinstance(error, (chats.ChatChangedDuringCheckpoint, TimeoutError)):
+            report(f"{identifier}: {error}; library save deferred, previous library retained")
+        else:
+            errors.append(f"{identifier}: {error}")
     if errors:
         notify(errors)
         raise CheckpointError("Checkpoint failed; managed destruction cancelled")
+
+
+def pane_working_directory(pane, context):
+    try:
+        cwd = decode_path(pane["cwd"], context)
+        if not cwd.is_dir():
+            raise CheckpointError(f"Working directory missing: {cwd}")
+        return cwd
+    except Exception as exc:
+        if not pane.get("editor") and pane["command"] != "nvim":
+            raise
+        report(f"Editor {pane['id']}: {exc}; reopening fresh in context directory")
+        discarded_editor(pane, True)
+        pane.pop("editor", None)
+        pane["command"] = "nvim"
+        return Path(context["path"]) if context else Path.home()
 
 
 def pane_command(pane, base, context, errors):
@@ -854,6 +1060,18 @@ def pane_command(pane, base, context, errors):
     if context:
         env["CONTEXT_DIRECTORY"] = context["path"]
         env["CONTEXT_ID"] = context["id"]
+    if pane.get("editor"):
+        try:
+            if discarded_editor(pane):
+                raise CheckpointError("Previously failed editor session discarded")
+            metadata = ctl.read_json(safe(base, pane["editor"]["manifest"]))
+            if metadata.get("version") != 3 or metadata.get("session") != "session.vim":
+                raise CheckpointError("Obsolete buffer recovery discarded")
+        except Exception as exc:
+            report(f"Editor {pane['id']}: {exc}")
+            discarded_editor(pane, True)
+            pane.pop("editor", None)
+            return ["env", *(f"{k}={v}" for k, v in env.items()), "CONTEXT_EDITOR_FRESH=1", "nvim"]
     if isinstance(base, store.MemoryPath) and (pane.get("editor") or pane.get("chat")):
         kind = "nvim" if pane.get("editor") else "opencode"
         relative = f"{kind}/{pane['id']}"
@@ -868,7 +1086,12 @@ def pane_command(pane, base, context, errors):
                        CONTEXT_EDITOR_RESTORE=str(safe(base, pane["editor"]["manifest"])))
             return ["env", *(f"{k}={v}" for k, v in env.items()), "nvim"]
         except Exception as exc:
-            errors.append(f"Editor {pane['id']}: {exc}")
+            report(f"Editor {pane['id']}: {exc}; reopening fresh")
+            discarded_editor(pane, True)
+            pane.pop("editor", None)
+            return ["env", *(f"{k}={v}" for k, v in env.items()), "CONTEXT_EDITOR_FRESH=1", "nvim"]
+    if pane["command"] == "nvim":
+        return ["env", *(f"{k}={v}" for k, v in env.items()), "CONTEXT_EDITOR_FRESH=1", "nvim"]
     if pane.get("chat_library"):
         try:
             sid, directory = chat_library.restore_reference(pane["chat_library"])
@@ -911,7 +1134,7 @@ def await_program(tm, target, pane, command):
                 return
             time.sleep(.05)
         raise CheckpointError(f"Pane {target} process readiness timed out: expected {expected}, observed {observed}")
-    deadline = time.monotonic() + 30
+    deadline = time.monotonic() + (3 if pane.get("editor") else 30)
     last_error = "application adapter not ready"
     while time.monotonic() < deadline:
         try:
@@ -923,7 +1146,9 @@ def await_program(tm, target, pane, command):
                 if row["@persistence-editor"] == pane["editor"]["id"] and endpoint and Path(endpoint).is_socket():
                     status = run(["nvim", "--server", endpoint, "--remote-expr",
                                   "get(g:, 'context_persistence_restore_status', 'loading')"], timeout=3)
-                    if status == "ready":
+                    if status in ("ready", "discarded"):
+                        if status == "discarded":
+                            discarded_editor(pane, True)
                         return
                     if status == "failed":
                         raise CheckpointError(f"Neovim {pane['editor']['id']} rejected recovery; see editor error")
@@ -945,9 +1170,9 @@ def await_program(tm, target, pane, command):
     raise CheckpointError(f"Pane {pane['id']} restore acknowledgement timed out: {last_error}")
 
 
-def restore_tmux(base, manifest, context, errors, tm, server_id=None):
+def restore_tmux(base, manifest, context, errors, tm, server_id=None, acknowledgements=None):
     validate(base, manifest, "tmux.json")
-    saved = ctl.read_json(base / "tmux.json")
+    saved = window_close.filter_closed(ctl.read_json(base / "tmux.json"), context)
     if server_id is not None:
         saved = [s for s in saved if s["server"]["id"] == server_id]
     live = {}
@@ -1007,12 +1232,15 @@ def restore_tmux(base, manifest, context, errors, tm, server_id=None):
                         continue
                     pane_errors = len(errors)
                     try:
-                        for prefix in (f"nvim/{pane['id']}/", f"opencode/{pane['id']}/"):
-                            validate(base, manifest, prefix)
-                        cwd = decode_path(pane["cwd"], context)
-                        if not cwd.is_dir():
-                            raise CheckpointError(f"Working directory missing: {cwd}")
-                        command = pane_command(pane, base, context, errors)
+                        if acknowledgements is not None:
+                            # Construct visible backing topology before imports,
+                            # external cwd checks, or application initialization.
+                            cwd = Path(context["path"]) if context else Path.home()
+                            command = ["/bin/sh", "-c", "printf 'Restoring saved pane...\\n'; exec sleep 2147483647"]
+                        else:
+                            validate_pane(base, manifest, pane)
+                            cwd = pane_working_directory(pane, context)
+                            command = pane_command(pane, base, context, errors)
                     except Exception as exc:
                         errors.append(f"Pane {pane['id']}: {exc}; starting recovery shell")
                         cwd = Path(context["cwd"]) if context else Path.home()
@@ -1035,14 +1263,16 @@ def restore_tmux(base, manifest, context, errors, tm, server_id=None):
                         tm.call("select-layout", "-t", win_target, "tiled")
                     tm.call("set-option", "-p", "-t", target, "@persistence-id", pane["id"])
                     if len(errors) == pane_errors:
-                        try:
-                            await_program(tm, target, pane, command)
-                            if isinstance(base, store.MemoryPath):
-                                for kind in ("nvim", "opencode"):
-                                    shutil.rmtree(local_root() / "restore" / (context["id"] if context else "local")
-                                                  / kind / pane["id"], ignore_errors=True)
-                        except Exception as exc:
-                            errors.append(str(exc))
+                        if acknowledgements is not None:
+                            # Pending is durable before visibility; a periodic
+                            # capture must not replace a still-loading recovery.
+                            tm.call("set-option", "-p", "-t", target, "@persistence-recovery-pending", "1")
+                            acknowledgements.append((session["id"], tm, target, pane, None, base, context, manifest))
+                        else:
+                            try:
+                                acknowledge_program(tm, target, pane, command, base, context)
+                            except Exception as exc:
+                                errors.append(str(exc))
                     if len(errors) != pane_errors:
                         # A visible shell is an honest recovery failure, not a
                         # replacement for the saved editor/chat. Never let its
@@ -1054,8 +1284,11 @@ def restore_tmux(base, manifest, context, errors, tm, server_id=None):
                     return
                 links[window["id"]] = (session_target, win_target)
                 tm.call("set-option", "-w", "-t", win_target, "@persistence-window-id", window["id"])
-                tm.call("set-option", "-w", "-t", win_target, "automatic-rename", "off")
                 tm.call("rename-window", "-t", win_target, window["name"])
+                # rename-window disables automatic naming. Restore its saved mode
+                # afterwards; old snapshots may have frozen tmux's transient label.
+                automatic = window.get("automatic_rename", False) or window["name"] == "[tmux]"
+                tm.call("set-option", "-w", "-t", win_target, "automatic-rename", "on" if automatic else "off")
                 # select-layout assigns leaves in native pane-index order. Restore
                 # that order first, including missing panes added to live windows.
                 for index, (_, wanted) in enumerate(restored_panes):
@@ -1090,11 +1323,62 @@ def restore_tmux(base, manifest, context, errors, tm, server_id=None):
                     tm.call("set-option", "-t", session_target, "@persistence-context", context["id"])
                     tm.call("set-environment", "-t", session_target, "CONTEXT_DIRECTORY", context["path"])
                     tm.call("set-environment", "-t", session_target, "CONTEXT_ID", context["id"])
+                    tm.set_working_directory(session_target, context["cwd"])
                 mapping[session["id"]] = {"socket": tm.socket, "target": session_target,
                                            "complete": len(errors) == initial_errors}
         except Exception as exc:
             errors.append(f"Session {session['name']}: {exc}")
     return mapping
+
+
+def acknowledge_program(tm, target, pane, command, base, context):
+    try:
+        await_program(tm, target, pane, command)
+    except Exception as exc:
+        if not pane.get("editor"):
+            raise
+        # Do not kill a live editor or retain an unresolved-recovery marker.
+        report(f"Editor {pane['id']}: {exc}; saved session discarded")
+        discarded_editor(pane, True)
+    if isinstance(base, store.MemoryPath):
+        for kind in ("nvim", "opencode"):
+            shutil.rmtree(local_root() / "restore" / (context["id"] if context else "local") / kind / pane["id"], ignore_errors=True)
+
+
+def finish_acknowledgements(pending, mapping, errors):
+    # All terminal windows have already been shown. Independent readiness waits
+    # share a bounded pool instead of serial 30-second deadlines per pane.
+    def complete(record):
+        sid, tm, target, pane, command, base, context = record[:7]
+        if command is None:
+            issues = []
+            try:
+                validate_pane(base, record[7], pane)
+                cwd = pane_working_directory(pane, context)
+                command = pane_command(pane, base, context, issues)
+                if issues:
+                    raise CheckpointError("; ".join(issues))
+                tm.call("respawn-pane", "-k", "-t", target, "-c", cwd, *command)
+            except Exception:
+                # A failed import leaves a usable, explicitly pending recovery
+                # shell rather than an eternal loading placeholder.
+                cwd = context["path"] if context else str(Path.home())
+                tm.call("respawn-pane", "-k", "-t", target, "-c", cwd, os.environ.get("SHELL", "/bin/sh"))
+                raise
+        acknowledge_program(tm, target, pane, command, base, context)
+        tm.call("set-option", "-pu", "-t", target, "@persistence-recovery-pending")
+        return sid
+
+    with ThreadPoolExecutor(max_workers=16) as pool:
+        jobs = {pool.submit(complete, record): record[0] for record in pending}
+        for job in as_completed(jobs):
+            try:
+                job.result()
+            except Exception as exc:
+                sid = jobs[job]
+                if sid in mapping:
+                    mapping[sid]["complete"] = False
+                errors.append(str(exc))
 
 
 def restore(context, runtime_id=None, tm=None, windows=True):
@@ -1109,26 +1393,28 @@ def restore(context, runtime_id=None, tm=None, windows=True):
             base, manifest = selected
             warnings.extend(manifest.get("warnings", []))
             validate(base, manifest, "tmux.json")
-            saved = ctl.read_json(base / "tmux.json")
+            saved = window_close.filter_closed(ctl.read_json(base / "tmux.json"), context)
             retention_path = local_root() / f"retained-{context['id'] if context else 'local'}.json"
             retained = ctl.read_json(retention_path, {"sessions": []})
             retained["sessions"] = sorted(set(retained["sessions"]) | {s["id"] for s in saved})
             ctl.atomic_json(retention_path, retained)
             mapping = {}
+            acknowledgements = []
             if tm is not None:
-                mapping.update(restore_tmux(base, manifest, context, errors, tm))
+                mapping.update(restore_tmux(base, manifest, context, errors, tm, acknowledgements=acknowledgements))
             else:
                 servers = {s["server"]["id"]: s["server"] for s in saved}
                 for identity, server in servers.items():
                     path = Path(f"/tmp/tmux-{os.getuid()}")
                     path.mkdir(mode=0o700, exist_ok=True)
                     target = Tmux(path / ("default" if server["default"] else "context-" + identity))
-                    mapping.update(restore_tmux(base, manifest, context, errors, target, identity))
+                    mapping.update(restore_tmux(base, manifest, context, errors, target, identity, acknowledgements=acknowledgements))
             failed_windows = set()
             if windows and runtime_id:
                 validate(base, manifest, "desktop.json")
                 desktop = ctl.read_json(base / "desktop.json")
                 failed_windows = restore_windows(desktop, mapping, context, runtime_id, errors, warnings)
+            finish_acknowledgements(acknowledgements, mapping, errors)
             complete = {sid for sid, result in mapping.items() if result.get("complete") and sid not in failed_windows}
             retained["sessions"] = [sid for sid in retained["sessions"] if sid not in complete]
             ctl.atomic_json(retention_path, retained)
@@ -1238,7 +1524,8 @@ def doctor():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=["save", "pre-kill", "restore", "verify", "doctor"])
+    parser.add_argument("command", choices=["save", "pre-kill", "close-tab", "retry-close", "restore", "verify", "doctor"])
+    parser.add_argument("--request")
     parser.add_argument("--socket")
     parser.add_argument("--context")
     parser.add_argument("--reason", default="manual")
@@ -1246,14 +1533,22 @@ def main():
     parser.add_argument("--operation", choices=["kill-server", "kill-session", "kill-window", "kill-pane"])
     parser.add_argument("--target-session")
     parser.add_argument("--target-window")
+    parser.add_argument("--target-pane")
     parser.add_argument("--all", type=int, default=0)
     parser.add_argument("--group", type=int, default=0)
     args = parser.parse_args()
     try:
         if args.command == "doctor":
             return 0 if doctor() else 1
-        context = ctl.find_context(args.context) if args.context else None
-        if args.command in ("save", "pre-kill"):
+        context = ctl.selected_context(args.context) if args.context else None
+        if args.context and context is None:
+            raise CheckpointError(f"Context is unavailable: {args.context}")
+        if args.command == "retry-close":
+            window_close.retry_close(args.request)
+        elif args.command == "close-tab":
+            window_close.close_tab(args.socket, args.operation, args.target_session, args.target_window,
+                                   args.target_pane, bool(args.all))
+        elif args.command in ("save", "pre-kill"):
             checkpoint("pre-kill" if args.command == "pre-kill" else args.reason, args.context, args.socket,
                        args.operation, args.target_session, args.target_window, bool(args.all), bool(args.group))
         elif args.command == "verify":

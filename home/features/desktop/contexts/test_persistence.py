@@ -12,6 +12,7 @@ import socket
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import unittest
 from unittest.mock import Mock, patch
@@ -51,7 +52,8 @@ class EditorRpcTests(unittest.TestCase):
 
     @staticmethod
     def snapshot():
-        return {"version": 2, "editor_id": "editor-id", "contents_encoding": "base64", "contents": {}}
+        return {"version": 3, "editor_id": "editor-id", "session": "session.vim",
+                "contents_encoding": "base64", "contents": {"session.vim": ""}}
 
     @staticmethod
     def reply(stdout, stderr="", code=0):
@@ -70,7 +72,7 @@ class EditorRpcTests(unittest.TestCase):
         with patch.object(p.subprocess, "run", side_effect=replies) as rpc, patch.object(p.time, "sleep"):
             self.assertEqual(p.editor_snapshot("/fixture/editor.sock"), snapshot)
         self.assertEqual(rpc.call_count, 3)
-        self.assertTrue(all(call.kwargs["timeout"] <= 15 for call in rpc.call_args_list))
+        self.assertTrue(all(call.kwargs["timeout"] <= 2 for call in rpc.call_args_list))
         self.assertTrue(all(call.kwargs["stdin"] == subprocess.DEVNULL for call in rpc.call_args_list))
 
     def test_persistent_invalid_reply_is_bounded_and_reports_native_diagnostics(self):
@@ -138,6 +140,53 @@ class ProgramReadinessTests(unittest.TestCase):
                 self.assertRaisesRegex(p.CheckpointError, "process.*timed out"):
             p.await_program(tm, "%0", {"command": "sh"}, ["env", "/bin/sh"])
         self.assertEqual(tm.rows.call_count, 1)
+
+
+class BestEffortEditorTests(unittest.TestCase):
+    def setUp(self):
+        temp = tempfile.TemporaryDirectory(prefix="editor-best-effort-", dir="/tmp/opencode")
+        self.addCleanup(temp.cleanup)
+        self.enterContext(patch.dict(os.environ, {"XDG_STATE_HOME": temp.name}))
+
+    def test_repeated_background_failures_never_spawn_notifications(self):
+        with patch.object(p.subprocess, "run") as process, patch.object(p, "report") as log:
+            for _ in range(20):
+                p.notify(["specific failure"])
+                p.notify(["Checkpoint failed; managed destruction cancelled"])
+        process.assert_not_called()
+        self.assertEqual(log.call_count, 40)
+
+    def test_failed_editor_acknowledgement_clears_pending_and_does_not_retain_session(self):
+        pane = {"id": "bad-editor", "editor": {"id": "editor"}, "command": "nvim"}
+        tm = Mock()
+        mapping = {"session": {"complete": True}}
+        errors = []
+        with patch.object(p, "await_program", side_effect=p.CheckpointError("editor rejected restore")):
+            p.finish_acknowledgements([("session", tm, "%0", pane, ["nvim"], None, None)], mapping, errors)
+        self.assertEqual(errors, [])
+        self.assertTrue(mapping["session"]["complete"])
+        self.assertTrue(p.discarded_editor(pane))
+        tm.call.assert_called_once_with("set-option", "-pu", "-t", "%0", "@persistence-recovery-pending")
+
+    def test_old_or_previously_failed_editor_opens_fresh_without_restore_work(self):
+        tree = p.store.Tree({"nvim/p/editor.json": b'{"version":2}'})
+        pane = {"id": "p", "command": "nvim", "editor": {"manifest": "nvim/p/editor.json"}}
+        errors = []
+        command = p.pane_command(pane, tree.path(), None, errors)
+        self.assertIn("CONTEXT_EDITOR_FRESH=1", command)
+        self.assertNotIn("editor", pane)
+        self.assertEqual(errors, [])
+        self.assertTrue(p.discarded_editor(pane))
+
+    def test_missing_editor_directory_opens_fresh_without_blocking_other_panes(self):
+        pane = {"id": "missing-cwd", "command": "nvim", "editor": {"id": "editor"},
+                "cwd": {"kind": "external", "path": "/missing-editor-directory-fixture"}}
+        self.assertEqual(p.pane_working_directory(pane, None), Path.home())
+        self.assertNotIn("editor", pane)
+        self.assertTrue(p.discarded_editor(pane))
+        pane["command"] = "opencode"
+        with self.assertRaises(p.CheckpointError):
+            p.pane_working_directory(pane, None)
 
 
 class PersistenceTests(unittest.TestCase):
@@ -226,6 +275,139 @@ class PersistenceTests(unittest.TestCase):
     def captured(self, tm=None):
         return [value for _, _, value in p.capture_tmux(tm or self.dest, ctl.scan())]
 
+    def test_restore_sets_default_cwd_without_moving_saved_panes(self):
+        work = self.base / "external work #1"
+        work.mkdir()
+        ctl.set_working_directory(self.a["id"], str(work))
+        self.a = ctl.find_context(self.a["id"])
+        self.session("alpha", self.a)
+        self.save()
+        base, manifest, _ = self.saved()
+        errors, pending = [], []
+        mapping = p.restore_tmux(base, manifest, self.a, errors, self.dest,
+                                 acknowledgements=pending)
+        self.assertEqual(errors, [])
+        target = next(iter(mapping.values()))["target"]
+        self.assertEqual(self.dest.call("display-message", "-p", "-t", target,
+                                        "#{session_path}"), str(work))
+        self.assertEqual(self.dest.call("display-message", "-p", "-t", pending[0][2],
+                                        "#{pane_current_path}"), self.a["path"])
+        # An attached client's new-window (like prefix+c) inherits session cwd.
+        p.run([TMUX, "-S", self.dest.socket, "-C", "attach-session", "-E", "-t", target,
+               ";", "new-window", "-d", "-n", "cwd-probe", "/bin/sh", ";", "detach-client"],
+              env=dict(os.environ, TMUX=""))
+        self.assertEqual(self.dest.call("display-message", "-p", "-t", "alpha:cwd-probe",
+                                        "#{pane_current_path}"), str(work))
+        self.assertEqual(self.dest.call("show-environment", "-t", target, "CONTEXT_DIRECTORY"),
+                         "CONTEXT_DIRECTORY=" + self.a["path"])
+
+    def test_targeted_close_never_discovers_other_servers_or_inventories_other_sessions(self):
+        self.session("alpha", self.a)
+        self.session("beta", self.b)
+        self.save()
+        original = p.Tmux.call
+
+        def call(tm, *arguments):
+            self.assertNotIn("-a", arguments, "selected close inventoried whole server")
+            if arguments[0] in ("list-panes", "list-windows"):
+                self.assertNotIn("beta", arguments)
+            return original(tm, *arguments)
+
+        with patch.object(p, "sockets", side_effect=AssertionError("global server discovery")), \
+                patch.object(ctl, "scan", side_effect=AssertionError("all-context discovery")), \
+                patch.object(p.chat_library, "sync_all", side_effect=AssertionError("library sweep")), \
+                patch.object(p.Tmux, "call", call):
+            start = time.monotonic()
+            p.checkpoint("close", context_id=self.a["id"])
+            print(f"targeted shell close checkpoint: {(time.monotonic() - start) * 1000:.1f}ms")
+
+    def test_recovery_failure_preflight_precedes_expensive_adapter_work(self):
+        self.session("alpha", self.a)
+        pending = self.session("failed", self.a)
+        self.tm.call("set-option", "-p", "-t", pending, "@persistence-recovery-pending", "1")
+        with patch.object(p, "adapter_capture", side_effect=AssertionError("export before preflight")):
+            with self.assertRaisesRegex(p.CheckpointError, "managed destruction cancelled"):
+                p.checkpoint("close", context_id=self.a["id"], socket_path=self.tm.socket)
+        self.assertIn("unresolved recovery shell", str(self.notices.call_args))
+
+    def test_restore_shows_windows_before_readiness_and_retains_failed_session(self):
+        self.session("alpha", self.a)
+        self.save()
+        events = []
+
+        def visible(*_args):
+            events.append("visible")
+            return set()
+
+        def readiness(tm, target, *_args):
+            self.assertEqual(events, ["visible"])
+            self.assertEqual(tm.call("show-options", "-p", "-v", "-t", target,
+                                     "@persistence-recovery-pending"), "1")
+            raise p.CheckpointError("slow app failed")
+
+        with patch.object(p, "restore_windows", side_effect=visible), \
+                patch.object(p, "await_program", side_effect=readiness):
+            p.restore(self.a, runtime_id="isolated", tm=self.dest)
+        retained = ctl.read_json(p.local_root() / f"retained-{self.a['id']}.json")
+        self.assertEqual(len(retained["sessions"]), 1)
+        self.assertIn("slow app failed", str(self.notices.call_args))
+
+    def test_slow_import_does_not_hide_windows_or_delay_other_pane(self):
+        self.session("alpha", self.a)
+        self.session("second", self.a)
+        self.save()
+        sessions = self.saved()[2]
+        first = sessions[0]["windows"][0]["panes"][0]["id"]
+        visible, independent = threading.Event(), threading.Event()
+        original = p.pane_command
+
+        def prepare(pane, *args):
+            self.assertTrue(visible.is_set(), "application import preceded visible terminals")
+            if pane["id"] == first:
+                self.assertTrue(independent.wait(2), "slow import serialized independent panes")
+            else:
+                independent.set()
+            return original(pane, *args)
+
+        with patch.object(p, "restore_windows", side_effect=lambda *_: visible.set() or set()), \
+                patch.object(p, "pane_command", side_effect=prepare):
+            p.restore(self.a, runtime_id="isolated", tm=self.dest)
+        self.assertTrue(independent.is_set())
+        self.assertEqual(self.notices.call_args.args[0], [])
+
+    def test_slow_publication_does_not_block_or_invalidate_other_context_lifecycle(self):
+        self.session("alpha", self.a)
+        self.session("beta", self.b)
+        self.save()
+        entered, release = threading.Event(), threading.Event()
+        original = p.store.Store.publish
+        failures = []
+
+        def publish(storage, *args, **kwargs):
+            entered.set()
+            if not release.wait(4):
+                raise AssertionError("publication not released")
+            return original(storage, *args, **kwargs)
+
+        def checkpoint():
+            try:
+                p.checkpoint("close", context_id=self.a["id"])
+            except Exception as exc:
+                failures.append(exc)
+
+        with patch.object(p.store.Store, "publish", publish):
+            thread = threading.Thread(target=checkpoint)
+            thread.start()
+            try:
+                self.assertTrue(entered.wait(3))
+                start = time.monotonic()
+                p.set_lifecycle(self.b, "closed")
+                self.assertLess(time.monotonic() - start, .5)
+            finally:
+                release.set()
+                thread.join(5)
+        self.assertEqual(failures, [], "unrelated lifecycle change invalidated selected publication")
+
     def wait_command(self, tm, pane, command):
         deadline = time.monotonic() + 5
         while time.monotonic() < deadline:
@@ -275,6 +457,34 @@ class PersistenceTests(unittest.TestCase):
         self.session("default index", self.a)
         self.save()
         self.recover()
+
+    def test_automatic_window_naming_survives_restore(self):
+        pane = self.session("automatic names", self.a)
+        self.tm.call("set-option", "-w", "-t", pane, "automatic-rename", "on")
+        self.save()
+        self.assertTrue(self.saved()[2][0]["windows"][0]["automatic_rename"])
+        self.recover()
+        self.assertEqual(self.dest.call("show-options", "-w", "-v", "-t",
+                                        "automatic names:0", "automatic-rename"), "on")
+
+    def test_legacy_tmux_mode_label_recovers_automatic_naming(self):
+        pane = self.session("legacy names", self.a)
+        self.tm.call("rename-window", "-t", pane, "[tmux]")
+        self.save()
+        original = ctl.read_json
+
+        def legacy(path, *args, **kwargs):
+            value = original(path, *args, **kwargs)
+            if path.name == "tmux.json":
+                for session in value:
+                    for window in session["windows"]:
+                        window.pop("automatic_rename", None)
+            return value
+
+        with patch.object(ctl, "read_json", side_effect=legacy):
+            self.recover()
+        self.assertEqual(self.dest.call("show-options", "-w", "-v", "-t",
+                                        "legacy names:0", "automatic-rename"), "on")
 
     def test_native_inventory_batches_metadata_without_per_pane_processes(self):
         for index in range(8):
@@ -491,12 +701,10 @@ class PersistenceTests(unittest.TestCase):
             self.test_real_editor_ram_capture_chunk_isolation_and_exit_without_publication_deadlock()
         self.assertEqual(injected, ["", '{"version":'])
 
-    def test_persistent_editor_reply_failure_preserves_current_without_writes(self):
+    def test_persistent_editor_reply_failure_drops_editor_without_blocking_context(self):
         self.session("bad editor reply", self.a)
         self.save()
         before = self.saved()[1]
-        snapshot = stats(self.base)
-        audit = Changes(self.base)
         original_capture, original_run = p.capture_tmux, subprocess.run
         attempts = []
 
@@ -514,13 +722,14 @@ class PersistenceTests(unittest.TestCase):
             return original_run(args, **kwargs)
 
         with patch.object(p, "capture_tmux", side_effect=editor), patch.object(p, "editor_ready"), \
-                patch.object(p.subprocess, "run", side_effect=transport), self.assertRaises(p.CheckpointError):
+                patch.object(p.subprocess, "run", side_effect=transport):
             self.save(rapid=True)
         self.assertEqual(len(attempts), 3)
-        self.assertEqual(self.saved()[1], before)
-        self.assertIn("native reply omitted", str(self.notices.call_args_list))
-        self.assertEqual(audit.finish(), b"", "failed capture wrote temporary checkpoint state")
-        self.assertEqual(stats(self.base), snapshot)
+        self.assertNotEqual(self.saved()[1], before)
+        pane = self.saved()[2][0]["windows"][0]["panes"][0]
+        self.assertNotIn("editor", pane)
+        self.assertTrue(p.discarded_editor(pane))
+        self.notices.assert_not_called()
 
     @unittest.skipUnless(os.environ.get("PERSISTENCE_NATIVE_TESTS") == "1", "native editor fixture opt-in")
     def test_real_editor_ram_capture_chunk_isolation_and_exit_without_publication_deadlock(self):
@@ -545,18 +754,19 @@ class PersistenceTests(unittest.TestCase):
         def rpc(code):
             return p.run([nvim, "--server", endpoint, "--remote-expr", 'luaeval(' + json.dumps(code) + ')'])
 
-        rpc("(function() local lines={}; for i=1,512 do lines[i]=tostring(i)..string.rep('x',1024) end; "
-            "vim.api.nvim_buf_set_lines(0,0,-1,false,lines); return true end)()")
-        real_lock = p.lock
+        original_file = Path(self.a["path"]) / "original.txt"
+        original_file.write_text("disk original\n")
+        rpc("vim.cmd('edit original.txt') or true")
+        rpc("vim.api.nvim_buf_set_lines(0,0,-1,false,{'unsaved text'}) or true")
+        real_lock = p.context_lock
         with patch.object(p, "adapter_capture", wraps=p.adapter_capture) as capture:
-            def publication_lock():
+            def publication_lock(context):
                 self.assertTrue(capture.called, "application capture must precede publication lock")
-                return real_lock()
-            with patch.object(p, "lock", side_effect=publication_lock):
+                return real_lock(context)
+            with patch.object(p, "context_lock", side_effect=publication_lock):
                 self.save()
         _, first, _ = self.saved()
-        # A normal-mode key prefix blocks ordinary RPCs, but the fast mode API
-        # must detect it without consuming input or publishing a partial save.
+        # A blocked editor is disposable and never blocks the rest of a save.
         def input_keys(keys):
             import msgpack
 
@@ -577,33 +787,23 @@ class PersistenceTests(unittest.TestCase):
             time.sleep(.03)
         self.notices.reset_mock()
         self.save(rapid=True)
-        self.assertEqual(self.saved()[1], first)
+        self.assertNotEqual(self.saved()[1], first)
+        self.assertNotIn("editor", self.saved()[2][0]["windows"][0]["panes"][0])
         self.notices.assert_not_called()
-        with self.assertRaises(p.CheckpointError):
-            self.save("shutdown", rapid=True)
-        self.assertEqual(self.saved()[1], first)
+        self.save("shutdown", rapid=True)
         input_keys("<Esc>")
         rpc("true")
         self.notices.reset_mock()
-        before = stats(p.state_dir(self.a))
-        audit = Changes(p.state_dir(self.a))
-        self.save(rapid=True)
-        self.assertEqual(audit.finish(), b"")
-        self.assertEqual(stats(p.state_dir(self.a)), before)
-        rpc("vim.api.nvim_buf_set_lines(0,10,11,false,{'11'..string.rep('y',1024)}) or true")
         self.save(rapid=True)
         _, second, _ = self.saved()
-        old = {k: v for k, v in first["artifacts"].items() if "/objects/" in k}
-        new = {k: v for k, v in second["artifacts"].items() if "/objects/" in k}
-        self.assertEqual(len(set(new) - set(old)), 1)
-        for name in set(old) & set(new):
-            self.assertEqual(old[name], new[name])
+        self.assertTrue(any(name.endswith("/session.vim") for name in second["artifacts"]))
+        self.assertFalse(any("/objects/" in name for name in second["artifacts"]))
         # Exit's submitted standalone save does not call back into this editor or
         # wait for coordinator's publication lock.
-        with real_lock():
+        with real_lock(self.a):
             rpc("vim.schedule(function() vim.cmd('qa!') end) or true")
             self.wait_command(self.tm, pane, "sh")
-        self.assertTrue(list((Path(self.a["path"]) / ".context/state/nvim/current").glob("*/editor.json")))
+        self.assertTrue(list((Path(self.a["path"]) / ".context/state/nvim/sessions").glob("*.vim")))
         # Use only this isolated init for reconstructed editors too. RPC clients
         # bypass the shim's editor-start flags.
         binary_dir = self.base / "bin"
@@ -617,8 +817,8 @@ class PersistenceTests(unittest.TestCase):
             restored = self.dest.rows("list-panes", ["pane_id", "@persistence-editor-socket"], "-a")
             self.assertEqual(len(restored), 1)
             contents = p.run([nvim, "--server", restored[0]["@persistence-editor-socket"], "--remote-expr",
-                              'luaeval("vim.api.nvim_buf_get_lines(0,10,11,false)[1]")'])
-            self.assertEqual(contents, "11" + "y" * 1024)
+                              'luaeval("vim.api.nvim_buf_get_lines(0,0,1,false)[1]")'])
+            self.assertEqual(contents, "disk original")
             self.recover()
             self.assertEqual(len(self.dest.rows("list-panes", ["pane_id"], "-a")), 1)
         self.assertFalse(list((p.local_root() / "restore").rglob("editor.json")),
@@ -759,7 +959,7 @@ class PersistenceTests(unittest.TestCase):
         self.session("alpha", self.a)
         self.save()
         before = self.saved()[1]
-        for command in ("nvim", "opencode"):
+        for command in ("opencode",):
             with self.subTest(adapter=command):
                 original = p.capture_tmux
                 def capture(*args):
@@ -875,9 +1075,13 @@ class PersistenceTests(unittest.TestCase):
                                                "sha256": p.digest(base / "tmux.json")}
         del base.tree.files[relative]
         errors = []
-        mapping = p.restore_tmux(base, manifest, self.a, errors, self.dest)
+        original = p.pane_command
+        with patch.object(p, "pane_command", side_effect=lambda pane, *args:
+                          ["/bin/sh"] if pane["command"] == "nvim" else original(pane, *args)):
+            mapping = p.restore_tmux(base, manifest, self.a, errors, self.dest)
         self.assertEqual(set(mapping), {saved[0]["id"]}, errors)
-        self.assertTrue(any("missing/corrupt" in error for error in errors), errors)
+        self.assertEqual(errors, [])
+        self.assertTrue(p.discarded_editor(pane))
         panes = self.dest.rows("list-panes", ["pane_id", "@persistence-id", "pane_current_command"], "-a")
         expected = {q["id"] for w in saved[0]["windows"] for q in w["panes"]}
         self.assertEqual({q["@persistence-id"] for q in panes}, expected)
@@ -1218,9 +1422,10 @@ class PersistenceTests(unittest.TestCase):
             extra = self.tm.call("split-window", "-d", "-P", "-F", "#{pane_id}", "-t", first,
                                  "-c", self.a["path"], "/bin/sh")
             self.wait_command(self.tm, extra, "sh")
-        # Verify unrelated context genuinely cannot checkpoint, without publishing it.
-        with self.assertRaises(p.CheckpointError):
-            self.save(context=self.b)
+        # An unrelated editor has no adapter. Targeted close must not inspect it,
+        # even though editor failures themselves are now best-effort.
+        self.assertEqual(self.tm.call("show-options", "-p", "-qv", "-t", unrelated,
+                                      "@persistence-editor-socket"), "")
         self.assertIsNone(p.latest(self.b))
         source = str(Path(p.__file__).parent)
         # Invoke actual CLI/coordinator in another process. Restrict discovery to
