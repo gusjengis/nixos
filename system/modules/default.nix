@@ -15,6 +15,7 @@
   imports = [
     ./hardware/facter-policy.nix
     ./hardware/gpu_drivers.nix
+    ./hardware/gpu_unlock.nix
     ./hardware/grub.nix
     ./hardware/boot_splash.nix
     ./desktop_env/hyprland.nix

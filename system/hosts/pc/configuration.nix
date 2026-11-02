@@ -22,6 +22,7 @@
     requires = [ "iwd.service" ];
   };
   nvidia.enable = true;
+  gpu-unlock.enable = true;
   boot.initrd.kernelModules = [
     "nvidia"
     "nvidia_modeset"

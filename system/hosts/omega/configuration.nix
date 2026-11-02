@@ -15,6 +15,7 @@
   grub.enable = true;
   hyprland.enable = false;
   nvidia.enable = true;
+  gpu-unlock.enable = true;
   nvim.enable = true;
 
   # Private git forge for the fleet, plus the nightly job that feeds the
