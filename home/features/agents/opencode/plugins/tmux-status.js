@@ -23,6 +23,7 @@ export const TmuxStatusPlugin = async () => {
   let completed = false
   let errored = false
   let completionCheck = 0
+  let disposed = false
 
   // Rate-limit retries render in the error color instead of the agent mode color.
   function currentMode() {
@@ -38,7 +39,7 @@ export const TmuxStatusPlugin = async () => {
   function setIcon(icon) {
     requestedIcon = icon
 
-    if (writingIcon || retryTimer || (requestedIcon === appliedIcon && currentMode() === appliedMode)) {
+    if (disposed || writingIcon || retryTimer || (requestedIcon === appliedIcon && currentMode() === appliedMode)) {
       return
     }
 
@@ -51,7 +52,9 @@ export const TmuxStatusPlugin = async () => {
         "set-option", "-p", "-t", pane, "@opencode_icon", nextIcon,
         ";", "set-option", "-p", "-t", pane, "@opencode_mode", nextMode,
       ],
+      { timeout: 500, killSignal: "SIGKILL" },
       (error) => {
+        if (disposed) return
         if (error) {
           writingIcon = false
           retryTimer = setTimeout(() => {
@@ -97,8 +100,9 @@ export const TmuxStatusPlugin = async () => {
     execFile(
       "tmux",
       ["display-message", "-p", "-t", pane, "#{session_attached} #{window_active} #{pane_active}"],
+      { timeout: 500, killSignal: "SIGKILL" },
       (error, stdout) => {
-        if (error || check !== completionCheck) {
+        if (disposed || error || check !== completionCheck) {
           return
         }
 
@@ -174,6 +178,13 @@ export const TmuxStatusPlugin = async () => {
 
   return {
     event: async ({ event }) => {
+      if (event.type === "server.instance.disposed") {
+        disposed = true
+        stopSpinner()
+        clearTimeout(retryTimer)
+        return
+      }
+      if (disposed) return
       if (event.type === "session.status") {
         if (event.properties.status.type === "idle") {
           const wasWorking = sessionStates.has(event.properties.sessionID)

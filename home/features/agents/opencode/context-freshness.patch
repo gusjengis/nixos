@@ -1,0 +1,65 @@
+--- a/packages/opencode/src/session/prompt.ts
++++ b/packages/opencode/src/session/prompt.ts
+@@ -1,1 +1,3 @@
++// Shared device-local adapter; not an auto-discovered plugin entrypoint.
++import { assertFreshness } from "./context-state.mjs"
+ import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+@@ -141,6 +143,28 @@
+     const flags = yield* RuntimeFlags.Service
+     const database = yield* Database.Service
+     const { db } = database
++    const checkFreshness = Effect.fn("SessionPrompt.checkFreshness")(function* (sessionID: SessionID) {
++      if (!process.env.CONTEXT_ID || process.env.OPENCODE_CONTEXT_HELPER) return
++      const session = yield* sessions.get(sessionID).pipe(Effect.orDie)
++      let root = session
++      const seen = new Set<string>()
++      while (root.parentID) {
++        if (seen.has(root.id)) throw new Error("Invalid conversation ancestry")
++        seen.add(root.id)
++        root = yield* sessions.get(root.parentID).pipe(Effect.orDie)
++      }
++      const failure = yield* Effect.sync(() => {
++        try { assertFreshness(session, { rootID: root.id }) }
++        catch (error) {
++          return new NamedError.Unknown({ message: error instanceof Error ? error.message : String(error) })
++        }
++      })
++      if (failure) {
++        yield* events.publish(Session.Event.Error, { sessionID, error: failure.toObject() })
++        throw failure
++      }
++    })
++
+     const ops = Effect.fn("SessionPrompt.ops")(function* () {
+       return {
+         cancel: (sessionID: SessionID) => cancel(sessionID),
+@@ -1053,6 +1077,7 @@
+       "SessionPrompt.prompt",
+     )(function* (input: PromptInput) {
+       const session = yield* sessions.get(input.sessionID).pipe(Effect.orDie)
++      yield* checkFreshness(input.sessionID)
+       yield* revert.cleanup(session)
+       const message = yield* createUserMessage(input)
+       yield* sessions.touch(input.sessionID)
+@@ -1343,6 +1368,7 @@
+     const loop: (input: LoopInput) => Effect.Effect<SessionV1.WithParts> = Effect.fn("SessionPrompt.loop")(function* (
+       input: LoopInput,
+     ) {
++      yield* checkFreshness(input.sessionID)
+       return yield* state.ensureRunning(input.sessionID, lastAssistant(input.sessionID), runLoop(input.sessionID))
+     })
+ 
+@@ -1349,6 +1375,7 @@
+     const shell: (input: ShellInput) => Effect.Effect<SessionV1.WithParts, Session.BusyError> = Effect.fn(
+       "SessionPrompt.shell",
+     )(function* (input: ShellInput) {
++      yield* checkFreshness(input.sessionID)
+       const ready = yield* Latch.make()
+       return yield* state.startShell(input.sessionID, lastAssistant(input.sessionID), shellImpl(input, ready), ready)
+     })
+@@ -1356,4 +1383,5 @@
+     const command = Effect.fn("SessionPrompt.command")(function* (input: CommandInput) {
++      yield* checkFreshness(input.sessionID)
+       yield* Effect.logInfo("command", {
+         "session.id": input.sessionID,
+         command: input.command,

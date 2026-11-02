@@ -1,0 +1,130 @@
+--- a/packages/tui/src/app.tsx
++++ b/packages/tui/src/app.tsx
+@@ -1,1 +1,2 @@
++import { DesktopStaleOverlay, installDesktopStaleKeys } from "./context/desktop-stale"
+ import { render, TimeToFirstDraw, useRenderer, useTerminalDimensions } from "@opentui/solid"
+@@ -359,6 +360,7 @@
+   const local = useLocal()
+   const kv = useKV()
+   const keymap = useOpencodeKeymap()
++  installDesktopStaleKeys(keymap)
+   const event = useEvent()
+   const sdk = useSDK()
+   const toast = useToast()
+@@ -1080,6 +1082,7 @@
+       <Show when={!startup.skipInitialLoading}>
+         <StartupLoading ready={ready} />
+       </Show>
++      <DesktopStaleOverlay />
+     </box>
+   )
+ }
+--- a/packages/tui/src/context/route.tsx
++++ b/packages/tui/src/context/route.tsx
+@@ -1,1 +1,2 @@
++import { desktopStale } from "./desktop-stale"
+ import { createStore, reconcile } from "solid-js/store"
+@@ -36,6 +37,7 @@
+       },
+       navigate(route: Route) {
++        if (!desktopStale.allowRoute(route)) return
+         setStore(reconcile(route))
+       },
+     }
+   },
+--- a/packages/tui/src/ui/dialog.tsx
++++ b/packages/tui/src/ui/dialog.tsx
+@@ -1,1 +1,2 @@
++import { desktopStale } from "../context/desktop-stale"
+ import { useRenderer, useTerminalDimensions } from "@opentui/solid"
+@@ -214,5 +215,5 @@
+       >
+-        <Show when={value.stack.length}>
++        <Show when={!desktopStale.blocked() && value.stack.length}>
+           <Dialog onClose={() => value.clear()} size={value.size}>
+             {value.stack.at(-1)!.element}
+           </Dialog>
+--- a/packages/tui/src/component/prompt/index.tsx
++++ b/packages/tui/src/component/prompt/index.tsx
+@@ -1,1 +1,2 @@
++import { desktopStale } from "../../context/desktop-stale"
+ import {
+@@ -237,4 +238,5 @@
+   event.on("tui.prompt.append", (evt, { workspace }) => {
++    if (desktopStale.blocked()) return
+     if (workspace !== project.workspace.current()) return
+     if (!input || input.isDestroyed) return
+     input.insertText(evt.properties.text)
+@@ -631,11 +633,24 @@
+     setInputTarget(undefined)
+     props.ref?.(undefined)
+   })
+ 
++  onMount(() => {
++    const unbind = desktopStale.bindPrompt({
++      id: () => props.sessionID,
++      capture: () => ({ prompt: unwrap(store.prompt), mode: store.mode, cursor: input.cursorOffset }),
++      restore: (draft) => {
++        ref.set(draft.prompt)
++        setStore("mode", draft.mode === "shell" ? "shell" : "normal")
++        input.cursorOffset = draft.cursor ?? 0
++      }, blur: () => input.blur(),
++    })
++    onCleanup(unbind)
++  })
++
+   createEffect(() => {
+     if (!input || input.isDestroyed) return
+-    if (props.visible === false || dialog.stack.length > 0) {
++    if (props.visible === false || dialog.stack.length > 0 || desktopStale.blocked()) {
+       if (input.focused) input.blur()
+       return
+     }
+ 
+@@ -955,6 +970,7 @@
+       syncExtmarksWithPromptParts()
+     }
+     if (props.disabled) return false
++    if (!(await desktopStale.beforeSubmit())) return false
+     if (workspace.creating() || move.creating()) return false
+     if (auto()?.visible) return false
+     if (!store.prompt.input) return false
+@@ -1059,12 +1075,13 @@
+     if (store.mode === "shell") {
++      const rejected = desktopStale.submission(sessionID)
+       move.startSubmit()
+       void sdk.client.session.shell({
+         sessionID,
+         agent: agent.name,
+         model: {
+           providerID: selectedModel.providerID,
+           modelID: selectedModel.modelID,
+         },
+         command: inputText,
+-      })
++      }, { throwOnError: true }).catch(rejected)
+       setStore("mode", "normal")
+@@ -1074,4 +1091,5 @@
+     ) {
+       move.startSubmit()
++      const rejected = desktopStale.submission(sessionID)
+       // Parse command from first line, preserve multi-line content in arguments
+       const firstLineEnd = inputText.indexOf("\n")
+@@ -1090,7 +1108,8 @@
+         parts: nonTextParts.filter((x) => x.type === "file"),
+-      })
++      }, { throwOnError: true }).catch(rejected)
+     } else {
+       move.startSubmit()
++      const rejected = desktopStale.submission(sessionID)
+       sdk.client.session
+         .prompt(
+           {
+@@ -1111,6 +1130,7 @@
+           { throwOnError: true },
+         )
+         .catch((error) => {
++          rejected(error)
+           toast.show({
+             title: "Failed to send prompt",
+             message: errorMessage(error),

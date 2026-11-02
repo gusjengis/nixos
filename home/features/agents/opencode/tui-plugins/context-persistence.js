@@ -13,7 +13,9 @@ export default {
     // Resolve channel/custom database location once at TUI startup. Periodic
     // capture can then fingerprint SQLite read-only without starting native CLI.
     const database = process.env.OPENCODE_DB ?? await new Promise((resolve) => {
-      execFile("opencode", ["db", "path"], { timeout: 10000 }, (error, stdout) => {
+      execFile("opencode", ["db", "path"], {
+        timeout: 10000, killSignal: "SIGKILL", env: { ...process.env, OPENCODE_CONTEXT_HELPER: "1" },
+      }, (error, stdout) => {
         resolve(error ? null : stdout.trim())
       })
     })
@@ -55,14 +57,14 @@ export default {
       writing = true
       // pane_pid lets readers verify that pid is still a descendant of this
       // pane's process, rather than trusting options left by a dead TUI.
-      execFile("tmux", ["-S", tmux, "display-message", "-p", "-t", pane, "#{pane_pid}"], (error, pid) => {
+      execFile("tmux", ["-S", tmux, "display-message", "-p", "-t", pane, "#{pane_pid}"], { timeout: 500, killSignal: "SIGKILL" }, (error, pid) => {
         if (error || disposed) { writing = false; return }
         panePID = Number(pid.trim())
         const metadata = JSON.stringify(selection())
         execFile("tmux", ["-S", tmux,
           "set-option", "-p", "-t", pane, "@persistence-chat", metadata,
           ";", "set-option", "-p", "-t", pane, "@persistence-chat-socket", socket,
-        ], (error) => { writing = false; if (!error) applied = value })
+        ], { timeout: 500, killSignal: "SIGKILL" }, (error) => { writing = false; if (!error) applied = value })
       })
     }
     // PID-specific path: never unlink an existing live endpoint.

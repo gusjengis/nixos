@@ -1,0 +1,11 @@
+--- a/session-notify.js
++++ b/session-notify.js
+@@ -163,7 +163,7 @@
+ 
+ function execFileText(file, args, options) {
+   return new Promise((resolve, reject) => {
+-    execFile(file, args, options, (error, stdout) => {
++    execFile(file, args, { timeout: 500, killSignal: "SIGKILL", ...options }, (error, stdout) => {
+       if (error) {
+         reject(error)
+         return

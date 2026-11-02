@@ -10,6 +10,8 @@
 let
   configRoot = "${repoRoot}/home/features/agents/opencode";
   contextPackages = import ./package.nix { inherit pkgs inputs repoRoot; };
+  claudeAuth = import ./claude-auth.nix { inherit pkgs; };
+  boundedNotify = import ./peripheral-plugins.nix { inherit pkgs; };
   sessionPolicy = import ../../../../system/modules/session-policy/materialize.nix { inherit pkgs; };
   hyprlandPackages = inputs.hyprland.packages.${pkgs.stdenv.hostPlatform.system};
   sessionNotify = pkgs.writeShellApplication {
@@ -64,7 +66,8 @@ in
 
     programs.bash.shellAliases.oc = "opencode";
 
-    systemd.user.services.opencode-session-capture = lib.mkIf (hostName != "omega") {
+    # Archived main vault: retain the collector for manual use, no scheduled writes.
+    systemd.user.services.opencode-session-capture = lib.mkIf false {
       Unit = {
         Description = "Pool sanitized OpenCode transcripts into Obsidian";
         ConditionPathIsDirectory = "${config.home.homeDirectory}/Documents/Obsidian/Notes";
@@ -75,7 +78,7 @@ in
         UMask = "0077";
       };
     };
-    systemd.user.timers.opencode-session-capture = lib.mkIf (hostName != "omega") {
+    systemd.user.timers.opencode-session-capture = lib.mkIf false {
       Unit.Description = "Capture OpenCode sessions periodically";
       Timer = {
         OnBootSec = "5min";
@@ -88,14 +91,25 @@ in
     # the next OpenCode start, and so state OpenCode writes itself (recent models,
     # UI preferences) is versioned and synced to other machines.
     xdg.configFile = {
+      # Pinned executable plugin, patched reproducibly rather than in npm cache.
+      "opencode/claude-auth".source = claudeAuth;
       "opencode/opencode.json".source = config.lib.file.mkOutOfStoreSymlink "${configRoot}/opencode.json";
       "opencode/tui.json".source = config.lib.file.mkOutOfStoreSymlink "${configRoot}/tui.json";
-      "opencode/plugins/session-notify.js".source =
-        config.lib.file.mkOutOfStoreSymlink "${configRoot}/session-notify/session-notify.js";
+      # Reproducibly patched executable; upstream submodule stays untouched.
+      "opencode/plugins/session-notify.js".source = "${boundedNotify}/session-notify.js";
       "opencode/plugins/tmux-status.js".source =
         config.lib.file.mkOutOfStoreSymlink "${configRoot}/plugins/tmux-status.js";
       "opencode/plugins/context-notebook.js".source =
         config.lib.file.mkOutOfStoreSymlink "${configRoot}/notebook/plugin.js";
+      "opencode/plugins/context-library.js".source =
+        config.lib.file.mkOutOfStoreSymlink "${configRoot}/plugins/context-library.js";
+      # Helpers are modules, never standalone auto-discovered server plugins.
+      "opencode/context-state.mjs".source =
+        config.lib.file.mkOutOfStoreSymlink "${configRoot}/context-state.mjs";
+      "opencode/history-controller.mjs".source =
+        config.lib.file.mkOutOfStoreSymlink "${configRoot}/history-controller.mjs";
+      "opencode/history-client.mjs".source =
+        config.lib.file.mkOutOfStoreSymlink "${configRoot}/history-client.mjs";
       "opencode/skills/context-notebook".source =
         config.lib.file.mkOutOfStoreSymlink "${configRoot}/notebook";
       # This guard is intentionally immutable and rebuild-controlled.
@@ -106,16 +120,12 @@ in
         config.lib.file.mkOutOfStoreSymlink "${configRoot}/tui-plugins/context-persistence.js";
       "opencode/tui-plugins/context-library.tsx".source =
         config.lib.file.mkOutOfStoreSymlink "${configRoot}/tui-plugins/context-library.tsx";
-
-      # Auto model router. The server plugin rewrites the model of every prompt
-      # sent while the "Auto" entry is selected; the TUI plugin shows which model
-      # and effort it picked. Only the entrypoint is linked: module resolution
-      # follows the symlink to the repository, so the plugin's sibling modules and
-      # its auto-router.json are read from here.
-      "opencode/plugins/auto-router.js".source =
-        config.lib.file.mkOutOfStoreSymlink "${configRoot}/auto-router/auto-router.js";
-      "opencode/tui-plugins/auto-router-status.tsx".source =
-        config.lib.file.mkOutOfStoreSymlink "${configRoot}/tui-plugins/auto-router-status.tsx";
+      "opencode/tui-plugins/context-stale.tsx".source =
+        config.lib.file.mkOutOfStoreSymlink "${configRoot}/tui-plugins/context-stale.tsx";
+      "opencode/tui-plugins/context-stale-controller.mjs".source =
+        config.lib.file.mkOutOfStoreSymlink "${configRoot}/tui-plugins/context-stale-controller.mjs";
+      "opencode/tui-plugins/context-stale-drafts.mjs".source =
+        config.lib.file.mkOutOfStoreSymlink "${configRoot}/tui-plugins/context-stale-drafts.mjs";
 
       # Caveman skill suite (caveman, caveman-commit, caveman-review, ...).
       # OpenCode scans ~/.config/opencode/skills recursively for **/SKILL.md, so

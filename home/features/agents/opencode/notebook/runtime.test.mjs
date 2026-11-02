@@ -8,6 +8,7 @@ function fixture() {
   tool.schema = schema
   const calls = []
   const permissions = []
+  const results = {}
   let clock = 1000
   const sessions = {
     root: { metadata: { desktop_context: { id: "child-context" } } },
@@ -17,6 +18,7 @@ function fixture() {
   const client = { session: { get: async ({ path }) => ({ data: sessions[path.id] }) } }
   const run = async (id, action, request) => {
     calls.push({ id, action, request })
+    if (results[action]) return results[action]
     return { context_id: id, vault: "/contexts/child/.context/notes", notes: [] }
   }
   const hooks = createHooks({ client, tool, run, skill: "WORKFLOW", now: () => clock })
@@ -26,7 +28,7 @@ function fixture() {
     await hooks["experimental.chat.system.transform"]({ sessionID }, output)
     return output.system
   }
-  return { hooks, calls, permissions, context, sessions, system, advance: ms => { clock += ms } }
+  return { hooks, calls, permissions, results, context, sessions, system, advance: ms => { clock += ms } }
 }
 
 test("automatic bootstrap uses conversation owner, reads identity only, and skips internal prompts", async () => {
@@ -94,4 +96,33 @@ test("ownership failures never fall back to launching/visible context", async ()
   const output = { context: [] }
   await f.hooks["experimental.session.compacting"]({ sessionID: "unowned" }, output)
   assert.deepEqual(output.context, [])
+})
+
+test("active outcome closeout survives work-state-only updates and compaction until explicit Done", async () => {
+  const f = fixture()
+  f.results.read = { path: "Widget.md", status: "In-Progress", revision: "one" }
+  await f.hooks.tool.notebook_read.execute({ action: "read", path: "Widget.md" }, f.context)
+  assert.match((await f.system()).at(-1), /Notebook closeout.*Widget.md/)
+  f.results.update = { path: "Widget.md", status: "In-Progress", revision: "two" }
+  await f.hooks.tool.notebook_write.execute({ action: "update", path: "Widget.md", revision: "one", work_state: "Tests passed" }, f.context)
+  assert.match((await f.system()).at(-1), /work_state alone leaves status unchanged/)
+  const compact = { context: [] }
+  await f.hooks["experimental.session.compacting"]({ sessionID: "root" }, compact)
+  assert.match(compact.context.at(-1), /Widget.md/)
+  f.results.update = { path: "Widget.md", status: "Done", revision: "three" }
+  await f.hooks.tool.notebook_write.execute({ action: "update", path: "Widget.md", revision: "two", status: "Done" }, f.context)
+  assert.ok(!(await f.system()).some(text => text.startsWith("Notebook closeout:")))
+  // Reminders never automatically mutate cards.
+  assert.deepEqual(f.calls.filter(call => call.action === "update").map(call => call.request.status), [undefined, "Done"])
+})
+
+test("closeout reminders never leak across ownership changes or deleted conversations", async () => {
+  const f = fixture()
+  f.results.read = { path: "Private.md", status: "In-Progress" }
+  await f.hooks.tool.notebook_read.execute({ action: "read", path: "Private.md" }, f.context)
+  f.sessions.root.metadata.desktop_context.id = "other-context"
+  assert.ok(!(await f.system()).some(text => text.startsWith("Notebook closeout:")))
+  f.sessions.root.metadata.desktop_context.id = "child-context"
+  await f.hooks.event({ event: { type: "session.deleted", properties: { info: { id: "root" } } } })
+  assert.ok(!(await f.system()).some(text => text.startsWith("Notebook closeout:")))
 })

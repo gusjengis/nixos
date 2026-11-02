@@ -5,10 +5,20 @@
 }:
 let
   native = inputs.opencode.packages.${pkgs.stdenv.hostPlatform.system}.default.overrideAttrs (old: {
-    patches = (old.patches or [ ]) ++ [ ./context-sessions.patch ];
+    patches = (old.patches or [ ]) ++ [
+      ./context-sessions.patch
+      ./context-freshness.patch
+      ./context-stale.patch
+    ];
     postPatch = (old.postPatch or "") + ''
       cp ${./context-sessions.ts} packages/opencode/src/session/context-sessions.ts
       cp ${./context-view.ts} packages/tui/src/util/desktop-context.ts
+      cp ${./context-state.mjs} packages/opencode/src/session/context-state.mjs
+      cp ${./context-state.mjs} packages/tui/src/util/context-state.mjs
+      cp ${./history-controller.mjs} packages/tui/src/util/history-controller.mjs
+      cp ${./history-client.mjs} packages/tui/src/util/history-client.mjs
+      cp ${./desktop-history.tsx} packages/tui/src/component/desktop-history.tsx
+      cp ${./context-stale-host.tsx} packages/tui/src/context/desktop-stale.tsx
     '';
   });
   launcher = pkgs.writeShellApplication {
@@ -33,5 +43,5 @@ let
   };
 in
 {
-  inherit launcher chats;
+  inherit native launcher chats;
 }

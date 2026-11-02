@@ -56,6 +56,15 @@ manual typing, dictation, and Kanban dragging; the agent is another client.
   directly from Thoughts when the user's request makes commitment clear.
 - A finished subtask does not finish a larger outcome. Keep partial work open.
   Record a blocker or useful next action rather than claiming completion.
+- Close each requested outcome before the final response: reread its card,
+  compare the full outcome with actual verification, then use `notebook_write`
+  with explicit `status: "Done"` when satisfied. Updating `work_state` alone does
+  not change status. Chat todos and completion reports do not move notebook cards.
+- Completed child outcomes move to Done even when their parent has separate
+  deployment or acceptance work remaining. Keep those outstanding requirements
+  on the owning parent; do not leave verified child work In-Progress solely
+  because the broader project is unfinished. Requirements belonging to the
+  child's own outcome still block its completion.
 - Plan/read-only mode never writes notebook state. Delegated agents may read;
   primary agent owns maintenance, so delegation does not multiply cards.
 - Use `notebook_write` for creation and updates, not raw status/YAML edits. It
@@ -68,6 +77,9 @@ manual typing, dictation, and Kanban dragging; the agent is another client.
 - After meaningful progress, a developed idea, a decision, or interruption, keep
   the relevant note current. Do this before ending a substantive work response;
   no need to wait for a special handoff request or a clean application exit.
+- When coordinating delegated work, reconcile final handoffs with the matching
+  notebook cards. The primary agent owns this closeout; delegated agents' reports
+  alone do not update status. Partial outcomes retain concrete blockers.
 - Preserve the original body. The helper maintains a small Work state section.
   Include only useful decisions, present state, next action, and blockers. Omit
   irrelevant headings. No mandatory report, transcript, or activity journal.

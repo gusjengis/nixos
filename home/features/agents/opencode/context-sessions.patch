@@ -28,8 +28,12 @@
 +          if (!desktopVisible(event.properties.info)) break
 --- a/packages/tui/src/component/dialog-session-list.tsx
 +++ b/packages/tui/src/component/dialog-session-list.tsx
-@@ -0,0 +1,1 @@
+@@ -0,0 +1,2 @@
 +import { desktopLabel, desktopVisible } from "../util/desktop-context"
++import { DesktopHistory } from "./desktop-history"
+@@ -45,1 +47,2 @@
+ export function DialogSessionList() {
++  if (process.env.CONTEXT_ID) return <DesktopHistory />
 @@ -91,1 +92,2 @@
        .filter((session) => !deleted().has(session.id))
 +      .filter(desktopVisible)

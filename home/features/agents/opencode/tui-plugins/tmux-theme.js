@@ -47,6 +47,7 @@ export default {
           ";", "set-option", "-p", "-t", pane, "@opencode_success_color", success,
           ";", "set-option", "-p", "-t", pane, "@opencode_question_color", question,
         ],
+        { timeout: 500, killSignal: "SIGKILL" },
         (error) => {
           writing = false
           if (!error) applied = next

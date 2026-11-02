@@ -8,6 +8,28 @@ export function createHooks({ client, tool, run, skill, now = Date.now }) {
   const briefings = new Map()
   const oriented = new Map()
   const turns = new Map()
+  const activeCards = new Map()
+
+  function trackCard(sessionID, scope, card) {
+    if (!card.path || !card.status) return
+    let tracked = activeCards.get(sessionID)
+    if (!tracked || tracked.owner !== scope.id) {
+      tracked = { owner: scope.id, paths: new Set() }
+      activeCards.set(sessionID, tracked)
+    }
+    if (card.status === "In-Progress") tracked.paths.add(card.path)
+    else tracked.paths.delete(card.path)
+  }
+
+  function closeout(sessionID, scope) {
+    const tracked = activeCards.get(sessionID)
+    if (tracked?.owner !== scope.id || !tracked.paths.size) return ""
+    return "Notebook closeout: cards read or written as In-Progress in this conversation: "
+      + JSON.stringify([...tracked.paths])
+      + ". Before the final response, reconcile relevant requested outcomes with verification. "
+      + "Reread and explicitly write status Done for each fully completed outcome; work_state alone leaves status unchanged. "
+      + "Keep partial outcomes open with concrete blockers. Reading a card is not a commitment to complete it."
+  }
 
   async function owner(sessionID) {
     if (!sessionID) throw new Error("No conversation identity")
@@ -28,6 +50,7 @@ export function createHooks({ client, tool, run, skill, now = Date.now }) {
       always: [info.vault + "/**"], metadata: { context_id: scope.id, action: args.action } })
     const result = await run(scope.id, args.action, args)
     if (args.action === "brief") oriented.set(context.sessionID, scope.id)
+    if (args.action === "read") trackCard(context.sessionID, scope, result)
     return JSON.stringify(result)
   }
 
@@ -52,6 +75,7 @@ export function createHooks({ client, tool, run, skill, now = Date.now }) {
     await context.ask({ permission: "edit", patterns: [info.vault + "/**"],
       always: [info.vault + "/**"], metadata: { context_id: scope.id, action: args.action, path: args.path, title: args.title } })
     const result = await run(scope.id, args.action, args)
+    trackCard(context.sessionID, scope, result)
     return JSON.stringify(result)
   }
 
@@ -100,6 +124,8 @@ export function createHooks({ client, tool, run, skill, now = Date.now }) {
           ? "Initial orientation is already in this conversation. Retrieve current relevant notes as needed.\n"
           : "Before replying, call notebook_read with action brief, then read relevant note bodies.\n")
         + JSON.stringify(saved.snapshot))
+      const reminder = closeout(key, scope)
+      if (reminder) output.system.push(reminder)
     },
     "experimental.session.compacting": async (input, output) => {
       let scope
@@ -107,12 +133,15 @@ export function createHooks({ client, tool, run, skill, now = Date.now }) {
       if (!scope || scope.delegated) return
       output.context.push("Preserve the owning context, relevant notebook paths and unfinished outcome/next action. "
         + "Notebook snapshots and revisions may be stale; reread before editing. Do not invent completed work or new cards during compaction.")
+      const reminder = closeout(input.sessionID, scope)
+      if (reminder) output.context.push(reminder)
     },
     event: async ({ event }) => {
       if (event.type === "session.deleted") {
         briefings.delete(event.properties.info.id)
         oriented.delete(event.properties.info.id)
         turns.delete(event.properties.info.id)
+        activeCards.delete(event.properties.info.id)
       }
     },
     tool: {
@@ -129,7 +158,7 @@ export function createHooks({ client, tool, run, skill, now = Date.now }) {
         execute: read,
       }),
       notebook_write: tool({
-        description: "Create a recognizable conversation-derived card or update its phase/concise work state. Reuse existing notes; read first and supply revision for updates. Records history with Obsidian closed. Normal edit permission required; unavailable in plan/delegated agents.",
+        description: "Create a recognizable card or update its phase/work state. Before final response, explicitly set status Done for verified completed outcomes; work_state alone never changes status. Reuse notes; read first and supply revision. Records history with Obsidian closed. Normal edit permission required; unavailable in plan/delegated agents.",
         args: {
           action: tool.schema.enum(["create", "update"]),
           path: tool.schema.string().optional().describe("Existing vault-relative .md path for update"),

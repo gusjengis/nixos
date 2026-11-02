@@ -1,9 +1,9 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "plugin": [
-    "opencode-claude-auth@2.2.1"
+    "./claude-auth/opencode-claude-auth.js"
   ],
-  "model": "auto/auto",
+  "model": "openai/gpt-6.1-sol",
   "mcp": {
     "supernote": {
       "type": "local",
@@ -26,38 +26,6 @@
     },
     "title": {
       "model": "openai/gpt-6-luna-fast"
-    },
-    "quick": {
-      "description": "Lightweight, read-only lookup agent. Use for bounded mechanical lookups: finding files, searching for symbols, tracing call sites, or answering narrow factual questions about the codebase. It uses OpenAI subscription quota. It cannot edit or run commands; give it one narrow, verifiable question. Prefer direct reads when delegation would add more context than it saves.",
-      "mode": "subagent",
-      "color": "info",
-      "model": "openai/gpt-6-luna-fast",
-      "temperature": 0,
-      "steps": 12,
-      "permission": {
-        "read": "allow",
-        "glob": "allow",
-        "grep": "allow",
-        "list": "allow",
-        "lsp": "allow",
-        "external_directory": "allow",
-        "edit": "deny",
-        "bash": "deny",
-        "task": "deny",
-        "todowrite": "deny",
-        "webfetch": "deny",
-        "websearch": "deny",
-        "question": "deny",
-        "skill": "deny"
-      },
-      "prompt": "You are a lookup agent. Answer exactly the question you were given, using the repository, and stop.\n\n- Search and read only what the question needs.\n- Answer with concrete findings: file paths with line numbers, symbol names, the actual lines that matter.\n- Quote code rather than describing it when the caller will need the exact text.\n- If you cannot find something, say so plainly and list where you looked. Never guess.\n- No preamble, no plan, no summary of what you are about to do. Just the answer.\n"
-    },
-    "deep": {
-      "description": "Strongest available model. Only for sub-problems that genuinely need harder reasoning than the current model can give: non-obvious root-cause debugging, architecture trade-offs, tricky algorithms, concurrency, or security-sensitive logic. Expensive; never use it for reading, searching, or mechanical edits.",
-      "mode": "subagent",
-      "color": "error",
-      "model": "anthropic/claude-opus-5-5",
-      "prompt": "You were called because the calling model was routed to a cheaper tier and hit a sub-problem above its level. Solve exactly that sub-problem and nothing else.\n\nBe economical: the whole point of delegating to you is that you are only used where it counts.\n\n- Do the minimum investigation needed to be correct, then answer.\n- Do not restate the task, summarise the codebase, or explore beyond the sub-problem.\n- Return the decision, the reasoning that actually matters, and the concrete change or answer.\n- If the sub-problem turns out to be trivial, say so in one line and return.\n"
     }
   },
   "permission": {
@@ -103,38 +71,6 @@
           "limit": {
             "context": 1048576,
             "output": 262144
-          }
-        }
-      }
-    },
-    "auto": {
-      "npm": "@ai-sdk/openai-compatible",
-      "name": "Router",
-      "options": {
-        "baseURL": "http://127.0.0.1:1/v1"
-      },
-      "models": {
-        "auto": {
-          "name": "Auto",
-          "attachment": true,
-          "reasoning": true,
-          "tool_call": true,
-          "temperature": true,
-          "limit": {
-            "context": 400000,
-            "output": 128000
-          },
-          "cost": {
-            "input": 0,
-            "output": 0
-          },
-          "variants": {
-            "none": {},
-            "low": {},
-            "medium": {},
-            "high": {},
-            "xhigh": {},
-            "max": {}
           }
         }
       }
