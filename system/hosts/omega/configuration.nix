@@ -28,9 +28,8 @@
   # Normalized/ with the resident model below.
   notesPipeline.enable = true;
 
-  # Fleet inference host. The OpenCode auto-router on every other machine sends
-  # each prompt here to be graded before it picks a paid model, and the nightly
-  # wallpaper job asks it which part of the day each new image belongs to, and
+  # Fleet inference host. The nightly wallpaper job asks it which part of the
+  # day each new image belongs to, and
   # the Supernote OCR on alpha and the note normalizer (notes.nix) use it too,
   # so this has to be the box with the 24 GB card on it.
   #

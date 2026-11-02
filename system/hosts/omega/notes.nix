@@ -159,7 +159,7 @@ in
     ];
 
     # Headless omega has no user session to run the Home Manager collector.
-    systemd.services.opencode-session-capture = {
+    systemd.services.opencode-session-capture = lib.mkIf false {
       description = "Pool local OpenCode transcripts into Obsidian";
       unitConfig.ConditionPathIsDirectory = [
         vault
@@ -174,7 +174,7 @@ in
         NoNewPrivileges = true;
       };
     };
-    systemd.timers.opencode-session-capture = {
+    systemd.timers.opencode-session-capture = lib.mkIf false {
       wantedBy = [ "timers.target" ];
       timerConfig = {
         OnBootSec = "5min";

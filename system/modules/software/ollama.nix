@@ -2,10 +2,8 @@
 #
 # One machine in the fleet keeps a small model resident on its GPU so other
 # machines can ask it questions over the tailnet without touching a metered
-# API. The most demanding caller is the OpenCode auto-router's prompt
-# classifier (see home/features/agents/opencode/auto-router/), which runs on
-# every user turn and therefore has to be both free and fast; the note pipeline
-# on omega (system/hosts/omega/notes.nix) uses the same models and embedders.
+# API. Supernote OCR, wallpaper labeling and the note pipeline on omega
+# (system/hosts/omega/notes.nix) share the resident models and embedders.
 #
 # Exposure is deliberately tailnet-only: Ollama has no authentication of any
 # kind, so the port is opened on the `tailscale0` interface rather than

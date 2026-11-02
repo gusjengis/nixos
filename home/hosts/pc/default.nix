@@ -1,5 +1,5 @@
 # Main desktop.
-{ pkgs, inputs, ... }:
+{ pkgs, ... }:
 {
   laptop.enable = false;
 
@@ -9,7 +9,6 @@
   mediaEditing.enable = true;
 
   home.packages = [
-    inputs.alga.packages.${pkgs.stdenv.hostPlatform.system}.default
     pkgs.easyeffects
     pkgs.arduino
     pkgs.android-studio

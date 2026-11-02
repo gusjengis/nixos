@@ -130,7 +130,7 @@ Logs: `journalctl -u <unit>` on the host (`--user` for pc's user units).
 
 | Model | Where | Context | Used for |
 |---|---|---|---|
-| `qwen3.8:27b` | GPU | 48k | OCR (alpha calls it), normalization, extraction, OpenCode auto-router, wallpaper labels |
+| `qwen3.8:27b` | GPU | 48k | OCR (alpha calls it), normalization, extraction, wallpaper labels |
 | `jina-v5-retrieval` | GPU | 4k | Search (user and Qwen) |
 | `jina-v5-matching` | CPU | 4k | Dedup, link shortlists |
 

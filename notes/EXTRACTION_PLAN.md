@@ -160,8 +160,8 @@ Outstanding problems, roughly by importance:
 6. **Titles stay terse** for terse bullets ("hyprlog track desktop",
    "Test drives, record"), and many short bullets are flagged `unclear`.
 7. **Cost:** a full backfill holds Qwen for ~30 min (one call per 250 words,
-   up to 3 dedup checks and 1-2 link calls per thought); the OpenCode
-   auto-router queues behind it. Steady state is a few calls per new capture.
+   up to 3 dedup checks and 1-2 link calls per thought); other inference callers
+   queue behind it. Steady state is a few calls per new capture.
 8. **Hand-made entities are not used for aliases:** the pipeline never edits
    an existing entity except to add `mentioned-by`, so a new alias found in a
    note is not added to it.
@@ -252,7 +252,7 @@ Code: `system/hosts/omega/note-extract.py`, units in `notes.nix`.
   script) and is then the user's to edit.
 - Cost: ~10 s for a short note, ~3.5 min to segment the 830-word brain dump;
   linking is 1-2 calls per new thought. A full backfill of ~50 notes takes on
-  the order of an hour and queues other Qwen callers (the auto-router) while
+  the order of an hour and queues other Qwen callers while
   it runs.
 
 ## Decisions taken (2026-10-04)
