@@ -39,14 +39,13 @@
         ]
     ++ lib.optionals (pkgs.stdenv.hostPlatform.isx86_64 && config.desktopEnv.enable) [ zoom-us ];
 
-  programs.discord =
+  # Vesktop ships Vencord from Nixpkgs' own managed copy (withSystemVencord
+  # stays false), and its config lives in ~/.config/vesktop/settings.json.
+  programs.vesktop =
     lib.mkIf
       (pkgs.stdenv.hostPlatform.isx86_64 && config.desktopEnv.enable && config.personalDesktop.enable)
       {
         enable = true;
-        package = pkgs.discord-canary;
-        configName = "discordcanary";
-        settings.SKIP_HOST_UPDATE = true;
       };
 
   # KDE Connect needs one-time pairing after first installation.

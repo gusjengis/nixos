@@ -36,7 +36,7 @@ assert absent [
   "claude-code"
   "mailspring"
   "mailspring-after-tray"
-  "discord-canary"
+  "vesktop"
   "slack"
   "1password"
   "obsidian"
