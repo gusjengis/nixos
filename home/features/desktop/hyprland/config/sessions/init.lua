@@ -237,6 +237,8 @@ function M.state(id)
 			-- including when this session is not currently visible.
 			slots = item.slots,
 			visible_specials = item.visible_specials,
+			workspaces = item.workspaces,
+			specials = item.specials,
 		}
 	end
 	for _, output in ipairs(outputs()) do
@@ -533,14 +535,26 @@ function M.toggle_special(role, output_name)
 	end
 end
 
-function M.focus_window(window_address)
+function M.focus_window(window_address, opts)
 	local window = assert(hl.get_window(window_address), "Window no longer exists")
-	local pin = state.pins["address:" .. window.address]
-	local item = owner(pin and pin.workspace or address(window.workspace))
-	if item then
-		M.switch(item.id)
+	local function focus()
+		local pin = state.pins["address:" .. window.address]
+		local item = owner(pin and pin.workspace or address(window.workspace))
+		if item then
+			M.switch(item.id)
+		end
+		hl.dispatch(hl.dsp.focus({ window = window_address }))
 	end
-	hl.dispatch(hl.dsp.focus({ window = window_address }))
+	if not (opts and opts.preserve_cursor) then
+		return focus()
+	end
+	-- Suppress warps during both session switching and window activation.
+	-- Runs synchronously in one compositor call; restore even on failure.
+	local no_warps = hl.get_config("cursor.no_warps")
+	hl.config({ cursor = { no_warps = true } })
+	local ok, err = pcall(focus)
+	hl.config({ cursor = { no_warps = no_warps } })
+	assert(ok, err)
 end
 
 finish_closing = function()
@@ -878,11 +892,11 @@ function M.setup(config)
 			then
 				hl.dispatch(hl.dsp.focus({ window = "address:" .. window.address }))
 			end
-			if request or (item and item.closing) then
-				publish()
-			end
 		end
 		park_inactive_pins()
+		-- Ordinary launches need an ownership snapshot too, even when neither
+		-- the workspace nor pending scratchpad state changed.
+		publish()
 	end)
 	hl.on("window.pin", function(window)
 		if changing then

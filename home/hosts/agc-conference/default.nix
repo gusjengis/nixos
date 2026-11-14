@@ -24,6 +24,7 @@
   windowsVm.displayName = "Anthony Green";
   windowsVm.remotesFile = "/home/gusjengis/.config/secrets/logins/rdp-remotes.csv";
   windowsVm.fullscreen = true;
+  windowsVm.desktopScale = 200;
   windowsVm.og.enable = false;
 
   # Other

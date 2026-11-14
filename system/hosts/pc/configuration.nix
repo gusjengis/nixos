@@ -1,11 +1,21 @@
 {
   pkgs,
+  inputs,
   ...
 }:
 
+let
+  # Match Home Manager's app: the privileged browser helper must use its build.
+  desktopPkgs = import inputs.nixpkgs {
+    system = pkgs.stdenv.hostPlatform.system;
+    config.allowUnfree = true;
+  };
+in
 {
   imports = [
     ./windows-vm.nix
+    ./windows-reboot
+    ./secure-boot.nix
   ];
 
   # Vial keyboard only ever gets plugged into this machine.
@@ -34,6 +44,15 @@
   boot.kernelModules = [ "nvidia_uvm" ];
   virtual-machines.enable = true;
   programs.steam.enable = true;
+  programs._1password = {
+    enable = true;
+    package = desktopPkgs._1password-cli;
+  };
+  programs._1password-gui = {
+    enable = true;
+    package = desktopPkgs._1password-gui;
+    polkitPolicyOwners = [ "gusjengis" ];
+  };
   boot.loader.efi.efiSysMountPoint = "/boot/efi";
   system.stateVersion = "25.05";
 

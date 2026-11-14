@@ -1,0 +1,762 @@
+diff --git a/data/protocols/hyprglass-item-v1.xml b/data/protocols/hyprglass-item-v1.xml
+index 4aeed1ac..8ffa9c92 100644
+--- a/data/protocols/hyprglass-item-v1.xml
++++ b/data/protocols/hyprglass-item-v1.xml
+@@ -24,7 +24,7 @@
+     SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+   </copyright>
+ 
+-  <interface name="hyprglass_item_manager_v1" version="2">
++  <interface name="hyprglass_item_manager_v1" version="3">
+     <description summary="manager to associate glass item hints with surfaces">
+       This is a Hyprland-hyprglass-specific extension. It lets a client hint
+       how the hyprglass compositor plugin should render the Liquid Glass
+@@ -99,7 +99,7 @@
+     </enum>
+   </interface>
+ 
+-  <interface name="hyprglass_item_v1" version="2">
++  <interface name="hyprglass_item_v1" version="3">
+     <description summary="glass rendering hints for one surface">
+       Carries optional per-surface hints for the hyprglass Liquid Glass
+       effect: which preset to use, and what rounded-rect shape to clip the
+@@ -221,5 +221,29 @@
+         setting (a capsule by default).
+       </description>
+     </request>
++    <request name="set_region" since="3">
++      <description summary="set an additional independently materialed glass region">
++        Sets one of sixteen additional rounded rectangles on this surface.
++        Slots are 0 through 15; larger indices are ignored. This does not
++        alter the original preset/shape hint. Each region has its own named
++        material and circular radius, in surface-local logical coordinates.
++        The same commit latching and inert-object rules apply. Unknown presets
++        draw nothing. Non-positive extents remove the slot; negative radii
++        clamp to zero. Regions draw in slot order after the original shape.
++        Version 3 guarantees built-in apple-toolbar and apple-toolbar-inactive
++        materials in addition to apple-sidebar.
++      </description>
++      <arg name="slot" type="uint"/>
++      <arg name="preset" type="string"/>
++      <arg name="x" type="fixed"/>
++      <arg name="y" type="fixed"/>
++      <arg name="width" type="fixed"/>
++      <arg name="height" type="fixed"/>
++      <arg name="radius" type="fixed"/>
++    </request>
++    <request name="unset_region" since="3">
++      <description summary="clear an additional region on the next surface commit"/>
++      <arg name="slot" type="uint"/>
++    </request>
+   </interface>
+ </protocol>
+diff --git a/data/strata.gresource.xml b/data/strata.gresource.xml
+index 4b6077c3..4faff1eb 100644
+--- a/data/strata.gresource.xml
++++ b/data/strata.gresource.xml
+@@ -2,6 +2,13 @@
+ <gresources>
+   <gresource prefix="/io/github/lgse/Strata">
+     <file>brand/strata-logo-white.svg</file>
++    <file>icons/scalable/actions/strata-finder-chevron-backward-symbolic.svg</file>
++    <file>icons/scalable/actions/strata-finder-chevron-forward-symbolic.svg</file>
++    <file>icons/scalable/actions/strata-finder-ellipsis-symbolic.svg</file>
++    <file>icons/scalable/actions/strata-finder-magnifyingglass-symbolic.svg</file>
++    <file>icons/scalable/actions/strata-finder-square-grid-2x2-symbolic.svg</file>
++    <file>icons/scalable/actions/strata-finder-list-bullet-symbolic.svg</file>
++    <file>icons/scalable/actions/strata-finder-rectangle-split-3x1-symbolic.svg</file>
+     <file>traffic-lights/close-glyph.png</file>
+     <file>traffic-lights/close-glyph@2x.png</file>
+     <file>traffic-lights/close-inactive.png</file>
+diff --git a/src/assets.rs b/src/assets.rs
+index 48cd0cff..59ee4067 100644
+--- a/src/assets.rs
++++ b/src/assets.rs
+@@ -27,7 +27,6 @@ pub mod icons {
+     pub const CIRCLE_CHECK: &str = "strata-circle-check";
+     pub const CIRCLE_X: &str = "strata-circle-x";
+     pub const CHECK_ON_PRIMARY: &str = "strata-check-on-primary";
+-    pub const CHEVRON_LEFT: &str = "strata-chevron-left";
+     pub const CHEVRON_RIGHT: &str = "strata-chevron-right";
+     pub const CLOCK: &str = "strata-clock";
+     pub const CLIPBOARD_PASTE: &str = "strata-clipboard-paste";
+@@ -38,7 +37,17 @@ pub mod icons {
+     pub const CORNER_DOWN_LEFT: &str = "strata-corner-down-left";
+     pub const DISC: &str = "strata-disc";
+     pub const DOCUMENTS: &str = "strata-file-text";
+-    pub const ELLIPSIS: &str = "strata-ellipsis";
++    pub const FINDER_BACK: &str = "strata-finder-chevron-backward-symbolic";
++    pub const FINDER_FORWARD: &str = "strata-finder-chevron-forward-symbolic";
++    pub const FINDER_MORE: &str = "strata-finder-ellipsis-symbolic";
++    pub const FINDER_SEARCH: &str = "strata-finder-magnifyingglass-symbolic";
++    pub const FINDER_ICONS: &str = "strata-finder-square-grid-2x2-symbolic";
++    pub const FINDER_LIST: &str = "strata-finder-list-bullet-symbolic";
++    pub const FINDER_COLUMNS: &str = "strata-finder-rectangle-split-3x1-symbolic";
++
++    pub fn is_finder_toolbar_symbol(name: &str) -> bool {
++        name.starts_with("strata-finder-")
++    }
+     // Finder's sidebar SF Symbols, extracted from macOS. Symbolic, so CSS
+     // colors them per sidebar section and window focus.
+     pub const SIDEBAR_DESKTOP: &str = "strata-sf-menubar-dock-rectangle-symbolic";
+@@ -426,7 +435,14 @@ pub fn set_text_icon_color(color: &str) {
+ pub fn chrome_icon(name: &str) -> gtk::Image {
+     let image = gtk::Image::new();
+     image.add_css_class("chrome-icon");
+-    register_interface_icon(&image, CHROME_ICON_PX);
++    register_interface_icon(
++        &image,
++        if icons::is_finder_toolbar_symbol(name) {
++            20
++        } else {
++            CHROME_ICON_PX
++        },
++    );
+     set_primary_icon(&image, name);
+     // Fill stretches paintables when desktop themes allocate extra button space.
+     image.set_halign(gtk::Align::Center);
+@@ -455,7 +471,7 @@ pub fn use_bundled_spin_icons(root: &impl IsA<gtk::Widget>) {
+ }
+ 
+ pub fn set_primary_icon(image: &gtk::Image, name: &str) {
+-    if icons::is_sidebar_symbol(name) {
++    if icons::is_sidebar_symbol(name) || icons::is_finder_toolbar_symbol(name) {
+         // GTK recolors the symbolic SVG from the widget's CSS color, so the
+         // sidebar can tint it per section and dim it with the window.
+         remove_primary_icon(image);
+diff --git a/src/assets/tests.rs b/src/assets/tests.rs
+index 48bd0b6e..c027c5ed 100644
+--- a/src/assets/tests.rs
++++ b/src/assets/tests.rs
+@@ -166,7 +166,9 @@ fn cold_interface_icons_render_when_decoder_workers_cannot_start() {
+                 .iter()
+                 .map(|resource| resource.strip_suffix(".svg").expect("bundled SVG icon"))
+                 // Finder sidebar symbols are drawn by GTK from the icon name.
+-                .filter(|name| !icons::is_sidebar_symbol(name))
++                .filter(|name| {
++                    !icons::is_sidebar_symbol(name) && !icons::is_finder_toolbar_symbol(name)
++                })
+                 .chain([icons::STRATA_LOGO]);
+             for name in names {
+                 let image = super::primary_icon(name, 18);
+diff --git a/src/finder.css b/src/finder.css
+index d8732afd..56ad0648 100644
+--- a/src/finder.css
++++ b/src/finder.css
+@@ -136,7 +136,11 @@ headerbar.browser-header > windowhandle > box {
+ 
+ headerbar.browser-header .finder-toolbar {
+   padding: 0 8px 0 7px;
+-  border-spacing: 6px;
++  border-spacing: 8px;
++}
++
++window.compositor-toolbar .finder-toolbar {
++  background: transparent;
+ }
+ 
+ /* Fill spare toolbar width with the search field, as Finder does. */
+@@ -256,6 +260,15 @@ button.search-field {
+   border-spacing: 0;
+ }
+ 
++/* The Apple shader supplies face, refraction, rim and shadow. GTK only draws
++   the controls above it, including selection, hover and keyboard focus. */
++window.compositor-toolbar .toolbar-capsule,
++window.compositor-toolbar button.search-field {
++  background: transparent;
++  box-shadow: none;
++  border: none;
++}
++
+ .toolbar-capsule button.header-action,
+ .toolbar-capsule menubutton > button,
+ .toolbar-capsule togglebutton,
+@@ -292,17 +305,39 @@ headerbar.browser-header .toolbar-capsule button.header-action {
+ }
+ 
+ .history-capsule button.header-action {
+-  min-width: 34px;
++  min-width: 36px;
++  min-height: 36px;
++  margin: 0;
++}
++
++.history-capsule {
++  padding: 0;
++}
++
++.history-capsule separator.capsule-divider {
++  margin: 8px 0;
+ }
+ 
+ button.search-field {
+   min-width: 0;
+-  padding: 0 12px;
++  padding: 0 8px;
+   color: @finder_secondary;
+ }
+ 
+ button.search-field > box {
+-  border-spacing: 6px;
++  border-spacing: 4px;
++}
++
++button.search-field.compact {
++  padding: 0;
++}
++
++button.search-field.compact > box {
++  border-spacing: 0;
++}
++
++button.search-field.compact image {
++  margin: 0 8px;
+ }
+ 
+ .search-field-placeholder {
+@@ -310,6 +345,11 @@ button.search-field > box {
+   font-size: 13px;
+ }
+ 
++window.inactive button.search-field,
++window.inactive .search-field-placeholder {
++  color: alpha(white, 0.26);
++}
++
+ /* Title / path */
+ .location-control {
+   margin-left: 6px;
+diff --git a/src/ui/compositor_glass.rs b/src/ui/compositor_glass.rs
+index 6d8b1534..db92338f 100644
+--- a/src/ui/compositor_glass.rs
++++ b/src/ui/compositor_glass.rs
+@@ -1,13 +1,14 @@
+ // SPDX-License-Identifier: MIT
+ 
+-//! Compositor-drawn Liquid Glass behind the sidebar.
++//! Compositor-drawn Liquid Glass behind the sidebar and Finder toolbar pills.
+ //!
+ //! GTK cannot see what lies behind its window, so Finder's sidebar glass
+ //! (blurred backdrop, edge bleed from the wallpaper outside the window) is
+ //! drawn by the compositor. Under Hyprland with the hyprglass plugin, the
+ //! window asks for the `apple-sidebar` material over the sidebar column via
+ //! `hyprglass_item_v1` (version 2 or later) and leaves that column
+-//! transparent. Anywhere else the sidebar keeps its opaque Finder colour.
++//! transparent. Version 3 also supports independent toolbar regions and their
++//! inactive material. Older compositors retain the opaque toolbar fallback.
+ 
+ use std::cell::RefCell;
+ use std::rc::Rc;
+@@ -39,7 +40,9 @@ use protocol::hyprglass_item_v1::HyprglassItemV1;
+ const SIDEBAR_PRESET: &str = "apple-sidebar";
+ /// First manager version that draws materials under a toplevel's own surface.
+ const MAIN_SURFACE_VERSION: u32 = 2;
++const TOOLBAR_VERSION: u32 = 3;
+ const GLASS_CLASS: &str = "compositor-glass";
++const TOOLBAR_CLASS: &str = "compositor-toolbar";
+ 
+ #[derive(Default)]
+ struct Registry {
+@@ -63,7 +66,7 @@ impl Dispatch<wl_registry::WlRegistry, ()> for Registry {
+             && interface == HyprglassItemManagerV1::interface().name
+             && version >= MAIN_SURFACE_VERSION
+         {
+-            state.manager = Some(registry.bind(name, MAIN_SURFACE_VERSION, queue, ()));
++            state.manager = Some(registry.bind(name, version.min(TOOLBAR_VERSION), queue, ()));
+         }
+     }
+ }
+@@ -108,6 +111,7 @@ struct GlassItem {
+     _manager: HyprglassItemManagerV1,
+     _queue: EventQueue<Registry>,
+     _surface: WlSurface,
++    toolbar: bool,
+ }
+ 
+ impl GlassItem {
+@@ -129,6 +133,7 @@ impl GlassItem {
+         queue.roundtrip(&mut registry).ok()?;
+         let manager = registry.manager?;
+         let item = manager.get_item(&wl_surface, &handle, ());
++        let toolbar = manager.version() >= TOOLBAR_VERSION;
+         item.set_preset(preset.to_owned());
+         Some(Self {
+             connection,
+@@ -136,6 +141,7 @@ impl GlassItem {
+             _manager: manager,
+             _queue: queue,
+             _surface: wl_surface,
++            toolbar,
+         })
+     }
+ 
+@@ -148,6 +154,16 @@ impl GlassItem {
+         }
+         let _ = self.connection.flush();
+     }
++
++    fn set_region(&self, slot: u32, preset: &str, rect: Option<Rect>, radius: f64) {
++        if let Some(r) = rect {
++            self.item
++                .set_region(slot, preset.to_owned(), r.x, r.y, r.width, r.height, radius);
++        } else {
++            self.item.unset_region(slot);
++        }
++        let _ = self.connection.flush();
++    }
+ }
+ 
+ impl Drop for GlassItem {
+@@ -162,13 +178,18 @@ struct SidebarGlass {
+     css: gtk::CssProvider,
+     shape: Option<Rect>,
+     clear_width: i32,
++    clear_height: i32,
++    regions: Vec<Option<Rect>>,
++    active: Option<bool>,
+ }
+ 
+-/// Puts compositor glass behind the sidebar column, which `cap` spans while
+-/// it carries `over-sidebar`. No effect unless the compositor supports it.
+-pub(in crate::ui) fn follow_sidebar(cap: &gtk::Box) {
++/// Follows sidebar and toolbar geometry on one surface-local protocol object.
++/// The toolbar becomes transparent only when independent materials are supported.
++pub(in crate::ui) fn follow_chrome(cap: &gtk::Box, toolbar: &gtk::Box, regions: &[gtk::Widget]) {
+     let state: Rc<RefCell<Option<SidebarGlass>>> = Rc::default();
+     let weak_cap = cap.downgrade();
++    let weak_toolbar = toolbar.downgrade();
++    let regions: Vec<_> = regions.iter().map(|widget| widget.downgrade()).collect();
+     let realized = state.clone();
+     cap.connect_realize(move |cap| {
+         let Some(window) = cap.root().and_downcast::<gtk::Window>() else {
+@@ -188,21 +209,32 @@ pub(in crate::ui) fn follow_sidebar(cap: &gtk::Box) {
+             .style_context()
+             .add_provider(&css, crate::ui::theme::COMPOSITOR_GLASS_STYLE_PRIORITY);
+         window.add_css_class(GLASS_CLASS);
++        if item.toolbar {
++            window.add_css_class(TOOLBAR_CLASS);
++        }
+         realized.replace(Some(SidebarGlass {
+             item,
+             css,
+             shape: None,
+             clear_width: -1,
++            clear_height: -1,
++            regions: Vec::new(),
++            active: None,
+         }));
+         // Finder drops the glass while its window is inactive and the sidebar
+         // turns flat; GTK repaints on the focus change, which commits the shape.
+         {
+             let state = realized.clone();
+             let weak_cap = weak_cap.clone();
++            let weak_toolbar = weak_toolbar.clone();
++            let regions = regions.clone();
+             window.connect_is_active_notify(move |window| {
+-                if let (Some(cap), Some(glass)) = (weak_cap.upgrade(), state.borrow_mut().as_mut())
+-                {
+-                    update(glass, &cap, window);
++                if let (Some(cap), Some(toolbar), Some(glass)) = (
++                    weak_cap.upgrade(),
++                    weak_toolbar.upgrade(),
++                    state.borrow_mut().as_mut(),
++                ) {
++                    update(glass, &cap, &toolbar, &regions, window);
+                 }
+                 window.queue_draw();
+             });
+@@ -214,13 +246,19 @@ pub(in crate::ui) fn follow_sidebar(cap: &gtk::Box) {
+         // so the shape latches with the pixels it describes.
+         let state = realized.clone();
+         let weak_cap = weak_cap.clone();
++        let weak_toolbar = weak_toolbar.clone();
++        let regions = regions.clone();
+         let weak_window = window.downgrade();
+         clock.connect_layout(move |_| {
+-            let (Some(cap), Some(window)) = (weak_cap.upgrade(), weak_window.upgrade()) else {
++            let (Some(cap), Some(toolbar), Some(window)) = (
++                weak_cap.upgrade(),
++                weak_toolbar.upgrade(),
++                weak_window.upgrade(),
++            ) else {
+                 return;
+             };
+             if let Some(glass) = state.borrow_mut().as_mut() {
+-                update(glass, &cap, &window);
++                update(glass, &cap, &toolbar, &regions, &window);
+             }
+         });
+     });
+@@ -229,11 +267,18 @@ pub(in crate::ui) fn follow_sidebar(cap: &gtk::Box) {
+             && let Some(window) = cap.root().and_downcast::<gtk::Window>()
+         {
+             window.remove_css_class(GLASS_CLASS);
++            window.remove_css_class(TOOLBAR_CLASS);
+         }
+     });
+ }
+ 
+-fn update(glass: &mut SidebarGlass, cap: &gtk::Box, window: &gtk::Window) {
++fn update(
++    glass: &mut SidebarGlass,
++    cap: &gtk::Box,
++    toolbar: &gtk::Box,
++    regions: &[gtk::glib::WeakRef<gtk::Widget>],
++    window: &gtk::Window,
++) {
+     let active = window.is_active();
+     if active != window.has_css_class(GLASS_CLASS) {
+         tracing::debug!(active, "compositor glass follows window focus");
+@@ -248,9 +293,25 @@ fn update(glass: &mut SidebarGlass, cap: &gtk::Box, window: &gtk::Window) {
+         .flatten()
+         .filter(|bounds| bounds.width() > 0.0);
+     let clear_width = column.map_or(0, |b| (b.x() + b.width()).round() as i32);
+-    if clear_width != glass.clear_width {
++    let toolbar_bounds = glass
++        .item
++        .toolbar
++        .then(|| toolbar.compute_bounds(window))
++        .flatten();
++    let clear_height = toolbar_bounds.map_or(0, |b| (b.y() + b.height()).round() as i32);
++    if clear_width != glass.clear_width || clear_height != glass.clear_height {
+         glass.clear_width = clear_width;
+-        glass.css.load_from_string(&window_background(clear_width));
++        glass.clear_height = clear_height;
++        let css = if glass.item.toolbar {
++            format!(
++                "window.compositor-toolbar {{ background-color: transparent; background-image: \
++                linear-gradient(to bottom, transparent {clear_height}px, @finder_content {clear_height}px); \
++                background-size: calc(100% - {clear_width}px) 100%; background-position: right; background-repeat: no-repeat; }}"
++            )
++        } else {
++            window_background(clear_width)
++        };
++        glass.css.load_from_string(&css);
+     }
+     let (offset_x, offset_y) = window.surface_transform();
+     let shape = column.map(|b| Rect {
+@@ -264,6 +325,48 @@ fn update(glass: &mut SidebarGlass, cap: &gtk::Box, window: &gtk::Window) {
+         glass.shape = shape;
+         glass.item.set_shape(shape);
+     }
++    if glass.item.toolbar {
++        let rect = |b: gtk::graphene::Rect| Rect {
++            x: offset_x + f64::from(b.x()),
++            y: offset_y + f64::from(b.y()),
++            width: f64::from(b.width()),
++            height: f64::from(b.height()),
++        };
++        let mut shapes = vec![
++            toolbar_bounds
++                .filter(|b| b.width() > 0.0 && b.height() > 0.0)
++                .map(rect),
++        ];
++        shapes.extend(regions.iter().map(|widget| {
++            widget
++                .upgrade()
++                .filter(|widget| widget.is_mapped() && widget.is_visible())
++                .and_then(|widget| widget.compute_bounds(window))
++                .filter(|b| b.width() > 0.0 && b.height() > 0.0)
++                .map(rect)
++        }));
++        let focus_changed = glass.active != Some(active);
++        for (slot, shape) in shapes.iter().enumerate() {
++            if focus_changed || glass.regions.get(slot) != Some(shape) {
++                let preset = if slot == 0 {
++                    "apple-toolbar-base"
++                } else if active {
++                    "apple-toolbar"
++                } else {
++                    "apple-toolbar-inactive"
++                };
++                tracing::debug!(slot, preset, ?shape, "compositor chrome region");
++                glass.item.set_region(
++                    slot as u32,
++                    preset,
++                    *shape,
++                    if slot == 0 { 0.0 } else { 18.0 },
++                );
++            }
++        }
++        glass.regions = shapes;
++        glass.active = Some(active);
++    }
+ }
+ 
+ /// The window body stays opaque except the sidebar column, so the opaque
+diff --git a/src/ui/window.rs b/src/ui/window.rs
+index 91054f34..664cfb61 100644
+--- a/src/ui/window.rs
++++ b/src/ui/window.rs
+@@ -694,7 +694,7 @@ pub(super) fn build_appearance_menu(
+     append_menu_heading(&content, &crate::i18n::tr("VIEW"));
+     let current_mode = view.view_mode();
+     // A fixed "more" glyph: the view switches beside it already show the mode.
+-    let button_icon = crate::assets::chrome_icon(crate::assets::icons::ELLIPSIS);
++    let button_icon = crate::assets::chrome_icon(crate::assets::icons::FINDER_MORE);
+     let (columns, columns_check, _) = appearance_option(
+         crate::assets::icons::COLUMNS,
+         "Columns",
+diff --git a/src/ui/window/composition.rs b/src/ui/window/composition.rs
+index 254145f5..03352021 100644
+--- a/src/ui/window/composition.rs
++++ b/src/ui/window/composition.rs
+@@ -14,6 +14,7 @@ use super::{SidebarView, TypeToSearch, keyboard};
+ mod input;
+ mod layout;
+ mod search;
++mod search_slot;
+ mod settings;
+ mod tabs;
+ mod tenxer_splash;
+diff --git a/src/ui/window/composition/layout.rs b/src/ui/window/composition/layout.rs
+index 24773f24..12f17544 100644
+--- a/src/ui/window/composition/layout.rs
++++ b/src/ui/window/composition/layout.rs
+@@ -90,6 +90,7 @@ impl Header {
+         let location = browser.location_widget();
+         location.set_hexpand(true);
+         let search = search_field_button();
++        let search_slot = super::search_slot::SearchSlot::new(&search);
+         let search_keys = crate::ui::keys::Keys::One(crate::ui::keys::bindings::SEARCH.shown());
+         // The field shows its own label, so the shortcut is only described.
+         crate::ui::shortcut_reference::follow_label(&search, "Search (%{keys})", search_keys);
+@@ -195,7 +196,18 @@ impl Header {
+         toolbar.append(&location);
+         toolbar.append(&views);
+         toolbar.append(&actions);
+-        toolbar.append(&search);
++        toolbar.append(&search_slot);
++        crate::ui::compositor_glass::follow_chrome(
++            &sidebar_cap,
++            &toolbar,
++            &[
++                navigation.clone().upcast(),
++                views.clone().upcast(),
++                actions.clone().upcast(),
++                search.clone().upcast(),
++            ],
++        );
++        follow_search_width(&toolbar, &search_slot, &search);
+         content.append(&sidebar_cap);
+         content.append(&toolbar);
+ 
+@@ -274,9 +286,9 @@ pub(in crate::ui::window) fn history_capsule(view: &BrowserView) -> gtk::Box {
+     let browser = view.browser();
+     let mut buttons = Vec::new();
+     for (icon, tooltip, binding, forward) in [
+-        (icons::CHEVRON_LEFT, "Back (%{keys})", HISTORY_BACK, false),
++        (icons::FINDER_BACK, "Back (%{keys})", HISTORY_BACK, false),
+         (
+-            icons::CHEVRON_RIGHT,
++            icons::FINDER_FORWARD,
+             "Forward (%{keys})",
+             HISTORY_FORWARD,
+             true,
+@@ -337,9 +349,9 @@ fn view_switcher(view: &BrowserView, preferences: &Rc<PreferenceManager>) -> gtk
+     let mut group: Option<gtk::ToggleButton> = None;
+     let mut toggles = Vec::new();
+     for (index, (mode, icon, label)) in [
+-        (BrowserMode::Icons, icons::ICONS, "as Icons"),
+-        (BrowserMode::List, icons::LIST, "as List"),
+-        (BrowserMode::Columns, icons::COLUMNS, "as Columns"),
++        (BrowserMode::Icons, icons::FINDER_ICONS, "as Icons"),
++        (BrowserMode::List, icons::FINDER_LIST, "as List"),
++        (BrowserMode::Columns, icons::FINDER_COLUMNS, "as Columns"),
+     ]
+     .into_iter()
+     .enumerate()
+@@ -401,7 +413,7 @@ fn view_switcher(view: &BrowserView, preferences: &Rc<PreferenceManager>) -> gtk
+ 
+ fn search_field_button() -> gtk::Button {
+     let content = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+-    content.append(&assets::chrome_icon(icons::SEARCH));
++    content.append(&assets::chrome_icon(icons::FINDER_SEARCH));
+     let placeholder = gtk::Label::new(Some(&crate::i18n::tr("Search")));
+     placeholder.add_css_class("search-field-placeholder");
+     placeholder.set_xalign(0.0);
+@@ -419,6 +431,35 @@ fn search_field_button() -> gtk::Button {
+     button
+ }
+ 
++fn follow_search_width(
++    toolbar: &gtk::Box,
++    slot: &super::search_slot::SearchSlot,
++    search: &gtk::Button,
++) {
++    let weak_search = search.downgrade();
++    let weak_slot = slot.downgrade();
++    // Finder reserves the title before expanding search, then gives search
++    // three quarters of additional toolbar width, capped at 325 pt. Below
++    // 180 pt it collapses to a 36 pt magnifier rather than squeezing the text.
++    crate::ui::frame::after_layout(toolbar, move |toolbar| {
++        let (Some(slot), Some(search)) = (weak_slot.upgrade(), weak_search.upgrade()) else {
++            return;
++        };
++        let preferred = (f64::from(toolbar.width()) * 0.75 - 478.0).round() as i32;
++        let compact = preferred < 180;
++        let width = if compact { 36 } else { preferred.min(325) };
++        if let Some(label) = search.child().and_then(|content| content.last_child()) {
++            label.set_visible(!compact);
++        }
++        if compact {
++            search.add_css_class("compact");
++        } else {
++            search.remove_css_class("compact");
++        }
++        slot.set_preferred_width(width);
++    });
++}
++
+ /// Keeps a cap as wide as the sidebar, or as its own controls when it is hidden.
+ fn bind_sidebar_cap(cap: &gtk::Box, content: &gtk::Paned) {
+     let weak_cap = cap.downgrade();
+@@ -528,7 +569,6 @@ pub(super) fn browser_layout(
+     );
+     bind_sidebar_cap(&header.sidebar_cap, &content);
+     bind_sidebar_cap(&header.footer_cap, &content);
+-    crate::ui::compositor_glass::follow_sidebar(&header.sidebar_cap);
+ 
+     let preview_split = gtk::Paned::new(gtk::Orientation::Horizontal);
+     preview_split.add_css_class("preview-split");
+diff --git a/src/ui/window/composition/search_slot.rs b/src/ui/window/composition/search_slot.rs
+new file mode 100644
+index 00000000..44c71980
+--- /dev/null
++++ b/src/ui/window/composition/search_slot.rs
+@@ -0,0 +1,85 @@
++// SPDX-License-Identifier: MIT
++
++use gtk::{glib, prelude::*, subclass::prelude::*};
++
++mod imp {
++    use super::*;
++    use std::cell::Cell;
++
++    #[derive(Default)]
++    pub struct SearchSlot {
++        pub preferred: Cell<i32>,
++    }
++
++    #[glib::object_subclass]
++    impl ObjectSubclass for SearchSlot {
++        const NAME: &'static str = "StrataFinderSearchSlot";
++        type Type = super::SearchSlot;
++        type ParentType = gtk::Widget;
++    }
++
++    impl ObjectImpl for SearchSlot {
++        fn dispose(&self) {
++            if let Some(child) = self.obj().first_child() {
++                child.unparent();
++            }
++        }
++    }
++
++    impl WidgetImpl for SearchSlot {
++        fn measure(&self, orientation: gtk::Orientation, for_size: i32) -> (i32, i32, i32, i32) {
++            if orientation == gtk::Orientation::Horizontal {
++                // A preferred field width must never become the window's minimum.
++                let minimum = self
++                    .obj()
++                    .first_child()
++                    .map_or(36, |child| child.measure(orientation, for_size).0.max(36));
++                (minimum, self.preferred.get().max(minimum), -1, -1)
++            } else {
++                self.obj().first_child().map_or((36, 36, -1, -1), |child| {
++                    child.measure(orientation, for_size)
++                })
++            }
++        }
++
++        fn size_allocate(&self, width: i32, height: i32, baseline: i32) {
++            if let Some(child) = self.obj().first_child() {
++                child.allocate(width, height, baseline, None);
++            }
++        }
++
++        fn snapshot(&self, snapshot: &gtk::Snapshot) {
++            if let Some(child) = self.obj().first_child() {
++                self.obj().snapshot_child(&child, snapshot);
++            }
++        }
++    }
++}
++
++glib::wrapper! {
++    pub struct SearchSlot(ObjectSubclass<imp::SearchSlot>)
++        @extends gtk::Widget,
++        @implements gtk::Accessible, gtk::Buildable, gtk::ConstraintTarget;
++}
++
++impl SearchSlot {
++    pub(super) fn new(button: &gtk::Button) -> Self {
++        let slot: Self = glib::Object::new();
++        slot.set_valign(gtk::Align::Center);
++        button.set_parent(&slot);
++        slot.set_visible(button.get_visible());
++        let weak_slot = slot.downgrade();
++        button.connect_visible_notify(move |button| {
++            if let Some(slot) = weak_slot.upgrade() {
++                slot.set_visible(button.get_visible());
++            }
++        });
++        slot
++    }
++
++    pub(super) fn set_preferred_width(&self, width: i32) {
++        if self.imp().preferred.replace(width) != width {
++            self.queue_resize();
++        }
++    }
++}
+diff --git a/data/icons/scalable/actions/strata-finder-chevron-backward-symbolic.svg b/data/icons/scalable/actions/strata-finder-chevron-backward-symbolic.svg
+new file mode 100644
+index 00000000..bbeca794
+--- /dev/null
++++ b/data/icons/scalable/actions/strata-finder-chevron-backward-symbolic.svg
+@@ -0,0 +1 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20"><path fill="#000" transform="matrix(0.523849 0 0 0.522083 6.750000 4.249994)" d="M0.000000 11.013577C0.000000 11.331613 0.128094 11.611350 0.360733 11.854289L10.421987 21.688508C10.635477 21.915248 10.928464 22.027143 11.253849 22.027143C11.911970 22.027143 12.408147 21.533915 12.408147 20.872845C12.408147 20.547460 12.283003 20.267722 12.072463 20.043932L2.847472 11.013577L12.072463 1.983222C12.283003 1.759432 12.408147 1.466445 12.408147 1.154309C12.408147 0.493239 11.911970 0.000011 11.253849 0.000011C10.928464 0.000011 10.635477 0.111906 10.421987 0.338646L0.360733 10.172865C0.128094 10.415804 0.000000 10.695542 0.000000 11.013577Z"/></svg>
+diff --git a/data/icons/scalable/actions/strata-finder-chevron-forward-symbolic.svg b/data/icons/scalable/actions/strata-finder-chevron-forward-symbolic.svg
+new file mode 100644
+index 00000000..e045ac45
+--- /dev/null
++++ b/data/icons/scalable/actions/strata-finder-chevron-forward-symbolic.svg
+@@ -0,0 +1 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20"><path fill="#000" transform="matrix(0.523849 0 0 0.522083 6.750007 4.249994)" d="M12.408135 11.013577C12.408135 10.695542 12.293290 10.415804 12.047401 10.172865L1.989098 0.338646C1.775607 0.111906 1.492920 0.000011 1.167535 0.000011C0.509414 0.000011 -0.000013 0.493239 -0.000013 1.154309C-0.000013 1.466445 0.141331 1.759432 0.335672 1.983222L9.576862 11.013577L0.335672 20.043932C0.141331 20.267722 -0.000013 20.547460 -0.000013 20.872845C-0.000013 21.533915 0.509414 22.027143 1.167535 22.027143C1.492920 22.027143 1.775607 21.915248 1.989098 21.688508L12.047401 11.854289C12.293290 11.611350 12.408135 11.331613 12.408135 11.013577Z"/></svg>
+diff --git a/data/icons/scalable/actions/strata-finder-ellipsis-symbolic.svg b/data/icons/scalable/actions/strata-finder-ellipsis-symbolic.svg
+new file mode 100644
+index 00000000..820b7633
+--- /dev/null
++++ b/data/icons/scalable/actions/strata-finder-ellipsis-symbolic.svg
+@@ -0,0 +1 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20"><path fill="#000" transform="matrix(0.506836 0 0 0.519182 4.000000 8.749999)" d="M21.265720 4.815270C22.599856 4.815270 23.676304 3.741772 23.676304 2.407636C23.676304 1.073500 22.599856 0.000001 21.265720 0.000001C19.947783 0.000001 18.858085 1.073500 18.858085 2.407636C18.858085 3.741772 19.947783 4.815270 21.265720 4.815270ZM11.836677 4.815270C13.170813 4.815270 14.241362 3.741772 14.241362 2.407636C14.241362 1.073500 13.170813 0.000001 11.836677 0.000001C10.502541 0.000001 9.429043 1.073500 9.429043 2.407636C9.429043 3.741772 10.502541 4.815270 11.836677 4.815270ZM2.407634 4.815270C3.741770 4.815270 4.812319 3.741772 4.812319 2.407636C4.812319 1.073500 3.741770 0.000001 2.407634 0.000001C1.073498 0.000001 0.000000 1.073500 0.000000 2.407636C0.000000 3.741772 1.073498 4.815270 2.407634 4.815270Z"/></svg>
+diff --git a/data/icons/scalable/actions/strata-finder-list-bullet-symbolic.svg b/data/icons/scalable/actions/strata-finder-list-bullet-symbolic.svg
+new file mode 100644
+index 00000000..a4f97a47
+--- /dev/null
++++ b/data/icons/scalable/actions/strata-finder-list-bullet-symbolic.svg
+@@ -0,0 +1 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20"><path fill="#000" transform="matrix(0.508364 0 0 0.512232 3.500000 5.249994)" d="M7.203951 17.965936L24.537196 17.965936C25.105520 17.965936 25.572249 17.515406 25.572249 16.947082C25.572249 16.362559 25.105520 15.928228 24.537196 15.928228L7.203951 15.928228C6.632677 15.928228 6.182147 16.362559 6.182147 16.947082C6.182147 17.515406 6.632677 17.965936 7.203951 17.965936ZM1.599223 18.546305C2.476880 18.546305 3.198446 17.824740 3.198446 16.947082C3.198446 16.056175 2.476880 15.347859 1.599223 15.347859C0.721565 15.347859 0.000000 16.056175 0.000000 16.947082C0.000000 17.824740 0.721565 18.546305 1.599223 18.546305ZM7.203951 10.294962L24.537196 10.294962C25.105520 10.294962 25.572249 9.841483 25.572249 9.273158C25.572249 8.704834 25.105520 8.251355 24.537196 8.251355L7.203951 8.251355C6.632677 8.251355 6.182147 8.704834 6.182147 9.273158C6.182147 9.841483 6.632677 10.294962 7.203951 10.294962ZM1.599223 10.872381C2.476880 10.872381 3.198446 10.153766 3.198446 9.273158C3.198446 8.392551 2.476880 7.673936 1.599223 7.673936C0.721565 7.673936 0.000000 8.392551 0.000000 9.273158C0.000000 10.153766 0.721565 10.872381 1.599223 10.872381ZM7.203951 2.618088L24.537196 2.618088C25.105520 2.618088 25.572249 2.170509 25.572249 1.599234C25.572249 1.030910 25.105520 0.580381 24.537196 0.580381L7.203951 0.580381C6.632677 0.580381 6.182147 1.030910 6.182147 1.599234C6.182147 2.170509 6.632677 2.618088 7.203951 2.618088ZM1.599223 3.198457C2.476880 3.198457 3.198446 2.476892 3.198446 1.599234C3.198446 0.721577 2.476880 0.000012 1.599223 0.000012C0.721565 0.000012 0.000000 0.721577 0.000000 1.599234C0.000000 2.476892 0.721565 3.198457 1.599223 3.198457Z"/></svg>
+diff --git a/data/icons/scalable/actions/strata-finder-magnifyingglass-symbolic.svg b/data/icons/scalable/actions/strata-finder-magnifyingglass-symbolic.svg
+new file mode 100644
+index 00000000..f40217c3
+--- /dev/null
++++ b/data/icons/scalable/actions/strata-finder-magnifyingglass-symbolic.svg
+@@ -0,0 +1 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20"><path fill="#000" transform="matrix(0.504049 0 0 0.519185 3.750004 3.499991)" d="M-0.000008 10.131623C-0.000008 15.720200 4.543021 20.249980 10.128649 20.249980C12.330290 20.249980 14.353740 19.548965 16.013409 18.347225L22.271045 24.613710C22.559631 24.902297 22.939514 25.039240 23.332646 25.039240C24.208755 25.039240 24.799178 24.388421 24.799178 23.546209C24.799178 23.139828 24.654884 22.776145 24.386897 22.497858L18.169009 16.260821C19.478244 14.558454 20.263205 12.440759 20.263205 10.131623C20.263205 4.543045 15.720176 0.000017 10.128649 0.000017C4.543021 0.000017 -0.000008 4.543045 -0.000008 10.131623ZM2.173144 10.131623C2.173144 5.732691 5.729717 2.173169 10.128649 2.173169C14.517281 2.173169 18.090053 5.732691 18.090053 10.131623C18.090053 14.520255 14.517281 18.090077 10.128649 18.090077C5.729717 18.090077 2.173144 14.520255 2.173144 10.131623Z"/></svg>
+diff --git a/data/icons/scalable/actions/strata-finder-rectangle-split-3x1-symbolic.svg b/data/icons/scalable/actions/strata-finder-rectangle-split-3x1-symbolic.svg
+new file mode 100644
+index 00000000..4937c514
+--- /dev/null
++++ b/data/icons/scalable/actions/strata-finder-rectangle-split-3x1-symbolic.svg
+@@ -0,0 +1 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20"><path fill="#000" transform="matrix(0.501292 0 0 0.513335 2.500000 3.999991)" d="M9.289591 22.036784L11.330249 22.036784L11.330249 1.339807L9.289591 1.339807ZM18.592432 22.036784L20.636039 22.036784L20.636039 1.339807L18.592432 1.339807ZM3.983308 23.376574L25.939373 23.376574C28.600295 23.376574 29.922681 22.048288 29.922681 19.435964L29.922681 3.943577C29.922681 1.328303 28.600295 0.000017 25.939373 0.000017L3.983308 0.000017C1.335635 0.000017 0.000000 1.322403 0.000000 3.943577L0.000000 19.435964C0.000000 22.054188 1.335635 23.376574 3.983308 23.376574ZM4.015706 21.322666C2.746122 21.322666 2.040658 20.643701 2.040658 19.334368L2.040658 4.042223C2.040658 2.719640 2.746122 2.053924 4.015706 2.053924L25.906974 2.053924C27.164760 2.053924 27.882023 2.719640 27.882023 4.042223L27.882023 19.334368C27.882023 20.643701 27.164760 21.322666 25.906974 21.322666Z"/></svg>
+diff --git a/data/icons/scalable/actions/strata-finder-square-grid-2x2-symbolic.svg b/data/icons/scalable/actions/strata-finder-square-grid-2x2-symbolic.svg
+new file mode 100644
+index 00000000..4fe66bd0
+--- /dev/null
++++ b/data/icons/scalable/actions/strata-finder-square-grid-2x2-symbolic.svg
+@@ -0,0 +1 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20"><path fill="#000" transform="matrix(0.513626 0 0 0.513335 4.000000 3.999991)" d="M15.165011 23.376574L20.933672 23.376574C22.551946 23.376574 23.363307 22.569661 23.363307 20.893941L23.363307 15.218026C23.363307 13.542305 22.551946 12.732443 20.933672 12.732443L15.165011 12.732443C13.546737 12.732443 12.732426 13.542305 12.732426 15.218026L12.732426 20.893941C12.732426 22.569661 13.546737 23.376574 15.165011 23.376574ZM15.197409 21.577355C14.743733 21.577355 14.521345 21.352017 14.521345 20.901291L14.521345 15.223925C14.521345 14.757000 14.743733 14.534611 15.197409 14.534611L20.914523 14.534611C21.365249 14.534611 21.577338 14.757000 21.577338 15.223925L21.577338 20.901291C21.577338 21.352017 21.365249 21.577355 20.914523 21.577355ZM2.429635 23.376574L8.201246 23.376574C9.816570 23.376574 10.630881 22.569661 10.630881 20.893941L10.630881 15.218026C10.630881 13.542305 9.816570 12.732443 8.201246 12.732443L2.429635 12.732443C0.811361 12.732443 0.000000 13.542305 0.000000 15.218026L0.000000 20.893941C0.000000 22.569661 0.811361 23.376574 2.429635 23.376574ZM2.448784 21.577355C2.011307 21.577355 1.785969 21.352017 1.785969 20.901291L1.785969 15.223925C1.785969 14.757000 2.011307 14.534611 2.448784 14.534611L8.168847 14.534611C8.619574 14.534611 8.844912 14.757000 8.844912 15.223925L8.844912 20.901291C8.844912 21.352017 8.619574 21.577355 8.168847 21.577355ZM15.165011 10.630898L20.933672 10.630898C22.551946 10.630898 23.363307 9.834286 23.363307 8.158565L23.363307 2.482650C23.363307 0.806929 22.551946 0.000017 20.933672 0.000017L15.165011 0.000017C13.546737 0.000017 12.732426 0.806929 12.732426 2.482650L12.732426 8.158565C12.732426 9.834286 13.546737 10.630898 15.165011 10.630898ZM15.197409 8.844929C14.743733 8.844929 14.521345 8.619591 14.521345 8.152665L14.521345 2.475300C14.521345 2.024574 14.743733 1.799235 15.197409 1.799235L20.914523 1.799235C21.365249 1.799235 21.577338 2.024574 21.577338 2.475300L21.577338 8.152665C21.577338 8.619591 21.365249 8.844929 20.914523 8.844929ZM2.429635 10.630898L8.201246 10.630898C9.816570 10.630898 10.630881 9.834286 10.630881 8.158565L10.630881 2.482650C10.630881 0.806929 9.816570 0.000017 8.201246 0.000017L2.429635 0.000017C0.811361 0.000017 0.000000 0.806929 0.000000 2.482650L0.000000 8.158565C0.000000 9.834286 0.811361 10.630898 2.429635 10.630898ZM2.448784 8.844929C2.011307 8.844929 1.785969 8.619591 1.785969 8.152665L1.785969 2.475300C1.785969 2.024574 2.011307 1.799235 2.448784 1.799235L8.168847 1.799235C8.619574 1.799235 8.844912 2.024574 8.844912 2.475300L8.844912 8.152665C8.844912 8.619591 8.619574 8.844929 8.168847 8.844929Z"/></svg>

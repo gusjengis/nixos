@@ -1,0 +1,40 @@
+diff --git a/ui/views/BUILD.gn b/ui/views/BUILD.gn
+--- a/ui/views/BUILD.gn
++++ b/ui/views/BUILD.gn
+@@ -705,6 +705,8 @@ component("views") {
+     ]
+     sources += [
+       "controls/menu/menu_config_linux.cc",
++      "controls/menu/menu_runner_impl_quickshell.cc",
++      "controls/menu/menu_runner_impl_quickshell.h",
+       "window/frame_view_layout_linux.cc",
+       "window/frame_view_linux.cc",
+       "window/frame_view_utils_linux.cc",
+diff --git a/ui/views/controls/menu/menu_runner_impl.cc b/ui/views/controls/menu/menu_runner_impl.cc
+--- a/ui/views/controls/menu/menu_runner_impl.cc
++++ b/ui/views/controls/menu/menu_runner_impl.cc
+@@ -18,6 +18,10 @@
+ #include "ui/views/controls/menu/menu_runner_impl_adapter.h"
+ #include "ui/views/widget/widget.h"
+ 
++#if BUILDFLAG(IS_LINUX)
++#include "ui/views/controls/menu/menu_runner_impl_quickshell.h"
++#endif
++
+ #if BUILDFLAG(IS_WIN)
+ #include "ui/events/win/system_event_state_lookup.h"
+ #endif
+@@ -68,6 +72,13 @@ MenuRunnerImplInterface* MenuRunnerImplInterface::Create(
+     ui::MenuModel* menu_model,
+     int32_t run_types,
+     base::RepeatingClosure on_menu_closed_callback) {
++#if BUILDFLAG(IS_LINUX)
++  if ((run_types & MenuRunner::CONTEXT_MENU) &&
++      !(run_types & (MenuRunner::IS_NESTED | MenuRunner::FOR_DROP))) {
++    return new MenuRunnerImplQuickshell(menu_model,
++                                       std::move(on_menu_closed_callback));
++  }
++#endif
+   return new MenuRunnerImplAdapter(menu_model,
+                                    std::move(on_menu_closed_callback));
+ }

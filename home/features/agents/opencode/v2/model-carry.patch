@@ -1,0 +1,62 @@
+--- a/packages/tui/src/context/local.tsx
++++ b/packages/tui/src/context/local.tsx
+@@ -231,9 +231,9 @@
+         return { providerID: selection.providerID, modelID: selection.modelID }
+       })
+ 
+-      function locationAgentKey(agentID: string) {
++      function locationAgentKey(_agentID: string) {
+         const ref = location.ref ?? data.location.default()
+-        return `${JSON.stringify([ref.directory, ref.workspaceID])}:${agentID}`
++        return `${JSON.stringify([ref.directory, ref.workspaceID])}:shared`
+       }
+ 
+       function preferredSelection(model: ModelPreferenceModel): ModelSelection {
+@@ -266,10 +266,8 @@
+       function sessionSelection(sessionID: string) {
+         const current = agent.current()
+         if (!current) return
+-        const session = data.session.get(sessionID)
+         const selected =
+-          selectionState.selectionBySessionAgent[sessionID]?.[current.id] ??
+-          (!session?.agent || session.agent === current.id ? durableSelection(sessionID) : undefined)
++          selectionState.selectionBySessionAgent[sessionID]?.shared ?? durableSelection(sessionID)
+         if (selected) {
+           const info = models()?.find((item) => item.providerID === selected.providerID && item.id === selected.modelID)
+           return {
+@@ -282,10 +280,10 @@
+         return model && preferredSelection(model)
+       }
+ 
+-      function setSessionSelection(sessionID: string, agentID: string, selection: ModelSelection | undefined) {
++      function setSessionSelection(sessionID: string, _agentID: string, selection: ModelSelection | undefined) {
+         setSelectionState("selectionBySessionAgent", sessionID, {
+           ...selectionState.selectionBySessionAgent[sessionID],
+-          [agentID]: selection,
++          shared: selection,
+         })
+       }
+ 
+@@ -293,12 +291,10 @@
+         const current = agent.current()
+         if (!current) return
+         const durable = durableSelection(sessionID)
+-        const session = data.session.get(sessionID)
+         setSessionSelection(
+           sessionID,
+           current.id,
+-          (!session?.agent || session.agent === current.id) &&
+-            durable &&
++          durable &&
+             selectionKey(durable) === selectionKey(selection)
+             ? undefined
+             : selection,
+@@ -336,7 +332,7 @@
+           agent.current()?.id !== expected.agentID
+         )
+           return
+-        const draft = selectionState.selectionBySessionAgent[sessionID]?.[expected.agentID]
++        const draft = selectionState.selectionBySessionAgent[sessionID]?.shared
+         if (draft && selectionKey(draft) === expected.selection)
+           setSessionSelection(sessionID, expected.agentID, undefined)
+       }

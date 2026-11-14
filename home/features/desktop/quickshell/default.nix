@@ -172,6 +172,13 @@ let
       exec python3 "${configRoot}/../universal-search.py" "$@"
     '';
   };
+  dockIdentity = pkgs.writeShellApplication {
+    name = "quickshell-dock-identity";
+    runtimeInputs = [ pkgs.python3 ];
+    text = ''
+      exec python3 "${configRoot}/../dock-identity.py" "$@"
+    '';
+  };
   systemControls = pkgs.writeShellApplication {
     name = "quickshell-system-controls";
     runtimeInputs = [
@@ -250,6 +257,7 @@ in
       wallpaperPhases
       wallpaperLocate
       systemControls
+      dockIdentity
       hyprpickerPackage
       pkgs.mpv
       pkgs.waypipe

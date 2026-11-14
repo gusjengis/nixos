@@ -33,11 +33,59 @@ def state_root():
     return Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local/state"))) / "desktop-contexts"
 
 
+def compositor_live(runtime, value):
+    """The compositor writes its pid as the first hyprland.lock line; a dead
+    instance leaves the directory and even the socket file behind, so only the
+    pid tells whether this signature is still serving."""
+    try:
+        lock = (Path(runtime) / "hypr" / value / "hyprland.lock").read_text()
+        pid = int(lock.split("\n", 1)[0].strip())
+        comm = (Path("/proc") / str(pid) / "comm").read_text().strip().lower()
+    except (OSError, ValueError):
+        return False
+    return "hyprland" in comm
+
+
 def signature():
     value = os.environ.get("HYPRLAND_INSTANCE_SIGNATURE", "offline")
     if not value or "/" in value or value in (".", ".."):
         raise ContextError("Invalid compositor signature")
-    return value
+    runtime = os.environ.get("XDG_RUNTIME_DIR")
+    if not runtime or value == "offline" or compositor_live(runtime, value):
+        return value
+    # The user manager outlives compositors and keeps the environment of
+    # whichever instance imported last, so the inherited signature can point
+    # at an instance that already exited. Follow the live compositor instead,
+    # preferring the most recently touched one with a runtime snapshot.
+    live = []
+    try:
+        for entry in (Path(runtime) / "hypr").iterdir():
+            candidate = entry.name
+            if candidate == value or candidate in (".", "..") or "/" in candidate:
+                continue
+            try:
+                stamp = entry.stat().st_mtime_ns
+            except OSError:
+                continue
+            if not compositor_live(runtime, candidate):
+                continue
+            try:
+                snapshot = (Path(runtime) / f"hyprland-sessions-{candidate}.json").exists()
+            except OSError:
+                snapshot = False
+            live.append((snapshot, stamp, candidate))
+    except OSError:
+        return value
+    if not live:
+        return value
+    live.sort()
+    return live[-1][2]
+
+
+def hyprctl_environment():
+    environment = dict(os.environ)
+    environment["HYPRLAND_INSTANCE_SIGNATURE"] = signature()
+    return environment
 
 
 def runtime_path(prefix):
@@ -388,14 +436,16 @@ def lua_string(value):
 
 
 def evaluate(statement):
-    result = subprocess.run(["hyprctl", "eval", statement], capture_output=True, text=True, timeout=3)
+    result = subprocess.run(["hyprctl", "eval", statement], capture_output=True, text=True, timeout=3,
+                            env=hyprctl_environment())
     output = result.stdout.strip()
     if result.returncode or output != "ok" or result.stderr.strip():
         raise ContextError(f"hyprctl eval failed: {output} {result.stderr.strip()}")
 
 
 def clients():
-    result = subprocess.run(["hyprctl", "-j", "clients"], capture_output=True, text=True, timeout=3)
+    result = subprocess.run(["hyprctl", "-j", "clients"], capture_output=True, text=True, timeout=3,
+                            env=hyprctl_environment())
     if result.returncode:
         raise ContextError("Cannot inspect existing note windows")
     value = json.loads(result.stdout)
@@ -518,8 +568,7 @@ def prepare_open(identifier, item=None):
     local["mappings"][identifier] = runtime_id
     save_state(local)
     if snapshot().get("active") != runtime_id:
-        raise ContextError("Active runtime changed before opening notes; mapping saved")
-    evaluate("require('sessions').show_special('notes')")
+        raise ContextError("Active runtime changed before restoration; mapping saved")
     return item, runtime_id, True
 
 
@@ -757,10 +806,13 @@ def watch():
     previous_notebooks = None
     while True:
         try:
+            # Stamp with the resolved signature so following a live compositor
+            # after the inherited one died republishes immediately.
+            instance = signature()
             try:
-                stamp = runtime_path("hyprland-sessions").stat().st_mtime_ns
+                stamp = (instance, runtime_path("hyprland-sessions").stat().st_mtime_ns)
             except FileNotFoundError:
-                stamp = None
+                stamp = (instance, None)
             # Discovery is metadata-only and never holds the foreground lock.
             discovery_changed = index_stamp() != previous_index
             discovery_due = time.monotonic() >= next_scan
@@ -893,7 +945,9 @@ def main(argv=None):
                 item = launch_context(args.runtime, metadata_only=True,
                                       check_working_directory=not args.session_directory)
                 directory = item["path" if args.session_directory else "cwd"] if item else str(Path.home())
-                spawn(["strata", directory])
+                # The compositor/context launcher can retain an old generation
+                # in PATH after a rebuild. Resolve the current profile at launch.
+                spawn([str(Path.home() / ".nix-profile/bin/strata"), directory])
             print("ok")
             return 0
         if args.command == "open":

@@ -1,0 +1,40 @@
+diff --git a/packages/tui/src/context/local.tsx b/packages/tui/src/context/local.tsx
+index a05d315..d99e40b 100644
+--- a/packages/tui/src/context/local.tsx
++++ b/packages/tui/src/context/local.tsx
+@@ -237,7 +237,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
+         const a = agent.current()
+         return (
+           getFirstValidModel(
+-            () => a && modelStore.model[a.name],
++            () => modelStore.model["shared"],
+             () => a && a.model,
+             fallbackModel,
+           ) ?? undefined
+@@ -285,7 +285,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
+           if (!val) return
+           const a = agent.current()
+           if (!a) return
+-          setModelStore("model", a.name, { ...val })
++          setModelStore("model", "shared", { ...val })
+         },
+         cycleFavorite(direction: 1 | -1) {
+           const favorites = modelStore.favorite.filter((item) => isModelValid(item))
+@@ -313,7 +313,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
+           if (!next) return
+           const a = agent.current()
+           if (!a) return
+-          setModelStore("model", a.name, { ...next })
++          setModelStore("model", "shared", { ...next })
+           setModelStore("recent", recentModels(next, modelStore.recent))
+           save()
+         },
+@@ -329,7 +329,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
+             }
+             const a = agent.current()
+             if (!a) return
+-            setModelStore("model", a.name, model)
++            setModelStore("model", "shared", model)
+             if (options?.recent) {
+               setModelStore("recent", recentModels(model, modelStore.recent))
+               save()

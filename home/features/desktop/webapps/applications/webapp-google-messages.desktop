@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Google Messages
+Comment=Open Google Messages as a web app
+Exec=chromium --app=https://messages.google.com/web/conversations
+Icon=webapp-google-messages
+Terminal=false
+Categories=Network;InstantMessaging;
+Keywords=messages;google;sms;rcs;chat;chrome-messages.google.com__web_conversations-Default;
+StartupNotify=true
+StartupWMClass=chrome-messages.google.com__web_conversations-Default

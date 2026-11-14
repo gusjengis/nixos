@@ -1,0 +1,16 @@
+--- a/packages/util/src/global.ts
++++ b/packages/util/src/global.ts
+@@ -10,7 +10,12 @@
+ import { makeGlobalNode } from "./effect/app-node.js"
+ 
+ const app = "opencode"
+-const { data, cache, config, state, tmp } = roots(app)
++const defaults = roots(app)
++const data = process.env.OPENCODE_DATA_DIR ?? defaults.data
++const cache = process.env.OPENCODE_CACHE_DIR ?? defaults.cache
++const state = process.env.OPENCODE_STATE_DIR ?? defaults.state
++const config = defaults.config
++const tmp = defaults.tmp
+ 
+ const paths = {
+   get home() {

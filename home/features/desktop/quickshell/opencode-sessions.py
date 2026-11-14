@@ -1,4 +1,5 @@
 """Read only live tmux TUI selections; reuse status-plugin presentation state."""
+from contextlib import closing
 import json
 from pathlib import Path
 import sqlite3
@@ -9,7 +10,8 @@ import sys
 FIELDS = ["pane_id", "pane_pid", "pane_current_command", "session_id", "session_name",
           "pane_current_path", "@opencode_icon", "@opencode_mode", "@persistence-chat",
           "@opencode_build_color", "@opencode_plan_color", "@opencode_question_color",
-          "@opencode_success_color", "@opencode_error_color"]
+          "@opencode_success_color", "@opencode_error_color",
+          "@persistence-close-staging", "@persistence-close-staged"]
 
 
 def run(args):
@@ -35,15 +37,20 @@ def descendant(pid, ancestor):
 
 
 def title_for(selection):
+    """Return a title only for a selected chat with persisted messages."""
     if not selection.get("session_id") or not selection.get("database"):
-        return "New session"
+        return None
     try:
         uri = Path(selection["database"]).as_uri() + "?mode=ro"
-        with sqlite3.connect(uri, uri=True, timeout=0.1) as db:
-            row = db.execute("SELECT title FROM session WHERE id = ?", (selection["session_id"],)).fetchone()
-            return row[0] if row and row[0] else "Untitled session"
+        with closing(sqlite3.connect(uri, uri=True, timeout=0.1)) as db:
+            native = db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='session_v2'").fetchone()
+            sessions, messages = ("session_v2", "session_message") if native else ("session", "message")
+            row = db.execute(f"""SELECT title FROM {sessions} WHERE id = ?
+                AND EXISTS (SELECT 1 FROM {messages} WHERE session_id = {sessions}.id)""",
+                (selection["session_id"],)).fetchone()
+            return (row[0] or "Untitled session") if row else None
     except (sqlite3.Error, ValueError):
-        return "OpenCode session"
+        return None
 
 
 def collect(output):
@@ -53,6 +60,12 @@ def collect(output):
         if len(values) != len(FIELDS):
             continue
         pane = dict(zip(FIELDS, values))
+        # Closed tabs may stay alive privately while capture finishes or awaits
+        # recovery. They are no longer navigable sessions, even with a live TUI.
+        if (pane["session_name"].startswith("__context_closing_")
+                or pane["@persistence-close-staging"] == "1"
+                or pane["@persistence-close-staged"] == "1"):
+            continue
         try:
             selection = json.loads(pane["@persistence-chat"] or "{}")
         except (ValueError, TypeError):
@@ -60,12 +73,11 @@ def collect(output):
         live = (bool(selection.get("pid_start_ticks"))
                 and start_ticks(selection.get("pid")) == selection["pid_start_ticks"]
                 and descendant(selection.get("pid"), pane["pane_pid"]))
-        if not live and pane["pane_current_command"] != "opencode":
-            continue
         if not live:
-            # Older TUIs lack selection metadata. The freshly observed pane
-            # process still provides a valid identity for focus-only routing.
-            selection = {"pid": int(pane["pane_pid"]), "pid_start_ticks": start_ticks(pane["pane_pid"])}
+            continue
+        title = title_for(selection)
+        if title is None:
+            continue
         icon, mode = pane["@opencode_icon"], pane["@opencode_mode"]
         state = {"?": "input", "!": "done", "X": "error", "": "idle"}.get(icon, "working")
         color_key = {"input": "question", "done": "success", "error": "error"}.get(state,
@@ -77,7 +89,7 @@ def collect(output):
         sessions.append({"pane": pane["pane_id"], "tmux_session": pane["session_id"],
                          "tmux_name": pane["session_name"], "selection": selection,
                          "directory": selection.get("directory") or pane["pane_current_path"],
-                         "title": title_for(selection), "state": state, "mode": mode,
+                          "title": title, "state": state, "mode": mode,
                          # Animate in QML at the plugin's 80ms cadence without
                          # rebuilding rows for each sampled tmux spinner frame.
                          "icon": "⠋" if state == "working" else icon,

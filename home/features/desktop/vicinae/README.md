@@ -5,12 +5,14 @@ and theme remain linked from this directory.
 
 ## Launch workspace tracking
 
-Hyprland uses `misc.initial_workspace_tracking = 2`. The workspace-tracking
-patch synchronously dispatches each application activation through Hyprland,
-which assigns a fresh token on Enter/activation rather than when the launcher
-opens. Delayed windows and inherited child processes follow that workspace;
-moving the primary window updates its children's destination. Applications
-already running before tracking was enabled need restarting to inherit a token.
+Hyprland uses `misc.initial_workspace_tracking = 0`. New windows open on the
+currently active workspace. Persistent tracking incorrectly sent file viewers
+and games back to a long-lived Strata, Quickshell, or Steam launcher's original
+workspace. Existing inherited tokens are ignored; those applications need not
+be restarted. Delayed windows use the workspace active when they appear.
+
+The workspace-tracking patch still dispatches application activation through
+Hyprland, but initial-workspace tokens do not control placement with tracking off.
 
 Arguments and working directories are shell-quoted independently; Lua long-string
 delimiters are chosen to avoid collisions. Non-Hyprland desktops retain the
@@ -19,7 +21,12 @@ Entries without an explicit working directory start in the user's home directory
 Inheriting the launcher's directory can break sandboxed applications: Steam's
 FHS environment hides `/etc/nixos`, so Bubblewrap cannot chdir there.
 
-Live acceptance check (briefly switches workspaces and restarts Vicinae):
+Launches export `GIO_LAUNCHED_DESKTOP_FILE`, as GLib launchers do. The Dock
+reads it from a window's process to name and icon windows whose class matches
+no entry, such as Proton games started outside Steam (`steam_app_0`).
+
+Legacy persistent-tracking acceptance check (requires tracking mode 2; not the
+current placement policy; briefly switches workspaces and restarts Vicinae):
 
 ```sh
 python home/features/desktop/vicinae/test_workspace_tracking.py
@@ -62,6 +69,10 @@ Completion stays highlighted while navigating. With an empty query it previews
 the entire selected title and its icon; moving the caret into actual query text
 suppresses the preview. Subtitles are hidden in shared result delegates and
 the specialized clipboard/store lists. Root type labels remain selected-only.
+
+Commands with arguments use the same highlighted preview and trailing icon while
+browsing. Their argument fields open only on explicit activation/focus request,
+so selecting commands does not resize the query or show inline argument labels.
 
 Title ink stays opaque white across selection. Title origins are integer-aligned;
 the existing 4× mipmapped text layers remain in use. No selected-only font weight

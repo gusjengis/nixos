@@ -1,2 +1,4 @@
 module Theme
 singleton Theme 1.0 Theme.qml
+WallpaperTint 1.0 WallpaperTint.qml
+NeutralSurfaces 1.0 NeutralSurfaces.qml

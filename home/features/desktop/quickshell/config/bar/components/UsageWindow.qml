@@ -23,27 +23,27 @@ Item {
         return "Resets " + Qt.formatDateTime(date, "ddd d MMM, ") + time;
     }
 
-    implicitHeight: 34
+    implicitHeight: 39
 
     Text {
         anchors { left: parent.left; top: parent.top }
         text: root.title
-        color: Theme.text
-        font { family: Theme.fontFamily; pixelSize: Theme.fontSize - 1 }
+        color: "#ebebf0"
+        font { family: Theme.fontFamily; pixelSize: 12 }
     }
 
     Text {
         anchors { right: parent.right; top: parent.top }
         text: root.used === null ? "no data" : Math.round(root.used) + "% used"
-        color: root.used === null ? Theme.muted : Theme.text
-        font { family: Theme.fontFamily; pixelSize: Theme.fontSize - 1; bold: true }
+        color: root.used === null ? "#aeaeb2" : "#f5f5f7"
+        font { family: Theme.fontFamily; pixelSize: 12; weight: Font.DemiBold }
     }
 
     Rectangle {
         anchors { left: parent.left; right: parent.right; top: parent.top; topMargin: 18 }
-        height: 5
+        height: 4
         radius: 3
-        color: Theme.border
+        color: "#56565a"
 
         Rectangle {
             width: root.used === null ? 0 : parent.width * root.used / 100
@@ -54,9 +54,9 @@ Item {
     }
 
     Text {
-        anchors { left: parent.left; top: parent.top; topMargin: 25 }
+        anchors { left: parent.left; top: parent.top; topMargin: 27 }
         text: root.resetText(root.usage.reset)
-        color: Theme.muted
+        color: "#aeaeb2"
         font { family: Theme.fontFamily; pixelSize: 10 }
     }
 }

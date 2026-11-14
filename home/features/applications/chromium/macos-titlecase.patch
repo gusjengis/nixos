@@ -1,0 +1,15 @@
+diff --git a/tools/grit/grit_args.gni b/tools/grit/grit_args.gni
+--- a/tools/grit/grit_args.gni
++++ b/tools/grit/grit_args.gni
+@@ -31,8 +31,9 @@
+   "use_aura=${use_aura}",
+   "use_ozone=${use_ozone}",
+ 
+-  # Mac wants Title Case strings.
+-  "use_titlecase=${is_mac}",
++  # This build uses macOS UI conventions. Select Chromium's authored title-case
++  # resources, preserving placeholders and dynamic names instead of recasing text.
++  "use_titlecase=true",
+ 
+   "is_desktop_android=${is_desktop_android}",
+ ]

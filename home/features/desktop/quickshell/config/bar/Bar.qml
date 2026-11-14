@@ -14,11 +14,7 @@ Scope {
     property var openLauncher: () => {}
 
     function syncHyprlandBarState(): void {
-        Quickshell.execDetached([
-            "hyprctl",
-            "eval",
-            "require('monitor-modes').set_bar_visible(" + (root.shown ? "true" : "false") + ")"
-        ]);
+        Quickshell.execDetached(["hyprctl", "eval", "require('monitor-modes').set_bar_visible(" + (root.shown ? "true" : "false") + ")"]);
     }
 
     onShownChanged: syncHyprlandBarState()
@@ -26,8 +22,7 @@ Scope {
 
     FileView {
         id: notchMonitorFile
-        path: (Quickshell.env("XDG_DATA_HOME") || Quickshell.env("HOME") + "/.local/share")
-            + "/quickshell/notch-monitor"
+        path: (Quickshell.env("XDG_DATA_HOME") || Quickshell.env("HOME") + "/.local/share") + "/quickshell/notch-monitor"
         preload: true
         blockLoading: true
         watchChanges: true
@@ -45,24 +40,44 @@ Scope {
         }
     }
 
-    UsageService { id: usageService }
-    OpenCodeService { id: sessionOverview }
-    BatteryService { id: batteryService }
-    SystemControlsService { id: systemControlsService }
+    UsageService {
+        id: usageService
+    }
+    OpenCodeService {
+        id: sessionOverview
+    }
+    BatteryService {
+        id: batteryService
+    }
+    SystemControlsService {
+        id: systemControlsService
+    }
     MonitorModes {
         id: monitorModes
         onHugeMarginsChanged: root.syncHyprlandBarState()
     }
-    NotificationService { id: notifications }
+    NotificationService {
+        id: notifications
+    }
 
     IpcHandler {
         target: "bar"
 
-        function toggle(): void { root.shown = !root.shown; }
-        function show(): void { root.shown = true; }
-        function hide(): void { root.shown = false; }
-        function refreshUsage(): void { usageService.refresh(); }
-        function usage(): string { return JSON.stringify(usageService.usage); }
+        function toggle(): void {
+            root.shown = !root.shown;
+        }
+        function show(): void {
+            root.shown = true;
+        }
+        function hide(): void {
+            root.shown = false;
+        }
+        function refreshUsage(): void {
+            usageService.refresh();
+        }
+        function usage(): string {
+            return JSON.stringify(usageService.usage);
+        }
         function battery(): string {
             return JSON.stringify({
                 "enabled": batteryService.enabled,
@@ -74,7 +89,9 @@ Scope {
                 "charging": batteryService.charging
             });
         }
-        function clearNotifications(): void { notifications.clear(); }
+        function clearNotifications(): void {
+            notifications.clear();
+        }
     }
 
     Variants {

@@ -1,0 +1,18 @@
+/* Protocol v4 supplies the inactive sidebar's neutral plane in the compositor.
+   This provider is display-wide: a window-local GTK provider cannot style its
+   children's backgrounds. Other backends retain the ordinary opaque fallback. */
+window.desktop-tint-composited {
+    /* Override the asynchronous fallback provider while v4 owns the planes. */
+    --finder-content: transparent;
+    --finder-footer: transparent;
+    background: transparent;
+}
+
+window.desktop-tint-composited.inactive .sidebar-shell,
+window.desktop-tint-composited.inactive .sidebar-split > .sidebar-shell,
+window.desktop-tint-composited.inactive .sidebar-cap.over-sidebar,
+window.desktop-tint-composited.inactive .footer-cap.over-sidebar,
+window.desktop-tint-composited.inactive .sidebar-split > separator.wide {
+    background: transparent;
+    box-shadow: none;
+}

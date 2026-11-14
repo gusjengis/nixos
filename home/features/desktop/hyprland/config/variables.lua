@@ -19,7 +19,8 @@ return {
 	gis = "chromium --app=https://mattgeocore.co.pierce.wa.us/login/home?filter=cvwebext",
 	db = "chromium --app=https://database.azuregreenconsultants.com/map",
 	claude = desktopLauncher .. " webapp-claude",
-	fileManager = "strata",
+	-- The compositor can retain a pre-rebuild PATH for its whole session.
+	fileManager = home .. "/.nix-profile/bin/strata",
 	whatsapp = desktopLauncher .. " webapp-whatsapp",
 	excel = desktopLauncher .. " webapp-excel",
 	calendar = desktopLauncher .. " webapp-calendar",

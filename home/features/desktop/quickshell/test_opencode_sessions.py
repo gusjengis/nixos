@@ -1,3 +1,4 @@
+from contextlib import closing
 import importlib.util
 import json
 import os
@@ -14,19 +15,34 @@ spec.loader.exec_module(overview)
 
 
 class SessionsTest(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.database = Path(directory.name) / "db.sqlite"
+        with closing(sqlite3.connect(self.database)) as db, db:
+            db.execute("CREATE TABLE session (id TEXT, title TEXT)")
+            db.execute("CREATE TABLE message (id TEXT, session_id TEXT)")
+            db.execute("INSERT INTO session VALUES ('chat', 'Actual selected title')")
+            db.execute("INSERT INTO message VALUES ('message', 'chat')")
+        self.selection = dict(pid=os.getpid(), pid_start_ticks=overview.start_ticks(os.getpid()),
+                              database=str(self.database), session_id="chat")
+
     def line(self, **fields):
         value = dict.fromkeys(overview.FIELDS, "")
         value.update(pane_id="%7", pane_pid=str(os.getpid()), pane_current_command="opencode",
                      session_id="$3", session_name="context-test", pane_current_path="/tmp")
+        value["@persistence-chat"] = json.dumps(self.selection)
         value.update(fields)
         return "\t".join(value[key] for key in overview.FIELDS)
 
     def test_live_idle_title_and_dead_tui_metadata(self):
         with tempfile.TemporaryDirectory() as directory:
             database = Path(directory) / "db.sqlite"
-            with sqlite3.connect(database) as db:
+            with closing(sqlite3.connect(database)) as db, db:
                 db.execute("CREATE TABLE session (id TEXT, title TEXT)")
                 db.execute("INSERT INTO session VALUES (?, ?)", ("chat", "Actual selected title"))
+                db.execute("CREATE TABLE message (id TEXT, session_id TEXT)")
+                db.execute("INSERT INTO message VALUES ('message', 'chat')")
             selection = dict(pid=os.getpid(), pid_start_ticks=overview.start_ticks(os.getpid()),
                              database=str(database), session_id="chat", directory=directory)
             line = self.line(**{"@persistence-chat": json.dumps(selection)})
@@ -47,11 +63,64 @@ class SessionsTest(unittest.TestCase):
                     f"@opencode_{color_key}_color": "#123456"}))
                 self.assertEqual((item["state"], item["color"]), (state, "#123456"))
 
+    def test_unselected_and_invalid_selections_are_hidden(self):
+        for selection in ["", "{}", "invalid", json.dumps({**self.selection, "session_id": None}),
+                          json.dumps({**self.selection, "pid_start_ticks": "stale"}),
+                          json.dumps({**self.selection, "database": str(self.database) + ".missing"})]:
+            with self.subTest(selection=selection):
+                self.assertEqual(overview.collect(self.line(**{"@persistence-chat": selection})), [])
+
+    def test_v2_native_tables_override_retained_legacy_titles_and_hide_empty_chats(self):
+        with closing(sqlite3.connect(self.database)) as db, db:
+            db.execute("CREATE TABLE session_v2 (id TEXT, title TEXT)")
+            db.execute("CREATE TABLE session_message (id TEXT, session_id TEXT)")
+            db.execute("INSERT INTO session_v2 VALUES ('chat', 'Current V2 goal')")
+        self.assertEqual(overview.collect(self.line()), [])
+        with closing(sqlite3.connect(self.database)) as db, db:
+            db.execute("INSERT INTO session_message VALUES ('native-message','chat')")
+        item, = overview.collect(self.line())
+        self.assertEqual(item["title"], "Current V2 goal")
+
+    def test_empty_chat_hidden_until_first_message_and_hidden_again_when_cleared(self):
+        with closing(sqlite3.connect(self.database)) as db, db:
+            db.execute("INSERT INTO session VALUES ('empty', 'New session')")
+        line = self.line(**{"@persistence-chat": json.dumps({**self.selection, "session_id": "empty"})})
+        with patch.object(overview, "run", return_value=line), \
+                patch.object(overview.subprocess, "run") as activate:
+            self.assertEqual(overview.snapshot(), [])
+            with self.assertRaisesRegex(RuntimeError, "Session closed"):
+                overview.focus("%7")
+            activate.assert_not_called()
+            with closing(sqlite3.connect(self.database)) as db, db:
+                db.execute("INSERT INTO message VALUES ('first', 'empty')")
+            item, = overview.snapshot()
+            self.assertEqual(item["title"], "New session")
+            with closing(sqlite3.connect(self.database)) as db, db:
+                db.execute("DELETE FROM message WHERE session_id = 'empty'")
+            self.assertEqual(overview.snapshot(), [])
+
+    def test_untitled_conversation_remains_visible(self):
+        with closing(sqlite3.connect(self.database)) as db, db:
+            db.execute("UPDATE session SET title = '' WHERE id = 'chat'")
+        item, = overview.collect(self.line())
+        self.assertEqual(item["title"], "Untitled session")
+
     def test_closed_row_cannot_reopen_chat(self):
         with patch.object(overview, "snapshot", return_value=[]), patch.object(overview.subprocess, "run") as run:
             with self.assertRaisesRegex(RuntimeError, "Session closed"):
                 overview.focus("%7")
             run.assert_not_called()
+
+    def test_closing_sessions_excluded_from_overview_and_focus(self):
+        for fields in [{"session_name": "__context_closing_request"},
+                       {"@persistence-close-staging": "1"},
+                       {"@persistence-close-staged": "1"}]:
+            with self.subTest(fields=fields), patch.object(overview, "run", return_value=self.line(**fields)), \
+                    patch.object(overview.subprocess, "run") as activate:
+                self.assertEqual(overview.snapshot(), [])
+                with self.assertRaisesRegex(RuntimeError, "Session closed"):
+                    overview.focus("%7")
+                activate.assert_not_called()
 
     def test_focus_uses_selected_chat_and_original_process_identity(self):
         item, = overview.collect(self.line())

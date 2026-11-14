@@ -64,13 +64,15 @@ in
     ];
 
     fileSystems."/mnt/office/orthos" = {
-      device = "//10.145.0.15/orthos";
+      # Use the shared ortho server directly, without the office subnet router.
+      device = "//agc-puy-hv01.tail47eee1.ts.net/orthos";
       fsType = "cifs";
       options = mountOptions;
     };
 
     fileSystems."/mnt/office/company" = {
-      device = "//10.145.0.18/company";
+      # Use the shared file server directly, without the office subnet router.
+      device = "//agc-puy-file.tail47eee1.ts.net/Company";
       fsType = "cifs";
       options = mountOptions;
     };

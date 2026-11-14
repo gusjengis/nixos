@@ -1,0 +1,11 @@
+diff --git a/src/AppleGlass.cpp b/src/AppleGlass.cpp
+--- a/src/AppleGlass.cpp
++++ b/src/AppleGlass.cpp
+@@ -1,3 +1,6 @@
+     auto source = g_pHyprRenderer->m_renderData.currentFB;
+-    if (!source)
++    // DMA-BUF screenshare targets may be renderable without an owned texture.
++    // They cannot supply the backdrop sampler; never dereference that missing
++    // texture or replace the normal monitor's cached backdrop with capture data.
++    if (!source || !source->getTexture())
+         return;

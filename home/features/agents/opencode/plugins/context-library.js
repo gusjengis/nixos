@@ -1,8 +1,7 @@
 import { execFile } from "node:child_process"
-import { assertFreshness, observeState, statePath } from "../context-state.mjs"
+import { observeState, statePath } from "../context-state.mjs"
 
-// Discovery is asynchronous; submission checks only tiny local readiness files.
-// No server-created conversation ever acquires a lifetime freshness exemption.
+// Discover portable history in the background; never gate local submissions.
 export const ContextLibraryPlugin = async ({ client }) => {
   const owner = process.env.CONTEXT_ID
   const scopeFile = process.env.OPENCODE_CONTEXT_SCOPE_FILE
@@ -43,33 +42,9 @@ export const ContextLibraryPlugin = async ({ client }) => {
     process.removeListener("exit", stop)
   }
   process.once("exit", stop)
-  const check = async (sessionID) => {
-    let session
-    let id = sessionID
-    const seen = new Set()
-    while (id) {
-      if (seen.has(id)) throw new Error("Invalid conversation ancestry")
-      seen.add(id)
-      const response = await client.session.get({ path: { id } })
-      if (response.error || !response.data) throw new Error("Cannot verify conversation freshness")
-      session ??= response.data
-      if (!response.data.parentID) {
-        assertFreshness(session, { rootID: response.data.id })
-        return
-      }
-      id = response.data.parentID
-    }
-    throw new Error("Cannot verify conversation freshness")
-  }
-  const gate = async (sessionID) => {
-    try { await check(sessionID) }
-    catch (error) { toast(error.message, "error"); throw error }
-  }
   return {
     event: async ({ event }) => {
       if (event.type === "server.instance.disposed") stop()
     },
-    "chat.message": async (input) => gate(input.sessionID),
-    "command.execute.before": async (input) => gate(input.sessionID),
   }
 }

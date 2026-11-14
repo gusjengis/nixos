@@ -1,0 +1,24 @@
+({
+typedef float dtV4 __attribute__((ext_vector_type(4)));
+unsigned char dtWindow[0x100]={0}; unsigned char dtPayload[0xa0]={0};
+*(void **)dtPayload=dtWindow; *(float *)(dtPayload+8)=1.0f;
+*(CGRect *)(dtPayload+0x10)=CGRectMake(0,0,8,8);
+dtV4 dtSAT[64];
+for(int dtY=0;dtY<8;dtY++)for(int dtX=0;dtX<8;dtX++){
+ dtV4 dtPixel={(float)dtX/7,(float)dtY/7,(float)(dtX+dtY)/14,1};
+ dtV4 dtAbove=dtY?dtSAT[(dtY-1)*8+dtX]:(dtV4){0,0,0,0};
+ dtV4 dtLeft=dtX?dtSAT[dtY*8+dtX-1]:(dtV4){0,0,0,0};
+ dtV4 dtCorner=(dtX&&dtY)?dtSAT[(dtY-1)*8+dtX-1]:(dtV4){0,0,0,0};
+ dtSAT[dtY*8+dtX]=dtPixel+dtAbove+dtLeft-dtCorner;
+}
+*(void **)(dtPayload+0x38)=dtSAT;
+*(unsigned long *)(dtPayload+0x48)=8;
+*(unsigned long *)(dtPayload+0x70)=63;
+CGRect dtRects[]={CGRectMake(0,0,8,8),CGRectMake(0,0,4,4),CGRectMake(1,1,4,4),CGRectMake(4,0,4,8),CGRectMake(0.25,0.25,3.5,3.5),CGRectMake(-1,-1,5,5)};
+NSMutableArray *dtOut=[NSMutableArray array];
+for(int dtI=0;dtI<6;dtI++){
+ dtV4 dtV=((dtV4(*)(void *,CGRect))__builtin_ptrauth_sign_unauthenticated((void *)__AVERAGE_FUNCTION__,0,0))(dtPayload,dtRects[dtI]);
+ [dtOut addObject:@{@"rect":NSStringFromRect(dtRects[dtI]),@"rgba":@[@(dtV.x),@(dtV.y),@(dtV.z),@(dtV.w)]}];
+}
+[[NSString alloc] initWithData:[NSJSONSerialization dataWithJSONObject:dtOut options:NSJSONWritingPrettyPrinted error:NULL] encoding:NSUTF8StringEncoding];
+})

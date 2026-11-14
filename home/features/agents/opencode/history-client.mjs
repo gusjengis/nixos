@@ -20,6 +20,7 @@ export function createHistoryClient({ env = process.env, command = runHistoryCom
   return {
     snapshot,
     verified(row, nativeID) {
+      if (row.local && row.nativeID === nativeID) return true
       return readVerdict(path, { id: row.owner, chat: row.chat, session: row.chat }, nativeID).allowed
     },
     observe(callback) { return observeState(path, callback, { interval: 250 }) },
@@ -33,11 +34,7 @@ export function createHistoryClient({ env = process.env, command = runHistoryCom
     },
     async open(row, progress) {
       abort?.abort()
-      if (row.nativeID) {
-        const marker = { id: row.owner, chat: row.chat, session: row.chat }
-        const result = readVerdict(path, marker, row.nativeID)
-        if (result.allowed) return row.nativeID
-      }
+      if (row.local && row.nativeID) return row.nativeID
       const current = new AbortController()
       abort = current
       const args = ["ensure", "--owner", row.owner, "--chat", row.chat]
@@ -70,7 +67,7 @@ export function createHistoryClient({ env = process.env, command = runHistoryCom
 export function attachHistoryState(rows, snapshot) {
   return rows.map((row) => {
     const record = snapshot?.conversations?.[`${row.owner}/${row.chat}`]
-    return record ? { ...row, ...record, nativeID: record.selected_root ?? row.nativeID } : row
+    return record ? { ...row, ...record, nativeID: row.local ? row.nativeID : record.selected_root ?? row.nativeID } : row
   })
 }
 

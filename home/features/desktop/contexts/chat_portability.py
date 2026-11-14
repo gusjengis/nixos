@@ -22,6 +22,7 @@ from contextlib import closing
 from contextvars import ContextVar
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
+import opencode_backend as backend
 
 _source_database = ContextVar("checkpoint_source_database", default=None)
 
@@ -44,9 +45,26 @@ def _cli(args, cwd):
     # A regular file makes native stdout synchronous. Anonymous scratch closes
     # on every exit path; unchanged captures still avoid invoking the CLI.
     from context_chat_worker import run_child
-    result = run_child(["opencode", *args], cwd=cwd, timeout=30, check=False,
-                       env=dict(os.environ, OPENCODE_CONTEXT_HELPER="1",
-                                **({"OPENCODE_DB": _source_database.get()} if _source_database.get() else {})))
+    database = Path(_source_database.get() or backend.default_database())
+    if args == ["db", "path"] and os.environ.get("OPENCODE_PROTOCOL") == "2":
+        return str(database)
+    protocol = int(os.environ.get("OPENCODE_PROTOCOL", "1"))
+    if database.is_file():
+        with closing(backend.connect(database)) as db:
+            protocol = db.protocol
+    selected = backend.load_profile()
+    binary = os.environ.get(f"OPENCODE_V{protocol}_BINARY") or selected.get("binary" if protocol == 2 else "legacy_binary", "opencode")
+    action = "compat-db" if args[0] == "db" else args[0]
+    native_args = ["session", action, *args[1:], "--standalone"] if protocol == 2 else args
+    environment = dict(os.environ, OPENCODE_CONTEXT_HELPER="1", OPENCODE_DB=str(database))
+    if protocol == 2 and selected:
+        environment.update(selected["environment"])
+        environment["OPENCODE_DB"] = str(database)
+    elif protocol == 1 and selected:
+        for key in ("OPENCODE_CONFIG_DIR", "OPENCODE_DATA_DIR", "OPENCODE_STATE_DIR", "OPENCODE_CACHE_DIR", "OPENCODE_CONFIG", "OPENCODE_CONFIG_CONTENT"):
+            environment.pop(key, None)
+        environment["OPENCODE_CONFIG_DIR"] = selected["legacy_config"]
+    result = run_child([binary, *native_args], cwd=cwd, timeout=30, check=False, env=environment)
     if result.returncode:
         raise RuntimeError(f"opencode {args[0]} failed: {result.stderr[-2000:]}")
     return result.stdout
@@ -54,6 +72,7 @@ def _cli(args, cwd):
 
 def _export(sid, cwd):
     data = json.loads(_cli(["export", sid], cwd))
+    data = backend.wrap(data)
     if data["info"]["id"] != sid or not isinstance(data["messages"], list):
         raise ValueError("Native export identity mismatch")
     return data
@@ -61,20 +80,33 @@ def _export(sid, cwd):
 
 def _database(cwd):
     # Avoid starting native CLI (and its logs/caches) for unchanged captures.
-    default = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local/share")) / "opencode/opencode.db"
+    default = backend.default_database()
     override = _source_database.get() or os.environ.get("OPENCODE_DB")
     path = Path(override or default)
     if not override and not path.is_file():
         # Nonstandard/channel installs are discovered once on changed/first use.
         path = Path(_cli(["db", "path"], cwd).strip())
     path = path.resolve(strict=True)
-    db = sqlite3.connect(path.as_uri() + "?mode=ro", uri=True)
-    db.execute("PRAGMA query_only=ON")
+    db = backend.connect(path)
     columns = {row[1] for row in db.execute("PRAGMA table_info(session)")}
     if not {"id", "parent_id", "directory"} <= columns:
         db.close()
         raise RuntimeError("Unsupported OpenCode session schema")
     return db
+
+
+def _protocol(cwd):
+    with closing(_database(cwd)) as db:
+        return getattr(db, "protocol", 1)
+
+
+def _convert_legacy(data, cwd):
+    if data["info"].get("_opencode_protocol") == 2:
+        return data
+    with tempfile.TemporaryDirectory(prefix="context-chat-convert-") as temporary:
+        file = Path(temporary) / "legacy.json"
+        _write(file, data)
+        return backend.wrap(json.loads(_cli(["convert-v1", str(file)], cwd)))
 
 
 def _descendants(sid, cwd):
@@ -163,7 +195,7 @@ def read_selection(endpoint: Path, pane_pid: int, tmux_socket: str, pane_id: str
 
 
 def capture(selection: dict, destination: Path, cwd: str) -> dict:
-    token = _source_database.set(selection.get("database"))
+    token = _source_database.set(selection.get("database") or _source_database.get())
     try:
         return _capture(selection, destination, cwd)
     finally:
@@ -218,6 +250,8 @@ def _capture(selection, destination, cwd):
     if not sid:
         _write(destination / "manifest.json", manifest)
         return manifest
+    if _protocol(cwd) == 2:
+        manifest["format"] = 3
     family = _family_root(sid, cwd)
     ids = _descendants(family, cwd)
     if sid not in ids:
@@ -315,6 +349,9 @@ def _equivalent(data):
     # Native import assigns project/path and may update this timestamp.
     data["info"].pop("projectID", None)
     data["info"].pop("path", None)
+    if data["info"].get("_opencode_protocol") == 2:
+        data["info"].pop("subpath", None)
+        data["info"].get("time", {}).pop("viewed", None)
     data["info"].get("time", {}).pop("updated", None)
     return data
 
@@ -342,7 +379,7 @@ def _restore(bundle: Path, cwd: str, context_root: str | None = None, work_root:
     import chat_recovery as recovery
     bundle = Path(bundle)
     manifest = json.loads((bundle / "manifest.json").read_text())
-    if manifest["format"] not in (1, 2):
+    if manifest["format"] not in (1, 2, 3):
         raise ValueError("Unsupported chat bundle")
     for relative, info in manifest["files"].items():
         if hashlib.sha256(_safe(bundle, relative).read_bytes()).hexdigest() != info["sha256"]:
@@ -350,6 +387,9 @@ def _restore(bundle: Path, cwd: str, context_root: str | None = None, work_root:
     selected = manifest["selection"].get("session_id")
     if not selected:
         return None
+    protocol = _protocol(cwd)
+    if manifest["format"] == 3 and protocol != 2:
+        raise ValueError("OpenCode V2 chat bundle requires OpenCode V2; original history retained")
     for directory in (cwd, work_root):
         if directory is not None and not Path(directory).is_dir():
             raise recovery.RecoveryUnavailable(f"Missing session directory: {directory}", directory=str(directory))
@@ -372,7 +412,7 @@ def _restore(bundle: Path, cwd: str, context_root: str | None = None, work_root:
     directories = {}
     for entry in manifest["sessions"]:
         item = json.loads(_safe(bundle, entry["file"]).read_text())
-        if manifest["format"] == 2:
+        if manifest["format"] in (2, 3):
             item["messages"] = [{"info": json.loads(_safe(bundle, m["info"]).read_text()),
                                  "parts": [json.loads(_safe(bundle, p).read_text()) for p in m["parts"]]}
                                 for m in item["messages"]]
@@ -405,6 +445,8 @@ def _restore(bundle: Path, cwd: str, context_root: str | None = None, work_root:
             # Relocate structured paths only; never rewrite prose/tool command strings.
             return relocate(value) if trail and trail[-1] in ("directory", "cwd", "root", "path", "outputPath") else value
         item = _walk(item, paths)
+        if protocol == 2:
+            item = _convert_legacy(item, cwd)
         directories[entry["id"]] = item["info"]["directory"]
         if not Path(directories[entry["id"]]).is_dir():
             raise recovery.RecoveryUnavailable(f"Missing session directory: {directories[entry['id']]}",
@@ -494,7 +536,7 @@ def _restore(bundle: Path, cwd: str, context_root: str | None = None, work_root:
                 continue
             with tempfile.TemporaryDirectory(prefix="context-chat-") as temp:
                 native = Path(temp) / "native.json"
-                _write(native, item)
+                _write(native, backend.unwrap(item) if protocol == 2 else item)
                 _cli(["import", str(native)], directories[sid])
             actual = _export(target, directories[sid])
             if _equivalent(actual) != _equivalent(item):

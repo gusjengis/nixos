@@ -1,0 +1,20 @@
+--- a/packages/cli/src/commands/commands.ts
++++ b/packages/cli/src/commands/commands.ts
+@@ -453,6 +453,7 @@
+       description: "Manage sessions",
+       globalFlags: ServerFlags,
+       commands: [
++        Spec.make("migrate-v1", { description: "Finish the V1 history migration before handing off the profile" }),
+         Spec.make("convert-v1", {
+           description: "Convert a V1 session export to V2 JSON without importing it",
+           params: { file: Argument.String("file").pipe(Argument.withDescription("V1 JSON export to convert")) },
+--- a/packages/cli/src/index.ts
++++ b/packages/cli/src/index.ts
+@@ -81,6 +81,7 @@
+   pair: () => import("./commands/handlers/pair"),
+   reload: () => import("./commands/handlers/reload"),
+   session: {
++    "migrate-v1": () => import("./commands/handlers/session/migrate-v1"),
+     "convert-v1": () => import("./commands/handlers/session/convert-v1"),
+     "compat-db": () => import("./commands/handlers/session/compat-db"),
+     list: () => import("./commands/handlers/session/list"),

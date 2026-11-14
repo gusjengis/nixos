@@ -1,0 +1,851 @@
+diff --git a/src/AppleGlass.cpp b/src/AppleGlass.cpp
+index 5c4e501..f9be1ab 100644
+--- a/src/AppleGlass.cpp
++++ b/src/AppleGlass.cpp
+@@ -51,9 +51,164 @@ namespace {
+         return p;
+     }
+ 
++    // Generated from Apple's decoded GPU uniforms (MacOS Theme/27-real-glass, harness2.py).
++    // Dock: DesignLibrary Configuration.dock, size medium, adaptive(false), glass diffusion 1.
++    SParams makeDock() {
++        SParams p;
++        p.dispScale = {1.0f, 1.0f};
++        p.refraction = true;
++        p.innerRefrAmount = -29.88f; p.innerRefrInvH = 0.0753f;
++        p.outerRefrAmount = 0.0f; p.outerRefrInvH = 1e6f;
++        p.refrThr0 = -1.0f; p.refrThr1 = 0.0f; p.refrOpacity = 0.19995f;
++        p.blurRadius = 1.2f;
++        p.blurAlpha = {1.0f, 0.5f, 0.0f, -0.5f};
++        p.blurDist = {-83.0f, -1.0f, 0.0f, 0.0f};
++        p.faceCm = ColorMatrix{Row{1.14551f, -0.26636f, -0.02679f, 0.04901f}, Row{-0.07916f, 0.9585f, -0.02692f, 0.04901f}, Row{-0.07922f, -0.26636f, 1.19824f, 0.04901f}};
++        p.faceOpacity = 1.0f; p.lumaComplement = 0.25f;
++        p.fillEnabled = true; p.fillBlur = 6.39844f;
++        p.fillLighten = 0.0f; p.fillDarken = 0.0f; p.fillNormal = 1.0f;
++        p.bleedAmount = 0.0f; p.bleedInvH = 1e6f; p.bleedBlur = 0.0f;
++        p.bleedD0 = 1.0f; p.bleedD1 = 0.0f; p.bleedOpacity = 0.0f;
++        p.bleedCm = ColorMatrix{Row{0.99805f, -0.67969f, -0.06848f, 0.75f}, Row{-0.2019f, 0.52051f, -0.0686f, 0.75f}, Row{-0.20203f, -0.6792f, 1.13184f, 0.75f}};
++        p.bleedDarken = {1.0f, 0.0f};
++        p.shadowAmount = 75.0f; p.shadowInvH = 0.01506f; p.shadowDistOffset = 0.0f;
++        p.shadowOffset = {0.0f, -8.0f};
++        p.shadowBlur = 0.0f; p.shadowInvRadius = 1e6f; p.shadowOpacity = 0.0f;
++        p.shadowCm = ColorMatrix{Row{1.04199f, -0.12878f, -0.01292f, 0.0f}, Row{-0.03827f, 0.95117f, -0.01302f, 0.0f}, Row{-0.03833f, -0.12866f, 1.06738f, 0.0f}};
++        p.shadowContribution = 0.0f; p.shadowFaceOpacity = 0.1f;
++        p.ringOffset = {0.0f, 0.0f};
++        p.ringStroke = 0.0f; p.ringRadius = 0.0f; p.ringOpacity = 0.0f; p.ringMask = 0.0f;
++        p.hlDir = {1.0f, 0.0f};
++        p.hlHeight = 1.0f; p.hlSpread = 0.25879f; p.hlAmount = 0.5f;
++        p.hlOffset = -1.0f; p.hlBias = -0.25f;
++        p.hlExtension = true; p.hlBiasCorrection = true; p.strokeMode = true;
++        p.aberrAmount = 0.0f; p.aberrInvH = 0.05f; p.aberrOffset = 0.0f;
++        p.aberrDir = {1.0f, 0.0f};
++        p.clampLimit = 1.0f; p.preserveHue = false;
++        p.applePyramid = true;
++        p.continuousCorners = true;
++        p.ovalization = 0.5f;
++        p.backdropScale = 0.5f;
++        p.margin = 36.0f;
++        p.quadPad = 2.0f;
++        auto& h = p.highlightLayer;
++        h.enabled = true;
++        h.keyHeight = 1.0f; h.keyAngle = 0.0f; h.keySpread = 1.5235314f; h.keyAmount = 0.5f;
++        h.fillHeight = 1.0f; h.fillAngle = 3.14159265f; h.fillSpread = 1.5235314f; h.fillAmount = 0.5f;
++        h.curvature = 0.75f;
++        h.diffuseHeightScale = 8.0f; h.diffuseSpreadScale = 0.65f; h.diffuseAmountScale = 0.15f;
++        h.cm = ColorMatrix{Row{1.0936999f, -0.3577f, -0.036f, 0.25f}, Row{-0.1063f, 0.84239995f, -0.0361f, 0.25f}, Row{-0.1064f, -0.3575f, 1.1639f, 0.25f}};
++        h.clamp = 1.0f;
++        return p;
++    }
++
++    // Context menus / Spotlight: Configuration.regular, size medium, glass diffusion 1 (32/86 black/white).
++    SParams makeMenu() {
++        SParams p;
++        p.dispScale = {1.0f, 1.0f};
++        p.refraction = true;
++        p.innerRefrAmount = -60.0f; p.innerRefrInvH = 0.05f;
++        p.outerRefrAmount = 41.5f; p.outerRefrInvH = 0.03012f;
++        p.refrThr0 = -1.0f; p.refrThr1 = 0.0f; p.refrOpacity = 0.6001f;
++        p.blurRadius = 1.0f;
++        p.blurAlpha = {0.7998f, 0.3999f, -0.09998f, -0.5f};
++        p.blurDist = {-83.0f, -1.0f, 0.0f, 0.0f};
++        p.faceCm = ColorMatrix{Row{0.61816f, -0.1073f, -0.01078f, 0.125f}, Row{-0.03189f, 0.54297f, -0.01084f, 0.125f}, Row{-0.03192f, -0.10724f, 0.63916f, 0.125f}};
++        p.faceOpacity = 1.0f; p.lumaComplement = 0.65f;
++        p.fillEnabled = true; p.fillBlur = 1.59961f;
++        p.fillLighten = 0.0f; p.fillDarken = 0.8999f; p.fillNormal = 1.0f;
++        p.bleedAmount = 58.1f; p.bleedInvH = 0.01721f; p.bleedBlur = 5.81f;
++        p.bleedD0 = 1.0f; p.bleedD1 = 0.0f; p.bleedOpacity = 0.7998f;
++        p.bleedCm = ColorMatrix{Row{0.86719f, -0.44702f, -0.04504f, 0.125f}, Row{-0.13281f, 0.55322f, -0.04514f, 0.125f}, Row{-0.13293f, -0.44702f, 0.95508f, 0.125f}};
++        p.bleedDarken = {-1.0f, 1.0f};
++        p.shadowAmount = 0.0f; p.shadowInvH = 1e6f; p.shadowDistOffset = 0.0f;
++        p.shadowOffset = {0.0f, -8.0f};
++        p.shadowBlur = 0.0f; p.shadowInvRadius = 0.04167f; p.shadowOpacity = 0.6001f;
++        p.shadowCm = ColorMatrix{Row{0.7002f, -5e-05f, 5e-05f, 0.0f}, Row{0.0f, 0.7002f, -2e-05f, 0.0f}, Row{-4e-05f, 4e-05f, 0.7002f, 0.0f}};
++        p.shadowContribution = 0.0f; p.shadowFaceOpacity = 0.3f;
++        p.ringOffset = {0.0f, -8.0f};
++        p.ringStroke = 4.0f; p.ringRadius = 5.0f; p.ringOpacity = 0.06f; p.ringMask = 1.0f;
++        p.hlDir = {1.0f, 0.0f};
++        p.hlHeight = 1.0f; p.hlSpread = 0.25879f; p.hlAmount = 0.5f;
++        p.hlOffset = -1.0f; p.hlBias = -0.25f;
++        p.hlExtension = true; p.hlBiasCorrection = true; p.strokeMode = true;
++        p.aberrAmount = 0.0f; p.aberrInvH = 0.05f; p.aberrOffset = 0.0f;
++        p.aberrDir = {1.0f, 0.0f};
++        p.clampLimit = 1.12993f; p.preserveHue = false;
++        p.applePyramid = true;
++        p.continuousCorners = true;
++        p.ovalization = 0.5f;
++        p.backdropScale = 0.125f;
++        p.margin = 86.0f;
++        p.quadPad = 80.0f;
++        auto& h = p.highlightLayer;
++        h.enabled = true;
++        h.keyHeight = 1.0f; h.keyAngle = 0.0f; h.keySpread = 1.40353561f; h.keyAmount = 0.5f;
++        h.fillHeight = 1.0f; h.fillAngle = 3.14159265f; h.fillSpread = 1.40353561f; h.fillAmount = 0.5f;
++        h.curvature = 0.75f;
++        h.diffuseHeightScale = 8.0f; h.diffuseSpreadScale = 0.65f; h.diffuseAmountScale = 0.15f;
++        h.cm = ColorMatrix{Row{1.1202f, -0.1894f, -0.019f, 0.1471f}, Row{-0.0563f, 0.9871f, -0.0191f, 0.1471f}, Row{-0.0563f, -0.1893f, 1.1574f, 0.1471f}};
++        h.clamp = 1.0f;
++        return p;
++    }
++
++    // Desktop widgets: Configuration.widgets, glass diffusion 1 (13/77 interior over black/white).
++    SParams makeWidgets() {
++        SParams p;
++        p.dispScale = {1.0f, 1.0f};
++        p.refraction = true;
++        p.innerRefrAmount = -60.0f; p.innerRefrInvH = 0.05f;
++        p.outerRefrAmount = 0.0f; p.outerRefrInvH = 1e6f;
++        p.refrThr0 = -1.0f; p.refrThr1 = 0.0f; p.refrOpacity = 0.0f;
++        p.blurRadius = 0.4f;
++        p.blurAlpha = {1.0f, 0.5f, 0.0f, -0.5f};
++        p.blurDist = {-82.0f, -1.0f, 0.0f, 0.0f};
++        p.faceCm = ColorMatrix{Row{0.68311f, -0.39331f, -0.03964f, 0.04999f}, Row{-0.11694f, 0.40674f, -0.03973f, 0.04999f}, Row{-0.11694f, -0.39331f, 0.76025f, 0.04999f}};
++        p.faceOpacity = 1.0f; p.lumaComplement = 0.0f;
++        p.fillEnabled = true; p.fillBlur = 3.19922f;
++        p.fillLighten = 0.0f; p.fillDarken = 0.0f; p.fillNormal = 1.0f;
++        p.bleedAmount = 0.0f; p.bleedInvH = 1e6f; p.bleedBlur = 0.0f;
++        p.bleedD0 = 1.0f; p.bleedD1 = 0.0f; p.bleedOpacity = 0.0f;
++        p.bleedCm = ColorMatrix{Row{0.99805f, -0.67969f, -0.06848f, 0.75f}, Row{-0.2019f, 0.52051f, -0.0686f, 0.75f}, Row{-0.20203f, -0.6792f, 1.13184f, 0.75f}};
++        p.bleedDarken = {1.0f, 0.0f};
++        p.shadowAmount = 75.0f; p.shadowInvH = 0.01524f; p.shadowDistOffset = 0.0f;
++        p.shadowOffset = {0.0f, -8.0f};
++        p.shadowBlur = 0.0f; p.shadowInvRadius = 1e6f; p.shadowOpacity = 0.0f;
++        p.shadowCm = ColorMatrix{Row{1.04199f, -0.12878f, -0.01292f, 0.0f}, Row{-0.03827f, 0.95117f, -0.01302f, 0.0f}, Row{-0.03833f, -0.12866f, 1.06738f, 0.0f}};
++        p.shadowContribution = 0.0f; p.shadowFaceOpacity = 0.1f;
++        p.ringOffset = {0.0f, 0.0f};
++        p.ringStroke = 0.0f; p.ringRadius = 0.0f; p.ringOpacity = 0.0f; p.ringMask = 0.0f;
++        p.hlDir = {1.0f, 0.0f};
++        p.hlHeight = 1.0f; p.hlSpread = 0.25879f; p.hlAmount = 0.5f;
++        p.hlOffset = -1.0f; p.hlBias = -0.25f;
++        p.hlExtension = true; p.hlBiasCorrection = true; p.strokeMode = true;
++        p.aberrAmount = 0.0f; p.aberrInvH = 0.05f; p.aberrOffset = 0.0f;
++        p.aberrDir = {1.0f, 0.0f};
++        p.clampLimit = 1.0f; p.preserveHue = false;
++        p.applePyramid = true;
++        p.continuousCorners = true;
++        p.ovalization = 0.5f;
++        p.backdropScale = 0.25f;
++        p.margin = 90.0f;
++        p.quadPad = 2.0f;
++        auto& h = p.highlightLayer;
++        h.enabled = true;
++        h.keyHeight = 1.0f; h.keyAngle = 0.0f; h.keySpread = 1.51989089f; h.keyAmount = 0.5f;
++        h.fillHeight = 1.0f; h.fillAngle = 3.14159265f; h.fillSpread = 1.51989089f; h.fillAmount = 0.5f;
++        h.curvature = 0.75f;
++        h.diffuseHeightScale = 8.0f; h.diffuseSpreadScale = 0.65f; h.diffuseAmountScale = 0.15f;
++        h.cm = ColorMatrix{Row{1.2483f, -0.2862f, -0.0288f, 0.19999999f}, Row{-0.085f, 1.0472f, -0.0289f, 0.19999999f}, Row{-0.085099995f, -0.28599998f, 1.3045f, 0.19999999f}};
++        h.clamp = 1.0f;
++        return p;
++    }
++
++
+     const std::unordered_map<std::string, SParams>& presets() {
+         static const std::unordered_map<std::string, SParams> table = {
+             {"apple-sidebar", makeSidebar()},
++            {"apple-dock", makeDock()},
++            {"apple-menu", makeMenu()},
++            {"apple-widgets", makeWidgets()},
+         };
+         return table;
+     }
+@@ -141,6 +296,42 @@ float reachPoints(const SParams& params) {
+     return std::max(params.margin, params.quadPad);
+ }
+ 
++SParams paramsForTint(std::string_view name, float tint) {
++    const auto* base = preset(name);
++    if (!base)
++        return {};
++    SParams p = *base;
++    const float t = std::isfinite(tint) ? std::clamp(tint, 0.0f, 1.0f) : 1.0f;
++    const float low = std::min(2.0f * t, 1.0f);
++    const float high = std::max(2.0f * t - 1.0f, 0.0f);
++    if (name == "apple-dock" || name == "apple-widgets") {
++        p.blurRadius = name == "apple-dock" ? 1.2f * low : 0.2f + 0.2f * low;
++        // Enabling the fill at zero weight is equivalent to Apple's disabled path.
++        p.fillEnabled = true;
++        p.fillNormal = high;
++    } else if (name == "apple-menu") {
++        // Apple half-precision uniform rows at diffusion .5/.625/.75/.875/1.
++        // Below .5 these rows are constant; blur-fill and luma compression still vary.
++        static constexpr std::array<ColorMatrix, 5> rows = {{
++            {Row{1.23633f,-0.2146f,-0.02156f,0.125f}, Row{-0.06378f,1.08594f,-0.02168f,0.125f}, Row{-0.06384f,-0.21448f,1.27832f,0.125f}},
++            {Row{1.08203f,-0.18787f,-0.01888f,0.11328f}, Row{-0.05582f,0.94971f,-0.01898f,0.11328f}, Row{-0.05588f,-0.18762f,1.11816f,0.11328f}},
++            {Row{0.92725f,-0.16101f,-0.01617f,0.10938f}, Row{-0.04782f,0.81396f,-0.01627f,0.10938f}, Row{-0.04788f,-0.16089f,0.95898f,0.10938f}},
++            {Row{0.77246f,-0.13416f,-0.01347f,0.11328f}, Row{-0.03986f,0.67822f,-0.01356f,0.11328f}, Row{-0.03992f,-0.13403f,0.79883f,0.11328f}},
++            {Row{0.61816f,-0.1073f,-0.01078f,0.125f}, Row{-0.03189f,0.54297f,-0.01084f,0.125f}, Row{-0.03192f,-0.10724f,0.63916f,0.125f}},
++        }};
++        const float x = high * 4.0f;
++        const int i = std::min(static_cast<int>(x), 3);
++        const float f = x - i;
++        for (int r = 0; r < 3; ++r)
++            for (int c = 0; c < 4; ++c)
++                p.faceCm[r][c] = std::lerp(rows[i][r][c], rows[i + 1][r][c], f);
++        p.fillNormal = t;
++        p.fillDarken = std::lerp(0.6748f, 0.8999f, low);
++        p.lumaComplement = std::lerp(0.55f, 0.65f, low);
++    }
++    return p;
++}
++
+ CState::~CState() {
+     if (m_fbo)
+         glDeleteFramebuffers(1, &m_fbo);
+@@ -178,6 +369,43 @@ bool CState::ensureTexture(int w, int h) {
+     return complete;
+ }
+ 
++// Levels above the backdrop scale are QuartzCore's blurred downsample (appledown.frag), each
++// rendered from the level below while sampling is restricted to that level.
++void CState::buildPyramid(const SParams& params) {
++    auto&     shaders = g_pGlobalState->shaderManager;
++    const int base    = std::max(0, static_cast<int>(std::lround(std::log2(m_pxPerPoint / params.backdropScale))));
++    if (base + 1 >= m_levels)
++        return;
++    GLuint fbo = 0;
++    glGenFramebuffers(1, &fbo);
++    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
++    auto shader = g_pHyprOpenGL->useShader(shaders.appleDownShader);
++    shader->setUniformMatrix3fv(SHADER_PROJ, 1, GL_FALSE, FULLSCREEN_PROJECTION);
++    shader->setUniformInt(SHADER_TEX, 0);
++    const GLuint P = shader->program();
++    glActiveTexture(GL_TEXTURE0);
++    glBindTexture(GL_TEXTURE_2D, m_tex);
++    glBindVertexArray(shader->getUniformLocation(SHADER_SHADER_VAO));
++    for (int L = base + 1; L < m_levels; ++L) {
++        const int sw = std::max(1, m_w >> (L - 1)), sh = std::max(1, m_h >> (L - 1));
++        const int dw = std::max(1, m_w >> L), dh = std::max(1, m_h >> L);
++        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, L - 1);
++        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, L - 1);
++        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_tex, L);
++        g_pHyprOpenGL->setViewport(0, 0, dw, dh);
++        glUniform1f(glGetUniformLocation(P, "srcLevel"), static_cast<float>(L - 1));
++        glUniform2f(glGetUniformLocation(P, "srcTexel"), 1.0f / sw, 1.0f / sh);
++        glUniform2f(glGetUniformLocation(P, "dstSize"), static_cast<float>(dw), static_cast<float>(dh));
++        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
++    }
++    glBindVertexArray(0);
++    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
++    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, m_levels - 1);
++    glBindTexture(GL_TEXTURE_2D, 0);
++    glBindFramebuffer(GL_FRAMEBUFFER, m_fbo);
++    glDeleteFramebuffers(1, &fbo);
++}
++
+ void CState::sample(PHLMONITOR monitor, const SParams& params, const std::optional<CBox>& windowBox, float windowRadius) {
+     auto& shaders = g_pGlobalState->shaderManager;
+     auto  source  = g_pHyprRenderer->m_renderData.currentFB;
+@@ -221,6 +449,8 @@ void CState::sample(PHLMONITOR monitor, const SParams& params, const std::option
+     glBindTexture(GL_TEXTURE_2D, m_tex);
+     glGenerateMipmap(GL_TEXTURE_2D);
+     glBindTexture(GL_TEXTURE_2D, 0);
++    if (params.applePyramid)
++        buildPyramid(params);
+ 
+     g_pHyprRenderer->blend(true);
+     glBindFramebuffer(GL_FRAMEBUFFER, fbId(source));
+@@ -240,6 +470,7 @@ void CState::draw(PHLMONITOR monitor, const SParams& params, const CBox& glassBo
+         return;
+ 
+     const float scale = static_cast<float>(monitor->m_scale);
++    m_pxPerPoint      = scale;
+ 
+     // Level-0 texel grid starts `margin` before the glass box, like the
+     // CABackdropLayer, and is padded on the far side to whole coarse texels so
+@@ -305,7 +536,7 @@ void CState::draw(PHLMONITOR monitor, const SParams& params, const CBox& glassBo
+     // Apple's backdrop texel is 4 pt: level 0 here is 1 px.
+     glUniform2f(loc("texOrigin"), m_texBox.x, m_texBox.y);
+     glUniform2f(loc("texSize"), m_texBox.w, m_texBox.h);
+-    f1("lodBias", std::log2(4.0f * scale));
++    f1("lodBias", std::log2(scale / std::max(params.backdropScale, 1e-3f)));
+     f1("px", scale);
+     glUniform4f(loc("shapeRect"), glassBox.x, glassBox.y, glassBox.w, glassBox.h);
+     glUniform4f(loc("radii"), radii[0], radii[1], radii[2], radii[3]);
+@@ -369,6 +600,24 @@ void CState::draw(PHLMONITOR monitor, const SParams& params, const CBox& glassBo
+     f2("aberrDir", params.aberrDir);
+     f1("clampLimit", params.clampLimit);
+     i1("preserveHue", params.preserveHue);
++    i1("continuousCorners", params.continuousCorners);
++    f1("ovalization", params.ovalization);
++    {
++        // CASDFKeyFillHighlightEffect -> sdf_diffuse_kf_highlight uniforms (DKF.md)
++        const auto& h   = params.highlightLayer;
++        auto        amt = [](float a) { return 1.0f / std::max(a, 1e-4f) - 2.0f; };
++        i1("dkfEnabled", h.enabled);
++        const float kx = std::sin(h.keyAngle), ky = -std::cos(h.keyAngle);
++        glUniform4f(loc("dkfP1"), h.keyHeight, std::cos(h.keySpread), amt(h.keyAmount), kx);
++        glUniform4f(loc("dkfP2"), ky, h.fillHeight, std::cos(h.fillSpread), amt(h.fillAmount));
++        glUniform4f(loc("dkfP3"), std::sin(h.fillAngle), -std::cos(h.fillAngle), h.curvature, h.effectOffset);
++        glUniform4f(loc("dkfP4"), h.keyHeight * h.diffuseHeightScale, std::cos(h.keySpread * h.diffuseSpreadScale), amt(h.keyAmount * h.diffuseAmountScale),
++                    h.fillHeight * h.diffuseHeightScale);
++        glUniform4f(loc("dkfP5"), std::cos(h.fillSpread * h.diffuseSpreadScale), amt(h.fillAmount * h.diffuseAmountScale), 0.0f, 0.0f);
++        glUniform2f(loc("dkfColorA"), h.keyAlpha, h.fillAlpha);
++        glUniform2f(loc("dkfClamp"), h.clamp, h.preserveHue);
++        uploadCm(P, "dkfCm", h.cm);
++    }
+     uploadWork(P, workSpace(monitor));
+     g_pHyprRenderer->blend(true);
+     glBindVertexArray(shader->getUniformLocation(SHADER_SHADER_VAO));
+diff --git a/src/AppleGlass.hpp b/src/AppleGlass.hpp
+index c91a7fd..728265c 100644
+--- a/src/AppleGlass.hpp
++++ b/src/AppleGlass.hpp
+@@ -86,6 +86,27 @@ struct SParams {
+     float clampLimit = 1.0f;
+     bool  preserveHue = false;
+ 
++    // Backdrop pyramid: level 0 is `backdropScale` px per point (CABackdropLayer scale).
++    // Levels above it use QuartzCore's variable_blur 13-tap downsample when applePyramid.
++    float backdropScale = 0.25f;
++    bool  applePyramid  = false;
++
++    // Shape: Apple continuous corners (supercircle SDF) and normal ovalization.
++    bool  continuousCorners = false;
++    float ovalization       = 0.0f;
++
++    // Separate glass-highlight layer (CASDFKeyFillHighlightEffect + vibrantColorMatrix).
++    struct SHighlightLayer {
++        bool        enabled = false;
++        float       keyHeight = 1, keyAngle = 0, keySpread = 0, keyAmount = 0.5f;
++        float       fillHeight = 1, fillAngle = 3.14159265f, fillSpread = 0, fillAmount = 0.5f;
++        float       curvature = 0.75f, effectOffset = 0;
++        float       diffuseHeightScale = 8, diffuseSpreadScale = 0.65f, diffuseAmountScale = 0.15f;
++        float       keyAlpha = 1, fillAlpha = 1;
++        ColorMatrix cm = IDENTITY_CM;
++        float       clamp = 1, preserveHue = 0;
++    } highlightLayer;
++
+     // Window body painted into the backdrop inside the owning window (sRGB 0..1),
+     // standing in for an opaque window body under a sidebar-style panel.
+     bool                 bodyFill = false;
+@@ -94,6 +115,8 @@ struct SParams {
+ 
+ // Built-in presets by item preset name; nullptr when unknown.
+ [[nodiscard]] const SParams* preset(std::string_view name);
++// Shared tint-file value is Apple's glass diffusion amount, not surface opacity.
++[[nodiscard]] SParams paramsForTint(std::string_view name, float tint);
+ 
+ // One glassed region on a window's main surface (hyprglass_item_v1 hints on the
+ // toplevel surface). Holds the cached mipmapped backdrop.
+@@ -110,12 +133,14 @@ class CState {
+   private:
+     GLuint m_tex = 0, m_fbo = 0;
+     int    m_w = 0, m_h = 0, m_levels = 0;
++    float  m_pxPerPoint = 1.0f;
+     CBox   m_texBox;           // framebuffer px covered by level 0
+     CBox   m_lastGlassBox;
+     bool   m_valid = false;
+     uint64_t m_lastGeneration = 0;
+ 
+     bool ensureTexture(int w, int h);
++    void buildPyramid(const SParams& params);
+     void sample(PHLMONITOR monitor, const SParams& params, const std::optional<CBox>& windowBox, float windowRadius);
+ };
+ 
+diff --git a/src/GlassLayerSurface.cpp b/src/GlassLayerSurface.cpp
+index b780da6..eaff300 100644
+--- a/src/GlassLayerSurface.cpp
++++ b/src/GlassLayerSurface.cpp
+@@ -343,7 +343,12 @@ void CGlassLayerSurface::sampleAndRedirect(PHLMONITOR monitor, float alpha) {
+     } else if (backgroundChanged) {
+         Diagnostics::recordLayerCacheMiss(monitorId);
+ 
+-        if (mac) {
++        if (mac && !mac->apple.empty()) {
++            // AppleGlass samples its own backdrop pyramid while compositing.
++            m_hasCachedSample     = true;
++            m_lastSceneGeneration = currentGeneration;
++            m_backgroundDirty     = false;
++        } else if (mac) {
+             // Full-resolution sample, then the fitted two-scale Gaussian: blur
+             // to sigma1, keep that as the narrow texture, continue to sigma2.
+             GlassRenderer::sampleBackground(m_sampleFramebuffer, source, sampleBox, m_samplePaddingRatio, 1);
+@@ -562,6 +567,11 @@ void CGlassLayerSurface::compositeAndRestore(PHLMONITOR monitor, float alpha, EM
+             break;
+     }
+ 
++    if (const auto* mac = macShape(); mac && !mac->apple.empty() && maskSource == EMaskSource::ALPHA_THRESHOLD) {
++        compositeApple(monitor, *mac, alpha, rawBox, transformBox, maskInfo);
++        return;
++    }
++
+     if (const auto* mac = macShape(); mac && maskSource == EMaskSource::ALPHA_THRESHOLD && m_macNarrowFramebuffer) {
+         const float scale = static_cast<float>(monitor->m_scale);
+         GlassRenderer::SMacDraw draw{
+@@ -601,3 +611,119 @@ void CGlassLayerSurface::compositeAndRestore(PHLMONITOR monitor, float alpha, EM
+                                      roundingPower, m_samplePaddingRatio, ctx,
+                                      &maskInfo);
+ }
++
++void CGlassLayerSurface::compositeApple(PHLMONITOR monitor, const SMacLayerShape& mac, float alpha, const CBox& rawBox, const CBox& transformBox,
++                                        const GlassRenderer::SMaskInfo& mask) {
++    const auto* preset = AppleGlass::preset(mac.apple);
++    const auto  layerSurface = m_layerSurface.lock();
++    auto        target = g_pHyprRenderer->m_renderData.currentFB;
++    if (!preset || !layerSurface || !target || !monitor)
++        return;
++    const auto params = AppleGlass::paramsForTint(mac.apple, currentMacTint());
++    const float scale = static_cast<float>(monitor->m_scale);
++
++    // Same shape rules as the fitted path (GlassRenderer::applyMacGlass), framebuffer px.
++    const float w = transformBox.w, h = transformBox.h;
++    const float inset = std::clamp(mac.inset * scale, 0.0f, std::min(w, h) * 0.5f - 1.0f);
++    const CBox  body{transformBox.x + inset, transformBox.y + inset, w - 2.0f * inset, h - 2.0f * inset};
++    std::vector<std::pair<CBox, float>> shapes;
++    if (mac.rectCount > 0) {
++        for (int i = 0; i < std::min(mac.rectCount, MAX_MAC_RECTS); ++i) {
++            const auto& r = mac.rects[i];
++            const CBox  box{body.x + r.x * scale, body.y + r.y * scale, r.width * scale, r.height * scale};
++            if (box.x + box.w > body.x + body.w + 0.5 || box.y + box.h > body.y + body.h + 0.5)
++                continue;
++            shapes.emplace_back(box, r.radius * scale);
++        }
++    } else {
++        const float radius = mac.radius < 0.0f ? (body.h > 100.0f * scale ? 23.0f * scale : body.h * 0.5f) : mac.radius * scale;
++        shapes.emplace_back(body, radius);
++    }
++
++    if (m_appleStates.size() < shapes.size())
++        m_appleStates.resize(shapes.size());
++    const bool resample = layerSurface->mapped();
++    for (size_t i = 0; i < shapes.size(); ++i) {
++        if (!m_appleStates[i])
++            m_appleStates[i] = std::make_shared<AppleGlass::CState>();
++        const auto& [box, radius] = shapes[i];
++        m_appleStates[i]->draw(monitor, params, box, {radius, radius, radius, radius}, std::nullopt, 0.0f, alpha, resample);
++    }
++
++    // Client surface on top.
++    auto&      shaders = g_pGlobalState->shaderManager;
++    const auto glTarget = dynamic_cast<Render::GL::CGLFramebuffer*>(target.get());
++    if (!glTarget)
++        return;
++    const bool additive = mac.placeholderAdditive;
++    if (additive) {
++        if (!m_appleBgFramebuffer)
++            m_appleBgFramebuffer = g_pHyprRenderer->createFB("hyprglass-apple-bg");
++        if (m_appleBgFramebuffer->m_size != target->m_size || m_appleBgFramebuffer->m_drmFormat != target->m_drmFormat)
++            m_appleBgFramebuffer->alloc(static_cast<int>(target->m_size.x), static_cast<int>(target->m_size.y), target->m_drmFormat);
++        const auto bgFb = dynamic_cast<Render::GL::CGLFramebuffer*>(m_appleBgFramebuffer.get());
++        const int  x0 = std::max(0, static_cast<int>(std::floor(transformBox.x))), y0 = std::max(0, static_cast<int>(std::floor(transformBox.y)));
++        const int  x1 = std::min(static_cast<int>(target->m_size.x), static_cast<int>(std::ceil(transformBox.x + transformBox.w)));
++        const int  y1 = std::min(static_cast<int>(target->m_size.y), static_cast<int>(std::ceil(transformBox.y + transformBox.h)));
++        if (bgFb && x1 > x0 && y1 > y0) {
++            glBindFramebuffer(GL_READ_FRAMEBUFFER, glTarget->getFBID());
++            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, bgFb->getFBID());
++            glBlitFramebuffer(x0, y0, x1, y1, x0, y0, x1, y1, GL_COLOR_BUFFER_BIT, GL_NEAREST);
++            glBindFramebuffer(GL_FRAMEBUFFER, glTarget->getFBID());
++        }
++    }
++
++    CBox       quad      = rawBox;
++    const auto transform = Math::wlTransformToHyprutils(Math::invertTransform(monitor->m_transform));
++    Mat3x3     glMatrix  = g_pHyprRenderer->projectBoxToTarget(quad, transform);
++    glMatrix.transpose();
++    glBindFramebuffer(GL_FRAMEBUFFER, glTarget->getFBID());
++    auto shader = g_pHyprOpenGL->useShader(shaders.appleSurfaceShader);
++    shader->setUniformMatrix3fv(SHADER_PROJ, 1, GL_FALSE, glMatrix.getMatrix());
++    shader->setUniformInt(SHADER_TEX, 0);
++    const GLuint P   = shader->program();
++    auto         loc = [&](const char* n) { return glGetUniformLocation(P, n); };
++    glActiveTexture(GL_TEXTURE0);
++    glBindTexture(mask.target, mask.textureId);
++    glActiveTexture(GL_TEXTURE1);
++    if (additive && m_appleBgFramebuffer)
++        m_appleBgFramebuffer->getTexture()->bind();
++    glActiveTexture(GL_TEXTURE0);
++    glUniform1i(loc("bgTex"), 1);
++    glUniform2f(loc("maskUVOffset"), mask.uvOffset.x, mask.uvOffset.y);
++    glUniform2f(loc("maskUVScale"), mask.uvScale.x, mask.uvScale.y);
++    glUniform1f(loc("opacity"), std::clamp(alpha, 0.0f, 1.0f));
++    glUniform1i(loc("placeholderAdditive"), additive ? 1 : 0);
++    {
++        const auto workDesc = g_pHyprRenderer->workBufferImageDescription();
++        const bool gamma22  = NColorManagement::getDefaultImageDescription()->value().transferFunction == NColorManagement::CM_TRANSFER_FUNCTION_GAMMA22;
++        bool       linear = false;
++        float      black = 0.0f, white = 1.0f;
++        if (workDesc->value().transferFunction == NColorManagement::CM_TRANSFER_FUNCTION_EXT_LINEAR) {
++            const auto cm = g_pHyprRenderer->getCMSettings(NColorManagement::getDefaultImageDescription(), workDesc, nullptr, true,
++                                                           monitor->m_sdrMinLuminance, monitor->m_sdrMaxLuminance);
++            const float range = std::max(cm.dstTFRange.max - cm.dstTFRange.min, 1e-6f);
++            linear = true;
++            black  = (cm.srcTFRange.min - cm.dstTFRange.min) / range * cm.sdrBrightnessMultiplier;
++            white  = (cm.srcTFRange.max - cm.dstTFRange.min) / range * cm.sdrBrightnessMultiplier;
++        }
++        glUniform1i(loc("workLinear"), linear ? 1 : 0);
++        glUniform1f(loc("workBlack"), black);
++        glUniform1f(loc("workWhite"), white);
++        glUniform1i(loc("sdrGamma22"), gamma22 ? 1 : 0);
++    }
++    g_pHyprRenderer->blend(true);
++    glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
++    CBox damageExtents = g_pHyprRenderer->m_renderData.damage.copy().intersect(transformBox).getExtents();
++    if (damageExtents.w > 0 && damageExtents.h > 0) {
++        glBindVertexArray(shader->getUniformLocation(SHADER_SHADER_VAO));
++        g_pHyprOpenGL->scissor(damageExtents);
++        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
++        g_pHyprOpenGL->scissor(nullptr);
++        glBindVertexArray(0);
++    }
++    glActiveTexture(GL_TEXTURE1);
++    glBindTexture(GL_TEXTURE_2D, 0);
++    glActiveTexture(GL_TEXTURE0);
++    glBindTexture(GL_TEXTURE_2D, 0);
++}
+diff --git a/src/GlassLayerSurface.hpp b/src/GlassLayerSurface.hpp
+index aa73028..d3cb2ff 100644
+--- a/src/GlassLayerSurface.hpp
++++ b/src/GlassLayerSurface.hpp
+@@ -1,5 +1,6 @@
+ #pragma once
+ 
++#include "AppleGlass.hpp"
+ #include "GlassRenderer.hpp"
+ #include "PluginConfig.hpp"
+ 
+@@ -62,6 +63,12 @@ class CGlassLayerSurface {
+     [[nodiscard]] const SMacLayerShape* macShape() const;
+     [[nodiscard]] float currentMacTint();
+     SP<Render::IFramebuffer> m_surfaceTempFramebuffer;
++    // mac_apple: one AppleGlass backdrop cache per glass shape, and a target copy for
++    // additive placeholder ink.
++    std::vector<std::shared_ptr<AppleGlass::CState>> m_appleStates;
++    SP<Render::IFramebuffer>                         m_appleBgFramebuffer;
++    void compositeApple(PHLMONITOR monitor, const SMacLayerShape& mac, float alpha, const CBox& rawBox, const CBox& transformBox,
++                        const GlassRenderer::SMaskInfo& mask);
+     Vector2D     m_samplePaddingRatio;
+     bool         m_hasCachedSample = false;
+     bool         m_backgroundDirty = false;
+diff --git a/src/PluginConfig.cpp b/src/PluginConfig.cpp
+index d3daa87..5518003 100644
+--- a/src/PluginConfig.cpp
++++ b/src/PluginConfig.cpp
+@@ -1,3 +1,4 @@
++#include "AppleGlass.hpp"
+ #include "PluginConfig.hpp"
+ #include "BuiltInPresets.hpp"
+ #include "Globals.hpp"
+@@ -746,6 +747,7 @@ struct SPendingLayer {
+     bool                          macPlaceholderAdditive = false;
+     std::array<SMacRect, MAX_MAC_RECTS> macRects{};
+     int                           macRectCount = 0;
++    std::string                   macApple;
+ };
+ 
+ static std::vector<SPendingLayer> s_pendingLayers;
+@@ -860,6 +862,16 @@ static int handleLuaLayer(lua_State* L) {
+         }
+         lua_pop(L, 1);
+ 
++        lua_getfield(L, 2, "mac_apple");
++        if (!lua_isnil(L, -1)) {
++            if (!lua_isstring(L, -1) || !AppleGlass::preset(lua_tostring(L, -1)))
++                return luaL_error(L, "hyprglass.layer: mac_apple must name a built-in Apple glass preset");
++            entry.macApple = lua_tostring(L, -1);
++            if (!entry.macInset)
++                entry.macInset = 0.0f;
++        }
++        lua_pop(L, 1);
++
+         lua_getfield(L, 2, "mac_material");
+         if (!lua_isnil(L, -1)) {
+             if (!lua_istable(L, -1))
+@@ -964,7 +976,7 @@ void commitPendingLayers() {
+                                                                     .outline = entry.macOutline, .controlProfile = entry.macControlProfile, .tint = entry.macTint, .tangential = entry.macTangential,
+                                                                     .placeholderAdditive = entry.macPlaceholderAdditive,
+                                                                     .rects = entry.macRects, .rectCount = entry.macRectCount,
+-                                                                    .material = entry.macMaterial};
++                                                                    .material = entry.macMaterial, .apple = entry.macApple};
+                 // the mac shader composites the surface itself and needs the redirect
+                 g_pGlobalState->layerNamespaceMaskModes[entry.ns] = ELayerMaskMode::ALPHA;
+             }
+diff --git a/src/PluginConfig.hpp b/src/PluginConfig.hpp
+index 3d68b6d..2b2a9d2 100644
+--- a/src/PluginConfig.hpp
++++ b/src/PluginConfig.hpp
+@@ -427,4 +427,7 @@ struct SMacLayerShape {
+     std::array<SMacRect, MAX_MAC_RECTS> rects{}; // body logical px, relative to inset origin
+     int rectCount = 0; // zero preserves the single Spotlight shape
+     SMacMaterial material{};
++    // Non-empty: draw with the ported QuartzCore glass_background preset of this name
++    // (AppleGlass, e.g. "apple-dock", "apple-menu") instead of the fitted shader.
++    std::string apple;
+ };
+diff --git a/src/ShaderManager.cpp b/src/ShaderManager.cpp
+index 74d3482..cad1e95 100644
+--- a/src/ShaderManager.cpp
++++ b/src/ShaderManager.cpp
+@@ -103,7 +103,8 @@ bool CShaderManager::compileBlurShader() {
+ 
+ bool CShaderManager::compileMacShaders() {
+     for (auto& [shader, file] : {std::pair{macShader, "macglass.frag"}, std::pair{macBlurShader, "macblur.frag"},
+-                                 std::pair{appleShader, "appleglass.frag"}, std::pair{appleCopyShader, "applecopy.frag"}}) {
++                                 std::pair{appleShader, "appleglass.frag"}, std::pair{appleCopyShader, "applecopy.frag"},
++                                 std::pair{appleDownShader, "appledown.frag"}, std::pair{appleSurfaceShader, "applesurface.frag"}}) {
+         if (!shader->createProgram(g_pHyprOpenGL->m_shaders->TEXVERTSRC, loadShaderSource(file), true)) {
+             HyprlandAPI::addNotification(PHANDLE, std::format("[{}] Failed to compile {}", PLUGIN_NAME, file), CHyprColor{1.0, 0.2, 0.2, 1.0}, 5000);
+             return false;
+@@ -127,6 +128,8 @@ void CShaderManager::destroy() noexcept {
+     macBlurShader->destroy();
+     appleShader->destroy();
+     appleCopyShader->destroy();
++    appleDownShader->destroy();
++    appleSurfaceShader->destroy();
+     m_initialized   = false;
+     m_compileFailed = false;
+ }
+diff --git a/src/ShaderManager.hpp b/src/ShaderManager.hpp
+index e724f6e..3370afb 100644
+--- a/src/ShaderManager.hpp
++++ b/src/ShaderManager.hpp
+@@ -85,6 +85,8 @@ class CShaderManager {
+     // QuartzCore glass_background port (AppleGlass.hpp).
+     SP<CShader>    appleShader     = makeShared<CShader>();
+     SP<CShader>    appleCopyShader = makeShared<CShader>();
++    SP<CShader>    appleDownShader = makeShared<CShader>();
++    SP<CShader>    appleSurfaceShader = makeShared<CShader>();
+ 
+   private:
+     bool m_initialized = false;
+diff --git a/src/Shaders.hpp b/src/Shaders.hpp
+index 09cb83a..9b54bc0 100644
+--- a/src/Shaders.hpp
++++ b/src/Shaders.hpp
+@@ -774,6 +774,88 @@ void main() {
+     }
+     fragColor = vec4(rgb, 1.0);
+ }
++)GLSL"},
++
++    // Client layer surface over AppleGlass (premultiplied over). With placeholderAdditive the
++    // marker ink (encoded gray 124) is added to the glass below it, like macglass.frag.
++    {"applesurface.frag", R"GLSL(
++#version 300 es
++precision highp float;
++
++uniform sampler2D tex;        // redirected layer surface, monitor sized, premultiplied
++uniform sampler2D bgTex;      // monitor-sized copy of the target (placeholderAdditive only)
++uniform vec2 maskUVOffset;
++uniform vec2 maskUVScale;
++uniform float opacity;
++uniform int placeholderAdditive;
++uniform int workLinear;
++uniform float workBlack;
++uniform float workWhite;
++uniform int sdrGamma22;
++
++in vec2 v_texcoord;
++layout(location = 0) out vec4 fragColor;
++
++vec3 toSrgb(vec3 c) {
++    if (workLinear == 0) return c;
++    vec3 v = clamp((c - workBlack) / max(workWhite - workBlack, 1e-6), 0.0, 1.0);
++    if (sdrGamma22 == 1) return pow(v, vec3(1.0 / 2.2));
++    return mix(1.055 * pow(v, vec3(1.0 / 2.4)) - 0.055, v * 12.92, lessThanEqual(v, vec3(0.0031308)));
++}
++vec3 fromSrgb(vec3 c) {
++    if (workLinear == 0) return c;
++    vec3 v = clamp(c, 0.0, 1.0);
++    vec3 l = sdrGamma22 == 1 ? pow(v, vec3(2.2)) : mix(pow((v + 0.055) / 1.055, vec3(2.4)), v / 12.92, lessThanEqual(v, vec3(0.04045)));
++    return l * (workWhite - workBlack) + workBlack;
++}
++
++void main() {
++    vec2 muv = clamp(v_texcoord * maskUVScale + maskUVOffset, 0.0, 1.0);
++    vec4 surf = texture(tex, muv);
++    if (surf.a <= 0.0) discard;
++    if (placeholderAdditive == 1) {
++        vec3 ink = toSrgb(surf.rgb / surf.a);
++        vec3 encodedPremult = ink * surf.a;
++        bool whiteInk = all(greaterThan(ink, vec3(0.9)));
++        bool markerInk = !whiteInk && all(lessThanEqual(abs(encodedPremult - vec3(124.0 / 255.0) * surf.a), vec3(2.0 / 255.0)));
++        if (markerInk) {
++            vec4 bg = texture(bgTex, muv);
++            vec3 background = toSrgb(bg.rgb / max(bg.a, 1e-6));
++            vec3 o = fromSrgb(clamp(background + vec3(124.0 / 255.0) * surf.a, 0.0, 1.0)) * bg.a;
++            // replace: blending is premultiplied over, so emit the full result with the bg alpha
++            fragColor = vec4(o, bg.a) * opacity;
++            return;
++        }
++    }
++    fragColor = surf * opacity;
++}
++)GLSL"},
++
++    // One level of QuartzCore's backdrop pyramid (variable_blur_downsample): 13 bilinear
++    // taps of the level below at 0, +-1.96 and +-3.92 source texels.
++    {"appledown.frag", R"GLSL(
++#version 300 es
++precision highp float;
++
++uniform sampler2D tex;
++uniform float srcLevel;
++uniform vec2 srcTexel;        // 1 / source level size
++uniform vec2 dstSize;         // destination level size
++
++in vec2 v_texcoord;
++layout(location = 0) out vec4 fragColor;
++
++vec4 s(vec2 uv, vec2 o) { return textureLod(tex, uv + o * srcTexel, srcLevel); }
++
++void main() {
++    vec2 uv = gl_FragCoord.xy / dstSize;
++    const float a = 1.9600850343704224, b = 3.9206759929656982;
++    vec4 c = 0.10546875 * s(uv, vec2(0.0));
++    c += 0.0902099609375 * (s(uv, vec2(a, 0.0)) + s(uv, vec2(-a, 0.0)) + s(uv, vec2(0.0, a)) + s(uv, vec2(0.0, -a)));
++    c += 0.07708740234375 * (s(uv, vec2(a, a)) + s(uv, vec2(-a, a)) + s(uv, vec2(a, -a)) + s(uv, vec2(-a, -a)));
++    c += 0.05633544921875 * (s(uv, vec2(b, 0.0)) + s(uv, vec2(-b, 0.0)) + s(uv, vec2(0.0, b)) + s(uv, vec2(0.0, -b)));
++    fragColor = c;
++}
+ )GLSL"},
+ 
+     // glass_background<C,R,E> (QuartzCore, macOS 27), see AppleGlass.hpp for units.
+@@ -819,6 +901,23 @@ uniform vec2 aberrDir;
+ uniform float clampLimit;
+ uniform int preserveHue;
+ 
++// Shape: 0 = circular corners, 1 = Apple continuous corners (supercircle_sdf).
++// ovalization blends the normal toward an elliptical radial normal (SdfFragmentUniforms arg.w).
++uniform int continuousCorners;
++uniform float ovalization;
++
++// Separate glass-highlight layer: sdf_diffuse_kf_highlight + vibrant_color_matrix_sover
++// (QuartzCore TdkfBvcm pipeline), drawn over the finished glass. Lengths in points.
++uniform int dkfEnabled;
++uniform vec4 dkfP1;           // (key height, cos key spread, key amt', key dir.x)
++uniform vec4 dkfP2;           // (key dir.y, fill height, cos fill spread, fill amt')
++uniform vec4 dkfP3;           // (-, -, curvature, effect offset)
++uniform vec4 dkfP4;           // (diffuse key height, cos, amt', diffuse fill height)
++uniform vec4 dkfP5;           // (diffuse fill cos, diffuse fill amt', -, -)
++uniform vec2 dkfColorA;       // key / fill colour alpha
++uniform vec4 dkfCm[3];        // rgb rows + offset; alpha row is identity
++uniform vec2 dkfClamp;        // (max component, preserve hue)
++
+ uniform int workLinear;
+ uniform float workBlack;
+ uniform float workWhite;
+@@ -846,23 +945,62 @@ vec3 cmat(vec4 m[3], vec3 c) { return vec3(dot(c, m[0].rgb), dot(c, m[1].rgb), d
+ vec3 flush(vec3 c) { return mix(c, vec3(0.0), lessThan(abs(c), vec3(1e-6))); }
+ vec3 unpremul(vec4 c) { return c.rgb / max(c.a, 1e-6); }
+ 
++// ShaderUtils::supercircle_sdf (QuartzCore uber shader), p in the positive quadrant.
++vec3 supercircleSdf(vec2 p, vec2 hs, float r) {
++    float k  = abs(r) * 1.5286649465560913;
++    float rr = k;
++    vec2  q  = p - hs + rr;
++    vec2  uc = abs(max(vec2(0.0), (p - hs + k) / max(k, 1e-6)));
++    float len = length(uc);
++    float mx = max(uc.x, uc.y), mn = min(uc.x, uc.y);
++    float t  = (mx == 0.0) ? 0.0 : clamp(mn / mx, 0.0, 1.0);
++    float poly = (((-0.9260540008544922 * t + 3.1560099124908447) * t - 3.6412200927734375) * t
++                  + 1.268030047416687) * t + 0.2685309946537018;
++    float v  = len + 1.0 - 1.0 / (1.0 - t * t * clamp(len, 0.0, 1.0) * poly) - 1.0;
++    float dist = min(max(q.x, q.y), 0.0) + k * v;
++    vec2  mq = max(vec2(0.0), q);
++    vec2  nq = mq * inversesqrt(max(dot(mq, mq), 1e-30));
++    vec2  n  = (nq.x + nq.y > 0.0) ? nq : (q.x > q.y ? vec2(1.0, 0.0) : vec2(0.0, 1.0));
++    return vec3(dist, n);
++}
++
+ // Rounded box: (distance px, outward unit normal). Corner order matches `radii`.
+ vec3 sdg(vec2 fp) {
+     vec2 h = shapeRect.zw * 0.5;
+     vec2 p = fp - shapeRect.xy - h;
+     float r = p.x > 0.0 ? (p.y > 0.0 ? radii.z : radii.y) : (p.y > 0.0 ? radii.w : radii.x);
+-    r = min(r, min(h.x, h.y));
+-    vec2 w = abs(p) - (h - r);
+     vec2 s = vec2(p.x < 0.0 ? -1.0 : 1.0, p.y < 0.0 ? -1.0 : 1.0);
+-    float g = max(w.x, w.y);
+-    vec2 q = max(w, 0.0);
+-    float l = length(q);
+-    vec2 n = s * (g > 0.0 ? q / max(l, 1e-6) : (w.x > w.y ? vec2(1.0, 0.0) : vec2(0.0, 1.0)));
+-    return vec3(g > 0.0 ? l - r : g - r, n);
++    vec3 res;
++    // continuous corners need 1.53 r of straight edge; larger radii (capsules) stay circular
++    if (continuousCorners == 1 && r * 1.5286649465560913 <= min(h.x, h.y)) {
++        vec3 sc = supercircleSdf(abs(p), h, r);
++        res = vec3(sc.x, s * sc.yz);
++    } else {
++        r = min(r, min(h.x, h.y));
++        vec2 w = abs(p) - (h - r);
++        float g = max(w.x, w.y);
++        vec2 q = max(w, 0.0);
++        float l = length(q);
++        vec2 n = s * (g > 0.0 ? q / max(l, 1e-6) : (w.x > w.y ? vec2(1.0, 0.0) : vec2(0.0, 1.0)));
++        res = vec3(g > 0.0 ? l - r : g - r, n);
++    }
++    if (ovalization > 0.0) {
++        vec2 radial = normalize(vec2(p.x, h.x * p.y / max(h.y, 1e-6)) + 1e-9);
++        res.yz = normalize(mix(res.yz, radial, ovalization));
++    }
++    return res;
+ }
+ 
+ vec4 src(vec2 fp, float r) { return textureLod(tex, (fp - texOrigin) / texSize, lodBias + blurLod(r)); }
+ 
++float dkfLobe(float depth, float fw, float height, float cosSpread, float ndotl, float curvature, bool specular) {
++    float t = clamp(depth / max(height, 1e-6), 0.0, 1.0);
++    float m = specular ? mix(t < 1.0 ? 1.0 : 0.0, 1.0 - t, curvature) : (1.0 - t);
++    float a = clamp(depth / fw + 0.5, 0.0, 1.0) * m * clamp((height - depth) / fw + 0.5, 0.0, 1.0);
++    return a * clamp((ndotl - cosSpread) / max(1.0 - cosSpread, 1e-4), 0.0, 1.0);
++}
++float dkfShape(float v, float amt) { return v / max(1.0 + amt - amt * v, 1e-4); }
++
+ vec4 aberrate(vec2 fp, vec2 off, float radius) {
+     float lod = blurLod(radius);
+     vec2 o = vec2(lod * px);
+@@ -1061,6 +1199,35 @@ void main() {
+         o.rgb = c * o.a;
+     }
+ 
++    // (9) glass-highlight layer over the finished glass (framebuffer = glass over backdrop)
++    if (dkfEnabled == 1) {
++        float depth = -(d + dkfP3.w);
++        float hfw = max(fwidth(depth), 1e-4);
++        float kdot = dot(vec2(dkfP1.w, dkfP2.x), n);
++        float k  = dkfLobe(depth, hfw, dkfP1.x, dkfP1.y, kdot, dkfP3.z, true);
++        float f  = dkfLobe(depth, hfw, dkfP2.y, dkfP2.z, -kdot, dkfP3.z, true);
++        float dk = dkfLobe(depth, hfw, dkfP4.x, dkfP4.y, kdot, dkfP3.z, false);
++        float df = dkfLobe(depth, hfw, dkfP4.w, dkfP5.x, -kdot, dkfP3.z, false);
++        float ha = (dkfShape(k, dkfP1.z) + dkfShape(dk, dkfP4.z)) * dkfColorA.x + (dkfShape(f, dkfP2.w) + dkfShape(df, dkfP5.y)) * dkfColorA.y;
++        if (ha > 1e-4) {
++            vec3 bg0 = flush(unpremul(textureLod(tex, (fp - texOrigin) / texSize, 0.0)));
++            vec3 dst = o.rgb + (1.0 - o.a) * bg0;
++            vec3 m = cmat(dkfCm, dst) * ha;
++            float ma = ha;
++            if (dkfClamp.x > 0.0) {
++                vec3 un = m / max(ma, 1e-4);
++                if (dkfClamp.y > 0.0) {
++                    float mx = max(max(un.r, un.g), un.b);
++                    if (mx > dkfClamp.x) un *= dkfClamp.x / mx;
++                } else {
++                    un = clamp(un, vec3(-0.75), vec3(dkfClamp.x));
++                }
++                m = un * ma;
++            }
++            o = vec4(m + (1.0 - ma) * dst, 1.0);
++        }
++    }
++
+     if (workLinear == 1 && o.a > 0.0)
+         o.rgb = fromSrgb(clamp(o.rgb / o.a, 0.0, 1.0)) * o.a;
+     fragColor = o * opacity;

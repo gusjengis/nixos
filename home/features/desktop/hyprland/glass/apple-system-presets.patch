@@ -1,0 +1,17 @@
+diff --git a/src/AppleGlass.cpp b/src/AppleGlass.cpp
+--- a/src/AppleGlass.cpp
++++ b/src/AppleGlass.cpp
+@@ -206,9 +206,13 @@
++    #include "AppleSystemPresets.inc"
++
+     const std::unordered_map<std::string, SParams>& presets() {
+         static const std::unordered_map<std::string, SParams> table = {
+             {"apple-sidebar", makeSidebar()},
+             {"apple-dock", makeDock()},
+             {"apple-menu", makeMenu()},
+             {"apple-widgets", makeWidgets()},
++            {"apple-control-center", makeControlCenter()},
++            {"apple-notification", makeNotification()},
+         };
+         return table;
+     }

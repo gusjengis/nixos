@@ -19,6 +19,8 @@ PanelWindow {
     property real popupY: Theme.barPopupY(anchorItem)
     property real popupWidth: 200
     property real popupHeight: 100
+    // Screen-local placement for application menus that have no shell anchor.
+    property var absolutePosition: null
     // Must match the hyprglass layer radius configured for glassNamespace.
     property string glassNamespace: "quickshell-menu"
     // False for surfaces whose children carry their own material.
@@ -29,12 +31,21 @@ PanelWindow {
     property int popupRadius: glassNamespace === "quickshell-panel" ? Theme.panelRadius : Theme.menuRadius
     readonly property bool glass: Theme.glassActive
     property int shadowPadding: glass ? Theme.glassShadowPadding : 0
+    // Space below the body for a compositor-drawn pointer (Dock menus).
+    property int calloutHeight: 0
     default property alias content: body.data
     readonly property Item body: body
 
     property point _origin: Qt.point(0, 0)
 
     function _place() {
+        if (absolutePosition !== null) {
+            const maxX = screen ? screen.width - popupWidth - Theme.popupScreenMargin : absolutePosition.x;
+            const maxY = screen ? screen.height - popupHeight - Theme.popupScreenMargin : absolutePosition.y;
+            _origin = Qt.point(Math.round(Math.max(Theme.popupScreenMargin, Math.min(absolutePosition.x, maxX))),
+                Math.round(Math.max(Theme.popupScreenMargin, Math.min(absolutePosition.y, maxY))));
+            return;
+        }
         if (!anchorItem)
             return;
         const p = anchorItem.mapToItem(null, popupX, popupY);
@@ -46,6 +57,8 @@ PanelWindow {
     onAnchorItemChanged: _place()
     onPopupXChanged: _place()
     onPopupWidthChanged: _place()
+    onPopupHeightChanged: _place()
+    onAbsolutePositionChanged: _place()
     onPopupYChanged: _place()
     onScreenChanged: _place()
 
@@ -54,7 +67,7 @@ PanelWindow {
     color: "transparent"
     exclusionMode: ExclusionMode.Ignore
     implicitWidth: popupWidth + 2 * shadowPadding
-    implicitHeight: popupHeight + 2 * shadowPadding
+    implicitHeight: popupHeight + calloutHeight + 2 * shadowPadding
     anchors {
         top: true
         left: true

@@ -13,9 +13,18 @@ their original workspaces; they are not serialized, closed, or rearranged.
 ## Try It Here
 
 - `Super+Z`: open session picker.
+- The picker shows a two-column gallery of session workspace previews, app icons,
+  and workspace-view dots. Default preview follows the remembered numbered slot
+  and visible local scratchpad, including empty desktops. Special-workspace
+  previews compose the normal workspace underneath, with thumbnail-scaled blur
+  and dimming from the compositor settings. Hover a dot to preview another
+  workspace or local scratchpad without switching. Previews capture one frame per window on
+  demand, including hidden sessions; global scratchpads are excluded. Missing
+  captures fall back to window layout and app icons.
+- Left/Right selects a card when the search field is empty; Up/Down moves a row.
 - Type a name with no matching session and press Enter to create and switch.
 - `Ctrl+N`: create using the field text, even when search has matches.
-- Up/Down and Enter: select and switch.
+- Arrow keys and Enter: select and switch.
 - F2 or Ctrl+R: rename selected session; Enter saves.
 - Ctrl+D: request closing selected session; Y confirms, N or Escape cancels.
 - Escape: close picker.
@@ -57,7 +66,9 @@ than reopening the closed one. Ctrl+D can explicitly retry closure while a
 session is still waiting for its application windows to exit.
 
 Qobuz (`Super+Shift+Q`) and Music Assistant (`Super+M`) are global. Every session
-reaches the same player workspace. Other application scratchpads remain local.
+reaches the same player workspace. Discord (`Super+D`) is also global: its single
+instance is reachable from every session, and only its scratchpad scope changes.
+Other application scratchpads remain local.
 
 ## Embed the Backend
 
@@ -138,7 +149,7 @@ for state.
 | `show_special(role, monitor?)` | Idempotently show role; lazily launch when empty |
 | `special_name(role)` | Return role's local or global raw `special:...` address |
 | `launch_special(role, command, expected_workspace?)` | Launch silently, without showing; reject stale expected address |
-| `focus_window(address)` | Switch owning session, then focus window; use `address:0x...` |
+| `focus_window(address, opts?)` | Switch owning session, then focus window; use `address:0x...`. Set `{ preserve_cursor = true }` for pointer-driven activation such as dock clicks; suppresses warps during the entire operation and restores the prior cursor policy even on failure. |
 | `state()` | Return frontend snapshot as a Lua table |
 
 Omitted monitor means focused monitor. The backend handles registry, ownership,
@@ -170,6 +181,11 @@ addresses with `name:` when passing to native dispatchers; special addresses
 already include `special:`. Prefer backend operations instead of doing this
 yourself. Workspaces have an immutable address and a separate display name;
 renaming a display name does not change ownership.
+Each session also exposes its own `workspaces` (monitor to slot addresses) and
+`specials` (role to address) maps, so overviews can label inactive sessions
+without parsing generated workspace names. These maps can be sparse or empty.
+`slots` and `visible_specials` remember the selected numbered slot and visible
+local special role per monitor, including when no window can receive focus.
 Native `monitor:set_special_workspace()` instead accepts a bare name without
 `special:`. The backend handles this conversion for showing and restoring.
 
@@ -217,10 +233,19 @@ XDG_RUNTIME_DIR=/tmp/opencode HYPRLAND_INSTANCE_SIGNATURE=test-sessions \
   home/features/desktop/hyprland/config/sessions/test.lua
 PYTHONDONTWRITEBYTECODE=1 python -m unittest discover \
   -s home/features/desktop/quickshell -p test_session_search.py
+qs -p home/features/desktop/quickshell/test_session_overview.qml
+QT_QPA_PLATFORM=offscreen qs -p home/features/desktop/quickshell/test_session_preview_geometry.qml
+QT_QPA_PLATFORM=offscreen qs -p home/features/desktop/quickshell/test_session_preview_state.qml
+# Inside a disposable nested compositor (its WAYLAND_DISPLAY and signature).
+# Keep its host window visible so Wayland frame callbacks are not throttled:
+SESSION_GALLERY_TEST=1 qs -p home/features/desktop/quickshell/test_session_gallery.qml
 ```
 
 Backend tests mock compositor operations across two monitors, existing windows,
 local/global scratchpads, scope changes, launches, navigation, reload, external
 focus, session-local pin suspension/restoration, orphaned pin recovery, monitor
 disconnect/reconnect, failed activation rollback, and safe session closure.
-No desktop applications are launched by tests.
+Backend tests launch no desktop applications.
+The separate gallery rendering test starts two disposable Quickshell fixture
+windows, verifies captured pixels for both cards, and saves its rendered panel
+to `/tmp/opencode/session-gallery-fixture.png`. Do not run it on the main desktop.

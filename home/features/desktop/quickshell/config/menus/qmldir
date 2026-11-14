@@ -1,0 +1,4 @@
+module ContextMenus
+singleton ContextMenus 1.0 ContextMenus.qml
+ContextMenuWindow 1.0 ContextMenuWindow.qml
+ContextMenuRow 1.0 ContextMenuRow.qml

@@ -1,0 +1,24 @@
+--- a/packages/schema/src/config/agent.ts
++++ b/packages/schema/src/config/agent.ts
+@@ -9,1 +9,4 @@
+-export const Color = Schema.String.check(Schema.isPattern(/^#[0-9a-fA-F]{6}$/u))
++export const Color = Schema.Union([
++  Schema.String.check(Schema.isPattern(/^#[0-9a-fA-F]{6}$/u)),
++  Schema.Literals(["primary", "secondary", "accent", "error", "warning", "success", "info"]),
++])
+--- a/packages/core/src/v1/config/migrate.ts
++++ b/packages/core/src/v1/config/migrate.ts
+@@ -48,1 +48,1 @@
+-      color: info.color === undefined ? undefined : info.color.startsWith("#") ? info.color : "#aaaaaa",
++      color: info.color,
+--- a/packages/tui/src/context/local.tsx
++++ b/packages/tui/src/context/local.tsx
+@@ -1,1 +1,2 @@
+ import { createStore } from "solid-js/store"
++import { agentThemeColor } from "../util/desktop-agent-colors.mjs"
+@@ -136,1 +137,4 @@
+-          if (agent?.color) return RGBA.fromHex(agent.color)
++          if (agent?.color) {
++            if (agent.color.startsWith("#")) return RGBA.fromHex(agent.color)
++            return agentThemeColor(theme, agent.color, newDesigns() ? 400 : 200) ?? colors()[index % colors().length]
++          }

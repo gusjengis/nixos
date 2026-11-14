@@ -1,0 +1,370 @@
+diff --git a/protocols/hyprglass-item-v1.xml b/protocols/hyprglass-item-v1.xml
+index 4aeed1a..8ffa9c9 100644
+--- a/protocols/hyprglass-item-v1.xml
++++ b/protocols/hyprglass-item-v1.xml
+@@ -24,7 +24,7 @@
+     SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+   </copyright>
+ 
+-  <interface name="hyprglass_item_manager_v1" version="2">
++  <interface name="hyprglass_item_manager_v1" version="3">
+     <description summary="manager to associate glass item hints with surfaces">
+       This is a Hyprland-hyprglass-specific extension. It lets a client hint
+       how the hyprglass compositor plugin should render the Liquid Glass
+@@ -99,7 +99,7 @@
+     </enum>
+   </interface>
+ 
+-  <interface name="hyprglass_item_v1" version="2">
++  <interface name="hyprglass_item_v1" version="3">
+     <description summary="glass rendering hints for one surface">
+       Carries optional per-surface hints for the hyprglass Liquid Glass
+       effect: which preset to use, and what rounded-rect shape to clip the
+@@ -221,5 +221,29 @@
+         setting (a capsule by default).
+       </description>
+     </request>
++    <request name="set_region" since="3">
++      <description summary="set an additional independently materialed glass region">
++        Sets one of sixteen additional rounded rectangles on this surface.
++        Slots are 0 through 15; larger indices are ignored. This does not
++        alter the original preset/shape hint. Each region has its own named
++        material and circular radius, in surface-local logical coordinates.
++        The same commit latching and inert-object rules apply. Unknown presets
++        draw nothing. Non-positive extents remove the slot; negative radii
++        clamp to zero. Regions draw in slot order after the original shape.
++        Version 3 guarantees built-in apple-toolbar and apple-toolbar-inactive
++        materials in addition to apple-sidebar.
++      </description>
++      <arg name="slot" type="uint"/>
++      <arg name="preset" type="string"/>
++      <arg name="x" type="fixed"/>
++      <arg name="y" type="fixed"/>
++      <arg name="width" type="fixed"/>
++      <arg name="height" type="fixed"/>
++      <arg name="radius" type="fixed"/>
++    </request>
++    <request name="unset_region" since="3">
++      <description summary="clear an additional region on the next surface commit"/>
++      <arg name="slot" type="uint"/>
++    </request>
+   </interface>
+ </protocol>
+diff --git a/src/AppleGlass.cpp b/src/AppleGlass.cpp
+index fb471cb..968caaa 100644
+--- a/src/AppleGlass.cpp
++++ b/src/AppleGlass.cpp
+@@ -203,6 +203,52 @@ namespace {
+     }
+ 
+ 
++    // Finder's live NSToolbar glass group, macOS 27.0.1. Filter inputs and
++    // CASDFKeyFillHighlightEffect were read from Finder; values below are the
++    // corresponding CARenderer GPU uniforms, not the regular/menu recipe.
++    SParams makeToolbar(bool active) {
++        auto p = makeMenu();
++        p.innerRefrAmount = -18.0f; p.innerRefrInvH = 1.0f / 9.0f;
++        p.outerRefrAmount = active ? 16.0f : 0.0f;
++        p.outerRefrInvH = active ? 0.0625f : 1e6f;
++        p.refrOpacity = active ? 0.6001f : 0.0f;
++        p.blurRadius = 1.0f;
++        p.blurAlpha = active ? std::array{0.0f, 0.0f, -0.5f, -0.5f} : std::array{0.3999f, 0.0f, -0.6001f, 0.0f};
++        p.blurDist = active ? std::array{-18.0f, -1.0f, 0.0f, 0.0f} : std::array{0.0f, 0.0f, 0.0f, 0.0f};
++        if (!active)
++            p.faceCm = {Row{0.62305f, -0.09125f, -0.00916f, 0.10248f}, Row{-0.0271f, 0.55859f, -0.00922f, 0.10248f}, Row{-0.02715f, -0.09113f, 0.64062f, 0.10248f}};
++        p.lumaComplement = 0.4f;
++        p.bleedAmount = 12.6f; p.bleedInvH = 1.0f / 12.6f;
++        p.bleedBlur = 0.0f; p.bleedOpacity = 0.0f;
++        p.shadowInvRadius = active ? 0.25f : 1e6f;
++        p.shadowOpacity = active ? 0.04001f : 0.0f;
++        p.ringOpacity = active ? 0.06f : 0.0f;
++        p.hlHeight = 0.5f;
++        p.hlSpread = active ? 0.25879f : -0.5f;
++        p.hlAmount = active ? 0.5f : 0.0f;
++        p.hlOffset = -0.5f;
++        p.hlBias = active ? -0.25f : -0.1875f;
++        p.margin = active ? 16.0f : 0.5f;
++        p.quadPad = active ? 16.0f : 1.0f;
++        p.highlightLayer.enabled = active;
++        p.highlightLayer.keySpread = p.highlightLayer.fillSpread = 1.3962634f;
++        p.highlightLayer.clamp = 1.2f;
++        p.bodyFill = true;
++        p.bodyColor = {40.0f / 255.0f, 40.0f / 255.0f, 40.0f / 255.0f};
++        return p;
++    }
++
++    // Opaque toolbar plane below glass islands, above the window backdrop.
++    // GTK leaves this row transparent so the compositor can draw its materials.
++    SParams makeToolbarBase() {
++        SParams p;
++        p.margin = 0.0f;
++        p.faceOpacity = 1.0f;
++        constexpr float c = 40.0f / 255.0f;
++        p.faceCm = {Row{0, 0, 0, c}, Row{0, 0, 0, c}, Row{0, 0, 0, c}};
++        return p;
++    }
++
+     #include "AppleSystemPresets.inc"
+ 
+     const std::unordered_map<std::string, SParams>& presets() {
+@@ -213,6 +259,9 @@ namespace {
+             {"apple-widgets", makeWidgets()},
+             {"apple-control-center", makeControlCenter()},
+             {"apple-notification", makeNotification()},
++            {"apple-toolbar", makeToolbar(true)},
++            {"apple-toolbar-inactive", makeToolbar(false)},
++            {"apple-toolbar-base", makeToolbarBase()},
+         };
+         return table;
+     }
+@@ -261,18 +310,19 @@ namespace {
+ } // namespace
+ 
+ namespace {
+-    std::unordered_map<WP<CWLSurfaceResource>, std::shared_ptr<CState>>& states() {
+-        static std::unordered_map<WP<CWLSurfaceResource>, std::shared_ptr<CState>> map;
++    std::unordered_map<WP<CWLSurfaceResource>, std::array<std::shared_ptr<CState>, 17>>& states() {
++        static std::unordered_map<WP<CWLSurfaceResource>, std::array<std::shared_ptr<CState>, 17>> map;
+         return map;
+     }
+ }
+ 
+-std::shared_ptr<CState> stateFor(const WP<CWLSurfaceResource>& surface) {
+-    auto& map = states();
+-    auto  it  = map.find(surface);
+-    if (it == map.end())
+-        it = map.emplace(surface, std::make_shared<CState>()).first;
+-    return it->second;
++std::shared_ptr<CState> stateFor(const WP<CWLSurfaceResource>& surface, uint32_t slot) {
++    if (slot >= 17)
++        return nullptr;
++    auto& state = states()[surface][slot];
++    if (!state)
++        state = std::make_shared<CState>();
++    return state;
+ }
+ 
+ void pruneStates() {
+diff --git a/src/AppleGlass.hpp b/src/AppleGlass.hpp
+index 728265c..fe6d5e2 100644
+--- a/src/AppleGlass.hpp
++++ b/src/AppleGlass.hpp
+@@ -148,7 +148,7 @@ class CState {
+ [[nodiscard]] float reachPoints(const SParams& params);
+ 
+ // Per-surface state registry (weakly keyed; pruned once per frame).
+-[[nodiscard]] std::shared_ptr<CState> stateFor(const WP<CWLSurfaceResource>& surface);
++[[nodiscard]] std::shared_ptr<CState> stateFor(const WP<CWLSurfaceResource>& surface, uint32_t slot = 0);
+ void                                  pruneStates();
+ void                                  clearStates();
+ 
+diff --git a/src/ItemHints.cpp b/src/ItemHints.cpp
+index 1c302c9..e1bf945 100644
+--- a/src/ItemHints.cpp
++++ b/src/ItemHints.cpp
+@@ -84,7 +84,7 @@ namespace {
+     }
+ 
+     bool loadHelper() {
+-        if (void* adopted = dlsym(RTLD_DEFAULT, "hyprglass_item_helper_v1_api")) {
++        if (void* adopted = dlsym(RTLD_DEFAULT, "hyprglass_item_helper_v2_api")) {
+             g_api = static_cast<const struct hyprglass_item_helper_v1_api*>(adopted);
+             return true;
+         }
+@@ -118,7 +118,7 @@ namespace {
+             return false;
+         }
+ 
+-        void* symbol = dlsym(handle, "hyprglass_item_helper_v1_api");
++        void* symbol = dlsym(handle, "hyprglass_item_helper_v2_api");
+         if (!symbol) {
+             warnProtocolUnavailable("helper is missing its API symbol");
+             return false;
+@@ -200,3 +200,26 @@ std::optional<SItemHints> ItemHints::forSurface(CWLSurfaceResource* surface) {
+ 
+     return hints;
+ }
++
++std::vector<SItemHints> ItemHints::regionsForSurface(CWLSurfaceResource* surface) {
++    std::vector<SItemHints> regions;
++    if (const auto primary = forSurface(surface))
++        regions.push_back(*primary);
++    auto* resource = g_api ? wireResource(surface) : nullptr;
++    hyprglass_item_state state{};
++    if (!resource || !g_api->get(resource, &state))
++        return regions;
++    for (uint32_t i = 0; i < HYPRGLASS_ITEM_HELPER_REGION_CAP; ++i) {
++        const auto& r = state.regions[i];
++        if (r.width <= 0.0 || r.height <= 0.0)
++            continue;
++        SItemHints hint;
++        hint.preset = r.preset;
++        hint.shapeMode = eItemShapeMode::EXPLICIT;
++        hint.x = r.x; hint.y = r.y; hint.width = r.width; hint.height = r.height;
++        hint.radii.fill(r.radius);
++        hint.slot = i + 1;
++        regions.push_back(std::move(hint));
++    }
++    return regions;
++}
+diff --git a/src/ItemHints.hpp b/src/ItemHints.hpp
+index 90e7c04..2cc7856 100644
+--- a/src/ItemHints.hpp
++++ b/src/ItemHints.hpp
+@@ -4,6 +4,7 @@
+ #include <cstdint>
+ #include <optional>
+ #include <string>
++#include <vector>
+ 
+ class CWLSurfaceResource;
+ 
+@@ -19,6 +20,7 @@ struct SItemHints {
+     eItemShapeMode        shapeMode = eItemShapeMode::NONE;
+     double                x = 0.0, y = 0.0, width = 0.0, height = 0.0; // surface-local logical px, EXPLICIT only
+     std::array<double, 4> radii{};                                     // top-left, top-right, bottom-right, bottom-left (logical px), EXPLICIT only
++    uint32_t              slot = 0; // stable backdrop-cache index, 0 is the original shape
+ };
+ 
+ namespace ItemHints {
+@@ -28,6 +30,7 @@ namespace ItemHints {
+     void exit();
+     // Hints latched by the surface's last applied commit; nullopt when the surface has no active item.
+     std::optional<SItemHints> forSurface(CWLSurfaceResource* surface);
++    std::vector<SItemHints> regionsForSurface(CWLSurfaceResource* surface);
+     // True once the helper is loaded and the wayland global is advertised (between init() succeeding and exit()).
+     bool active();
+ }
+diff --git a/src/item-helper/helper.c b/src/item-helper/helper.c
+index 487e78e..fb90f8c 100644
+--- a/src/item-helper/helper.c
++++ b/src/item-helper/helper.c
+@@ -156,6 +156,30 @@ static void item_handle_unset_shape(struct wl_client* client, struct wl_resource
+     clear_pending_shape(item);
+ }
+ 
++static void item_handle_unset_region(struct wl_client* client, struct wl_resource* resource, uint32_t slot) {
++    (void)client;
++    struct item_object* item = wl_resource_get_user_data(resource);
++    if (!item->inert && slot < HYPRGLASS_ITEM_HELPER_REGION_CAP)
++        memset(&item->pending.regions[slot], 0, sizeof(item->pending.regions[slot]));
++}
++
++static void item_handle_set_region(struct wl_client* client, struct wl_resource* resource, uint32_t slot, const char* preset,
++                                   wl_fixed_t x, wl_fixed_t y, wl_fixed_t width, wl_fixed_t height, wl_fixed_t radius) {
++    struct item_object* item = wl_resource_get_user_data(resource);
++    if (item->inert || slot >= HYPRGLASS_ITEM_HELPER_REGION_CAP)
++        return;
++    item_handle_unset_region(client, resource, slot);
++    if (width <= 0 || height <= 0 || !preset || !preset[0])
++        return;
++    struct hyprglass_item_region* region = &item->pending.regions[slot];
++    strncpy(region->preset, preset, sizeof(region->preset) - 1);
++    region->x = wl_fixed_to_double(x);
++    region->y = wl_fixed_to_double(y);
++    region->width = wl_fixed_to_double(width);
++    region->height = wl_fixed_to_double(height);
++    region->radius = radius < 0 ? 0.0 : wl_fixed_to_double(radius);
++}
++
+ static const struct hyprglass_item_v1_interface item_impl = {
+     .destroy            = item_handle_destroy,
+     .set_preset         = item_handle_set_preset,
+@@ -163,6 +187,8 @@ static const struct hyprglass_item_v1_interface item_impl = {
+     .set_shape          = item_handle_set_shape,
+     .set_inherit_shape  = item_handle_set_inherit_shape,
+     .unset_shape        = item_handle_unset_shape,
++    .set_region         = item_handle_set_region,
++    .unset_region       = item_handle_unset_region,
+ };
+ 
+ static void handle_surface_destroy(struct wl_listener* listener, void* data) {
+@@ -312,7 +338,7 @@ static int api_start(struct wl_display* display) {
+         free(retired);
+     }
+ 
+-    struct wl_global* global = wl_global_create(display, &hyprglass_item_manager_v1_interface, 2, NULL, bind_manager);
++    struct wl_global* global = wl_global_create(display, &hyprglass_item_manager_v1_interface, 3, NULL, bind_manager);
+     if (!global)
+         return -1;
+ 
+@@ -402,7 +428,7 @@ static void api_for_each_active_item(hyprglass_item_foreach_fn callback, void* u
+     }
+ }
+ 
+-const struct hyprglass_item_helper_v1_api hyprglass_item_helper_v1_api = {
++const struct hyprglass_item_helper_v1_api hyprglass_item_helper_v2_api = {
+     .abi_version           = HYPRGLASS_ITEM_HELPER_V1_ABI_VERSION,
+     .start                 = api_start,
+     .stop                  = api_stop,
+diff --git a/src/item-helper/hyprglass_item_helper_api.h b/src/item-helper/hyprglass_item_helper_api.h
+index f3f3b1d..bc8c3e9 100644
+--- a/src/item-helper/hyprglass_item_helper_api.h
++++ b/src/item-helper/hyprglass_item_helper_api.h
+@@ -21,11 +21,17 @@ struct wl_resource;
+ // Bumped on any incompatible layout change to this struct or to
+ // hyprglass_item_state; the plugin refuses to use a helper whose
+ // abi_version does not match its own compiled-in constant.
+-#define HYPRGLASS_ITEM_HELPER_V1_ABI_VERSION 1u
++#define HYPRGLASS_ITEM_HELPER_V1_ABI_VERSION 2u
+ 
+ // Preset names are truncated to this many bytes (including the NUL) rather
+ // than rejected, matching the protocol's "hints are sanitised, not errored" rule.
+ #define HYPRGLASS_ITEM_HELPER_PRESET_CAP 128
++#define HYPRGLASS_ITEM_HELPER_REGION_CAP 16
++
++struct hyprglass_item_region {
++    char preset[HYPRGLASS_ITEM_HELPER_PRESET_CAP];
++    double x, y, width, height, radius;
++};
+ 
+ enum hyprglass_item_shape_mode {
+     HYPRGLASS_ITEM_SHAPE_NONE           = 0, // region extents, corners from subsurfaces:radius
+@@ -41,6 +47,7 @@ struct hyprglass_item_state {
+     enum hyprglass_item_shape_mode shape_mode;
+     double                         x, y, width, height; // surface-local logical px, EXPLICIT only
+     double                         radii[4];             // top-left, top-right, bottom-right, bottom-left, EXPLICIT only
++    struct hyprglass_item_region    regions[HYPRGLASS_ITEM_HELPER_REGION_CAP];
+ };
+ 
+ // Fired synchronously from within the get_item request (on_item_created) and
+@@ -94,7 +101,7 @@ struct hyprglass_item_helper_v1_api {
+ 
+ // Exported by the helper library; fetch with dlsym (dlopen'd instance) or
+ // dlsym(RTLD_DEFAULT, ...) (adopting one loaded by a previous plugin load).
+-extern const struct hyprglass_item_helper_v1_api hyprglass_item_helper_v1_api;
++extern const struct hyprglass_item_helper_v1_api hyprglass_item_helper_v2_api;
+ 
+ #ifdef __cplusplus
+ }
+diff --git a/src/main.cpp b/src/main.cpp
+index 2fe27fa..b1e2ce4 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -572,7 +572,8 @@ static void hkRenderPassAdd(Render::CRenderPass* pass, UP<IPassElement>&& el) {
+     const auto& data      = surfaceEl->m_data;
+     const auto  monitor   = data.pMonitor.lock();
+     if (data.mainSurface && !data.popup && data.pWindow && data.surface && monitor && appleItemsEnabledForWindow(data.pWindow)) {
+-        const auto hints = ItemHints::forSurface(data.surface.get());
++        for (const auto& region : ItemHints::regionsForSurface(data.surface.get())) {
++        const auto* hints = &region;
+         const auto* params = hints && hints->shapeMode == eItemShapeMode::EXPLICIT && hints->width > 0.0 && hints->height > 0.0 ?
+             AppleGlass::preset(hints->preset) :
+             nullptr;
+@@ -601,7 +602,7 @@ static void hkRenderPassAdd(Render::CRenderPass* pass, UP<IPassElement>&& el) {
+             }
+ 
+             AppleGlass::CPassElement::SData glass{
+-                .state         = AppleGlass::stateFor(WP<CWLSurfaceResource>(data.surface)),
++                .state         = AppleGlass::stateFor(WP<CWLSurfaceResource>(data.surface), hints->slot),
+                 .params        = params,
+                 .monitor       = data.pMonitor,
+                 .glassBox      = WindowGeometry::applyMonitorTransform(glassRaw, monitor),
+@@ -619,6 +620,7 @@ static void hkRenderPassAdd(Render::CRenderPass* pass, UP<IPassElement>&& el) {
+             // glass; the window body is opaque, the glass is the backdrop now.
+             surfaceEl->m_data.blur = false;
+         }
++        }
+         callOriginalRenderPassAdd(pass, std::move(el));
+         return;
+     }

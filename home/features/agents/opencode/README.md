@@ -1,30 +1,52 @@
 # OpenCode integration
 
-Pinned OpenCode 1.19.3 carries context ownership/history, freshness and blocking
-stale-session patches. The
+Pinned OpenCode 2.2.6 carries context ownership/history, shared-model and
+goal-aware-title patches. OpenCode 1.19.3 remains
+available internally for original-database exports and rollback. The
 launcher publishes local context visibility, then executes OpenCode without
 checking network working directories or synchronizing chat histories.
 
 ## Startup
 
+V2 uses `v2/config/`, `v2/state/` and `~/.local/share/opencode-v2/`; V1 settings
+and its original database remain intact. The configuration/state directories are
+editable repository-backed Home Manager links. Native profile overrides leave
+the desktop context registry's XDG paths unchanged. Context-bound V2 requests use
+standalone servers, so a shared daemon cannot mix different context environments.
+
+The first rebuild makes a consistent SQLite backup, runs the upstream V1 history
+migration, verifies identities/titles/ancestry/metadata and seeds the portable
+library's new-database ledgers. `opencode-v2-handoff.service` waits for any final
+V1 responses to finish, closes those V1 processes and imports their late writes
+without overwriting divergent data. Pending families remain blocked until the
+handoff completes. Original IDs route to verified replacement IDs. The profile
+record lives in `~/.local/state/desktop-contexts/opencode-profile.json`; selecting
+an older installed launcher restores the original database default on rollback.
+
+V2 portable bundles use format 3. V2 can restore old format 1/2 bundles using the
+upstream history transformer. V1 rejects format 3 before importing any members.
+
 - `plugins/context-library.js` discovers visible portable summaries asynchronously.
-  Fresh and unchanged local conversations send without waiting for discovery.
-  Every send checks device-local authoritative freshness and received-head state;
-  conversations created here have no lifetime exemption. Opening a portable-only
+  Local conversations send without freshness checks or waiting for discovery.
+  Opening a portable-only
   conversation imports only its selected family. Preparation failures retain
   histories and report errors without turning missing data into readiness.
 - The history picker merges local rows and portable summaries with persistent
-  availability/progress/error state. `context-stale` blocks known superseded chats
-  with an acknowledgement overlay, preserves drafts and histories, and opens the
-   latest verified copy only after a deliberate choice and revision recheck.
-   A changed shared archive head alone does not latch the stale overlay: discovery
-   first determines whether this conversation changed. Local checkpoint publication
-   is recognized through its database-local durable journal, including the interval
-   before ledger commit; local selection and observed revision publish atomically.
+  availability/progress/error state. Conversation-update blocking and its recovery
+  overlay are removed: newer remote copies never interrupt local continuation.
+  Portable import validation, ownership, and the one-time V1 profile handoff remain.
 - `notebook/` resolves notebook identity from conversation ownership using local
   metadata, without probing job/repository directories.
 - `tui-plugins/context-persistence.js` exposes selected-chat metadata for terminal
   recovery. Its `db path` helper explicitly skips interactive startup preparation.
+- Command palette **Move session to context** offers searchable context breadcrumbs,
+  including sub-contexts. After confirmation, an idle conversation and all its
+  subagents transfer to the destination's portable library, preserving native
+  session IDs, history and working directory. Open the destination context and
+  select the chat to continue. Source history is tombstoned against resurrection;
+  interrupted publication can be finished by repeating the same move. The transfer
+  uses native `db` tooling and a durable device-local journal. Moving back creates
+  a fresh portable identity rather than reviving a deleted archive entry.
 - `tmux-theme` copies theme colors into tmux pane options; it does not restore
   windows. `tmux-status` drives work/question/completion indicators.
 - `session-notify` provides desktop notifications and sounds.
@@ -35,7 +57,16 @@ quick/deep agents. Main-vault transcript collector remains available manually;
 its user and Omega system timers are declaratively omitted while that vault is
 archived. Verify activation separately on each host.
 
-## Claude authentication
+## V2 Claude authentication
+
+`v2/claude-auth.nix` pins the V2-compatible upstream 3.0.0 plugin. Discovery checks
+connection metadata without resolving or refreshing OAuth; renewal stays on the
+Anthropic request path. CLI fallback remains asynchronous and bounded. Profile
+preparation imports existing Claude credentials into the new method without
+renewing them or deleting the old credential. Native V2 credential APIs also own
+OpenAI workspace switching and renewal for the existing quota widget.
+
+## Legacy Claude authentication
 
 `claude-auth.nix` pins upstream `opencode-claude-auth` 2.2.1 and applies
 `claude-auth.patch`. Initialization reads local credentials and registers hooks;
@@ -77,8 +108,8 @@ upstream build or a cold-boot desktop restoration.
 
 | Component | Source / upgrade proof |
 | --- | --- |
-| OpenCode | `flake.nix` tag 1.19.3, locked revision `e3c4eb242585dcd77be1a867391b7c25fd47ce52`; `package.nix` owns native patch/copy wiring |
-| Claude auth | npm 2.2.1 fixed source/hash in `claude-auth.nix`; patch and 14 isolated regressions run in Nix `checkPhase` |
+| OpenCode | `flake.nix` input `opencode-v2` tag 2.2.6; `v2/package.nix` owns native patch/copy/check wiring. Input `opencode` and `package.nix` retain V1 export compatibility |
+| Claude auth | V2 npm 3.0.0 in `v2/claude-auth.nix` with isolated startup/expiry/switch/fallback checks; V1 npm 2.2.1 and its 14 checks remain in `claude-auth.nix` |
 | Session notifications | existing `session-notify` submodule; `peripheral-plugins.nix` applies `session-notify-timeout.patch` to an immutable executable copy; no submodule revision change |
 | Server plugins | auth, context library, context notebook, tmux status, notifications, existing immutable session policy |
 | TUI plugins | `tui.json`; tmux theme, selection persistence and context history/stale UI |

@@ -24,6 +24,8 @@ setmetatable(windows, {
 })
 local close_requests, cleanup_timers = {}, {}
 local focused, focused_window
+local no_warps = false
+local focus_no_warps
 local function emit(event, ...)
 	for _, callback in ipairs(events[event] or {}) do
 		callback(...)
@@ -98,6 +100,13 @@ resolve("special:music", left).windows = 1
 windows["address:0x4"] = { address = "0x4", workspace = workspaces["special:music"] }
 
 hl = {
+	get_config = function(key)
+		assert(key == "cursor.no_warps")
+		return no_warps
+	end,
+	config = function(values)
+		no_warps = values.cursor.no_warps
+	end,
 	get_monitors = function()
 		return monitors
 	end,
@@ -197,6 +206,7 @@ hl = {
 			assert(windows[action.close], "Close must target an existing window")
 			close_requests[#close_requests + 1] = action.close
 		elseif action.focus then
+			focus_no_warps = no_warps
 			if action.focus.monitor then
 				focused = hl.get_monitor(action.focus.monitor)
 			elseif action.focus.window then
@@ -258,6 +268,8 @@ local hidden = sessions.state("s1")
 assert(hidden.active == second, "inspecting hidden session must preserve active identity")
 assert(hidden.workspaces["DP-1"][7] == "DP-1:7", "hidden state must expose original workspace addresses")
 assert(hidden.specials.terminal == "special:terminal", "hidden state must preserve adopted special address")
+assert(hidden.sessions[1].workspaces["DP-1"][7] == "DP-1:7", "overview exposes inactive session slot addresses")
+assert(hidden.sessions[1].specials.terminal == "special:terminal", "overview exposes inactive local scratchpad labels")
 assert(left.active_workspace.addressable_name == sessions.state().workspaces["DP-1"][1], "inspection must not change monitor view")
 sessions.select_workspace(7, "DP-1")
 sessions.select_workspace(4, "HDMI-A-1")
@@ -277,6 +289,7 @@ assert(sessions.state().active == "s1")
 assert(left.active_workspace.addressable_name == "DP-1:1")
 assert(right.active_workspace.addressable_name == "2")
 assert(left.active_special_workspace.addressable_name == "special:terminal")
+
 assert(right.active_special_workspace == nil)
 sessions.previous()
 assert(left.active_workspace.addressable_name == sessions.state().workspaces["DP-1"][7])
@@ -335,6 +348,21 @@ assert(not rules[1].enabled)
 sessions.focus_window("address:0x1")
 assert(sessions.state().active == "s1")
 assert(left.active_special_workspace.addressable_name == "special:terminal")
+
+-- Dock focus suppresses compositor warps, without changing keyboard policy.
+assert(focus_no_warps == false)
+sessions.focus_window("address:0x1", { preserve_cursor = true })
+assert(focused_window == "address:0x1" and focus_no_warps == true)
+assert(no_warps == false, "dock focus must restore the previous cursor policy")
+no_warps = true
+sessions.focus_window("address:0x1", { preserve_cursor = true })
+assert(no_warps == true, "an existing no-warp policy must remain enabled")
+no_warps = false
+local dispatch = hl.dispatch
+hl.dispatch = function() error("focus failed") end
+assert(not pcall(sessions.focus_window, "address:0x1", { preserve_cursor = true }))
+assert(no_warps == false, "failed focus must restore cursor policy")
+hl.dispatch = dispatch
 
 -- External focus into another session must switch all outputs coherently.
 sessions.switch("s2")
@@ -841,6 +869,16 @@ sessions.close(active_remote, { ["0xactive"] = true })
 complete_close("address:0xactive")
 assert(sessions.state().active == away, "active remote close returns to surviving session")
 assert(#close_requests == prior_requests, "active remote close also skips compositor confirmation")
+-- Ordinary launches have no pending scratchpad request and may not switch
+-- workspaces. Frontends still need their ownership before any click/focus event.
+local ordinary = { address = "0xdocklaunch", workspace = focused.active_workspace }
+windows["address:0xdocklaunch"] = ordinary
+ordinary.workspace.windows = ordinary.workspace.windows + 1
+emit("window.open", ordinary)
+local snapshot_file = assert(io.open(base .. ".json", "r"))
+local published = snapshot_file:read("*a")
+snapshot_file:close()
+assert(published:find('"0xdocklaunch"', 1, true), "ordinary launch must publish ownership immediately without interaction")
 os.remove(base .. ".lua")
 os.remove(base .. ".json")
 print("sessions: scratchpads, session-local pins, reload, focus, hotplug, session closure, and default fallback passed")

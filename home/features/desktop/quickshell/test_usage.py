@@ -1,4 +1,6 @@
 import json
+from contextlib import closing
+import sqlite3
 import tempfile
 import unittest
 import urllib.error
@@ -6,6 +8,78 @@ from pathlib import Path
 from unittest import mock
 
 import usage
+
+
+class V2AccountTests(unittest.TestCase):
+    def auth(self, account, access="access", expires=4102444800000):
+        return {"type": "oauth", "access": access, "refresh": "refresh-" + account,
+                "expires": expires, "accountId": account}
+
+    def native(self, home, account, expires=4102444800000, active=True):
+        path = usage.v2_database_path(home)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        value = self.auth(account, expires=expires)
+        value.pop("accountId")
+        value.update(methodID="chatgpt-browser", metadata={"accountID": account})
+        with closing(sqlite3.connect(path)) as db, db:
+            db.execute("CREATE TABLE credential(id TEXT,integration_id TEXT,value TEXT,active INTEGER,time_created INTEGER)")
+            db.execute("INSERT INTO credential VALUES('cred_fixture','openai',?,1,1)", (json.dumps(value),))
+        marker = Path(usage.os.environ["XDG_STATE_HOME"]) / "desktop-contexts/opencode-profile.json"
+        marker.parent.mkdir(parents=True)
+        marker.write_text(json.dumps({"protocol": 2, "database": str(path), "active": active}))
+
+    def environment(self, directory):
+        return mock.patch.dict("os.environ", {"XDG_DATA_HOME": directory, "XDG_STATE_HOME": directory + "/state"})
+
+    def test_metadata_status_uses_v2_without_refreshing_or_exposing_tokens(self):
+        with tempfile.TemporaryDirectory() as directory, self.environment(directory):
+            home = Path(directory) / "home"
+            usage.store_profile(home, "personal", self.auth("personal"))
+            usage.store_profile(home, "business", self.auth("business"))
+            usage.write_private_json(usage.auth_path(home), {"openai": self.auth("personal")})
+            self.native(home, "business")
+            with mock.patch.object(usage, "refresh_openai_auth", side_effect=AssertionError("unexpected refresh")), \
+                    mock.patch.object(usage, "v2_bridge", side_effect=AssertionError("unexpected subprocess")):
+                result = usage.account_status(home)
+            self.assertEqual(result["active"], "business")
+            self.assertNotIn("refresh-business", json.dumps(result))
+            self.assertNotIn('"access"', json.dumps(result))
+
+    def test_inactive_profile_keeps_legacy_selection(self):
+        with tempfile.TemporaryDirectory() as directory, self.environment(directory):
+            home = Path(directory) / "home"
+            usage.write_private_json(usage.auth_path(home), {"openai": self.auth("personal")})
+            self.native(home, "business", active=False)
+            self.assertEqual(usage.current_openai_auth(home)["accountId"], "personal")
+
+    def test_workspace_selection_updates_v2_and_keeps_other_legacy_providers(self):
+        with tempfile.TemporaryDirectory() as directory, self.environment(directory):
+            home = Path(directory) / "home"
+            usage.store_profile(home, "personal", self.auth("personal"))
+            usage.store_profile(home, "business", self.auth("business"))
+            usage.write_private_json(usage.auth_path(home), {"openai": self.auth("business"), "anthropic": {"fixture": True}})
+            self.native(home, "business")
+            with mock.patch.object(usage, "v2_bridge", return_value={"ok": True}) as bridge:
+                usage.activate_profile(home, "personal")
+            bridge.assert_called_once_with("bridge-select", "personal")
+            self.assertEqual(usage.read_json(usage.auth_path(home))["openai"]["accountId"], "personal")
+            self.assertEqual(usage.read_json(usage.auth_path(home))["anthropic"], {"fixture": True})
+
+    def test_active_renewal_uses_native_refresh_locking(self):
+        with tempfile.TemporaryDirectory() as directory, self.environment(directory):
+            home = Path(directory) / "home"
+            expired = self.auth("personal", expires=1)
+            usage.store_profile(home, "personal", expired)
+            usage.write_private_json(usage.auth_path(home), {"openai": expired})
+            self.native(home, "personal", expires=1)
+            renewed = self.auth("personal", access="renewed")
+            with mock.patch.object(usage, "v2_bridge", return_value=renewed) as bridge, \
+                    mock.patch.object(usage, "refresh_openai_auth", side_effect=AssertionError("must use native refresh")), \
+                    mock.patch.object(usage, "request_json", return_value={}):
+                result = usage.fetch_openai_profile(home, "personal", True, {})
+            self.assertTrue(result["available"])
+            bridge.assert_called_once_with("bridge-current")
+            self.assertEqual(usage.read_profile(home, "personal")["access"], "renewed")
 
 
 class UsageNormalizationTests(unittest.TestCase):

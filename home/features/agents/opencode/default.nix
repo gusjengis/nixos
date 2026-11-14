@@ -9,7 +9,11 @@
 }:
 let
   configRoot = "${repoRoot}/home/features/agents/opencode";
-  contextPackages = import ./package.nix { inherit pkgs inputs repoRoot; };
+  legacyPackages = import ./package.nix { inherit pkgs inputs repoRoot; };
+  contextPackages = import ./v2/integration.nix {
+    inherit config pkgs inputs repoRoot sessionPolicy;
+    legacy = legacyPackages;
+  };
   claudeAuth = import ./claude-auth.nix { inherit pkgs; };
   boundedNotify = import ./peripheral-plugins.nix { inherit pkgs; };
   sessionPolicy = import ../../../../system/modules/session-policy/materialize.nix { inherit pkgs; };
@@ -91,6 +95,7 @@ in
     # the next OpenCode start, and so state OpenCode writes itself (recent models,
     # UI preferences) is versioned and synced to other machines.
     xdg.configFile = {
+      "opencode-v2".source = config.lib.file.mkOutOfStoreSymlink "${configRoot}/v2/config";
       # Pinned executable plugin, patched reproducibly rather than in npm cache.
       "opencode/claude-auth".source = claudeAuth;
       "opencode/opencode.json".source = config.lib.file.mkOutOfStoreSymlink "${configRoot}/opencode.json";
@@ -155,6 +160,28 @@ in
     home.file.".local/state/opencode" = {
       source = config.lib.file.mkOutOfStoreSymlink "${configRoot}/state";
       force = true;
+    };
+    home.file.".local/state/opencode-v2" = {
+      source = config.lib.file.mkOutOfStoreSymlink "${configRoot}/v2/state";
+    };
+
+    home.activation.opencodeV2Profile = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
+      ${contextPackages.python}/bin/python3 -B "${configRoot}/v2/profile.py" prepare ${contextPackages.specificationFile}
+    '';
+    home.activation.opencodeV2Activate = lib.hm.dag.entryBetween [ "reloadSystemd" ] [ "installPackages" "linkGeneration" ] ''
+      ${contextPackages.python}/bin/python3 -B "${configRoot}/v2/profile.py" activate ${contextPackages.specificationFile}
+    '';
+
+    systemd.user.services.opencode-v2-handoff = {
+      Unit.Description = "Finish the final V1 OpenCode history writes in the V2 profile";
+      Service = {
+        Type = "exec";
+        ExecStart = "${contextPackages.python}/bin/python3 -B ${configRoot}/v2/profile.py finalize ${contextPackages.specificationFile}";
+        TimeoutStartSec = "infinity";
+        UMask = "0077";
+        Nice = 10;
+      };
+      Install.WantedBy = [ "default.target" ];
     };
 
     # Home Manager cannot replace a real directory with a directory symlink.

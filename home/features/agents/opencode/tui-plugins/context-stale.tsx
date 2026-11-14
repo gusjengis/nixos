@@ -13,8 +13,10 @@ export default {
     const host = globalThis[Symbol.for("opencode.desktop.stale.v1")]
     if (host?.version !== 1) throw new Error("Blocking stale-session native support missing; install context-stale.patch.")
     const path = statePath(process.env)
-    const store = new DraftStore(join(process.env.XDG_STATE_HOME ?? join(process.env.HOME, ".local/state"),
-      "opencode-context", "stale-recovery"))
+    const recovery = process.env.OPENCODE_STATE_DIR
+      ? join(process.env.OPENCODE_STATE_DIR, "context")
+      : join(process.env.XDG_STATE_HOME ?? join(process.env.HOME, ".local/state"), "opencode-context")
+    const store = new DraftStore(join(recovery, "stale-recovery"))
     let disposed = false
     let refreshing = false
     let armedAt = 0

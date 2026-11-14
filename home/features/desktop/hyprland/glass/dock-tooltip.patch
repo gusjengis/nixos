@@ -1,0 +1,107 @@
+diff --git a/src/PluginConfig.hpp b/src/PluginConfig.hpp
+--- a/src/PluginConfig.hpp
++++ b/src/PluginConfig.hpp
+@@ -413,3 +413,4 @@
+     float                 outlineSidePower = 0.0f;  // > 0: outline alpha *= |normal.x|^power
++    bool                  dockTooltip = false; // 26 px capsule plus rounded 7 px pointer
+ 
+     bool operator==(const SMacMaterial&) const = default;
+diff --git a/src/PluginConfig.cpp b/src/PluginConfig.cpp
+--- a/src/PluginConfig.cpp
++++ b/src/PluginConfig.cpp
+@@ -897,2 +897,9 @@
+             auto& material = entry.macMaterial;
++            lua_getfield(L, -1, "dock_tooltip");
++            if (!lua_isnil(L, -1)) {
++                if (!lua_isboolean(L, -1))
++                    return luaL_error(L, "hyprglass.layer: mac_material.dock_tooltip must be a boolean");
++                material.dockTooltip = lua_toboolean(L, -1);
++            }
++            lua_pop(L, 1);
+             if (readArray("lut", material.lut.data(), 17)) {
+diff --git a/src/GlassRenderer.cpp b/src/GlassRenderer.cpp
+--- a/src/GlassRenderer.cpp
++++ b/src/GlassRenderer.cpp
+@@ -791,2 +791,3 @@
+     glUniform1f(loc("outlineSidePower"), material.outlineSidePower);
++    glUniform1i(loc("dockTooltip"), material.dockTooltip ? 1 : 0);
+     glUniform3f(loc("shadowKey"), MacGlass::SHADOW_KEY[0] * draw.shadowScale, MacGlass::SHADOW_KEY[1], MacGlass::SHADOW_KEY[2]);
+diff --git a/src/Shaders.hpp b/src/Shaders.hpp
+--- a/src/Shaders.hpp
++++ b/src/Shaders.hpp
+@@ -561,2 +561,3 @@
+ uniform float outlineSidePower; // > 0: outline alpha scales with |normal.x|^power
++uniform int dockTooltip;
+ uniform vec3 shadowKey;      // alpha, dy, sigma
+@@ -607,3 +608,60 @@
++// Measured Ref4K Dock label: circular 13 px caps, rounded shoulders and tip.
++// One signed-distance silhouette means no seam or differently tinted pointer.
++vec2 tooltipShoulder(float t) {
++    float u = 1.0 - t;
++    return u*u*u*vec2(15.0, 0.0) + 3.0*u*u*t*vec2(9.0, 0.0)
++         + 3.0*u*t*t*vec2(8.0, 2.0) + t*t*t*vec2(2.0, 6.0);
++}
++void tooltipEdge(vec2 p, vec2 a, vec2 b, inout float d2, inout float s) {
++    vec2 e = b - a;
++    vec2 v = p - a;
++    vec2 w = v - e * clamp(dot(v, e) / max(dot(e, e), 1e-8), 0.0, 1.0);
++    d2 = min(d2, dot(w, w));
++    bvec3 c = bvec3(p.y >= a.y, p.y < b.y, e.x*v.y > e.y*v.x);
++    if (all(c) || all(not(c))) s = -s;
++}
++float tooltipLevel(vec2 q) {
++    vec2 size = glassBoxSizePx / pxScale;
++    vec2 p = q / pxScale;
++    float h = size.y - 7.0;
++    float r = min(13.0, min(size.x, h) * 0.5);
++    vec2 d = abs(p - vec2(size.x, h)*0.5) - vec2(size.x, h)*0.5 + r;
++    float body = length(max(d, 0.0)) + min(max(d.x, d.y), 0.0) - r;
++    p -= vec2(size.x * 0.5, h);
++    float bodyDistance = abs(body);
++    // Remove the body's hidden bottom edge at the pointer attachment. A plain
++    // min(body, pointer) would leave an internal rim across the join.
++    if (p.y > -h * 0.5 && abs(p.x) < 15.0)
++        bodyDistance = min(length(vec2(15.0 - abs(p.x), p.y)), p.y + h);
++    float dist2 = 1e20;
++    float sign = 1.0;
++    vec2 a = tooltipShoulder(0.0);
++    // 8 chords per 7 px shoulder give subpixel contour accuracy at 1x/2x.
++    for (int i = 1; i <= 8; ++i) {
++        vec2 b = tooltipShoulder(float(i)/8.0);
++        tooltipEdge(p, a, b, dist2, sign);
++        a = b;
++    }
++    for (int i = 1; i <= 8; ++i) {
++        float t = float(i)/8.0;
++        vec2 b = vec2(2.0 - 4.0*t, 6.0 + 4.0*t*(1.0-t));
++        tooltipEdge(p, a, b, dist2, sign);
++        a = b;
++    }
++    for (int i = 7; i >= 0; --i) {
++        vec2 b = tooltipShoulder(float(i)/8.0) * vec2(-1.0, 1.0);
++        tooltipEdge(p, a, b, dist2, sign);
++        a = b;
++    }
++    // Close the polygon for the inside test only; its top is not an edge of
++    // the combined silhouette.
++    float ignored = 1e20;
++    tooltipEdge(p, a, tooltipShoulder(0.0), ignored, sign);
++    return (body < 0.0 || sign < 0.0 ? -1.0 : 1.0)
++         * min(bodyDistance, sqrt(dist2)) * pxScale;
++}
++
+ float shapeLevel(vec2 q, out int closest) {
+     closest = -1;
++    if (dockTooltip == 1) return tooltipLevel(q);
+     if (rectMode == 0)
+@@ -683,5 +741,8 @@
+         float e = 0.25;
+-        vec2 grad = vec2(rectLevel(shapeQ + vec2(e, 0.0), shapeSize, shapeRadius) - rectLevel(shapeQ - vec2(e, 0.0), shapeSize, shapeRadius),
+-                         rectLevel(shapeQ + vec2(0.0, e), shapeSize, shapeRadius) - rectLevel(shapeQ - vec2(0.0, e), shapeSize, shapeRadius));
++        vec2 grad = dockTooltip == 1
++            ? vec2(shapeLevel(q + vec2(e, 0.0)) - shapeLevel(q - vec2(e, 0.0)),
++                   shapeLevel(q + vec2(0.0, e)) - shapeLevel(q - vec2(0.0, e)))
++            : vec2(rectLevel(shapeQ + vec2(e, 0.0), shapeSize, shapeRadius) - rectLevel(shapeQ - vec2(e, 0.0), shapeSize, shapeRadius),
++                   rectLevel(shapeQ + vec2(0.0, e), shapeSize, shapeRadius) - rectLevel(shapeQ - vec2(0.0, e), shapeSize, shapeRadius));
+         vec2 n = grad / max(length(grad), 1e-6);
+ 

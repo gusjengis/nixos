@@ -33,6 +33,8 @@ Neovim, lazygit, and tmux remain core utilities with development disabled.
 - `Super+T`: context terminal scratchpad; new tmux sessions start Neovim and OpenCode windows in its working directory, matching the session dispensary.
 - `Super+Q`: another terminal attached to that context's tmux session.
 - `Super+F`: file manager at the context working directory.
+  Launches `~/.nix-profile/bin/strata` directly so a long-running compositor or
+  older `contextctl` wrapper cannot select a stale Strata build from `PATH`.
 - `Ctrl+D` in runtime switcher: close running session, never delete saved context/notes.
 - F2 in runtime switcher: rename runtime session only, not its saved directory.
 - F2 in organizer: rename display label, including open/repository contexts.
@@ -56,6 +58,42 @@ notes and checkpoint storage stay in the original local context directory.
 Notes/config stay outside the checkout and therefore outside its Git history.
 Missing working directories fall back to the context directory; the notebook still opens.
 All other ordinary files and folders beside checkouts are free-form synced work.
+
+## Browser links
+
+The Chromium desktop URL handler runs `context-browser`. It selects the most
+recently focused ordinary Chromium window owned by the current runtime context,
+including windows on numbered workspaces. Webapps and other contexts are excluded.
+With no local browser, it launches a new window on the context's browser workspace
+using the session module's existing placement/reveal handling.
+
+Existing-window handoffs focus that window before invoking Chromium, allowing its
+Wayland activation state to catch up. Context, ownership and focus are checked again
+before dispatch; a changed context or failed lookup never falls back to global MRU.
+Chromium's unsolicited activation focus is disabled, so its shared process cannot
+switch contexts. Contexts-disabled hosts retain ordinary browser launches.
+
+Run focused tests with `python3 -m unittest test_context_browser.py` from this directory.
+
+## Dock inheritance
+
+Dock pins follow the organizer's current logical hierarchy, not filesystem nesting.
+Parent pin changes reach descendants live; moving a context changes inherited pins
+for its entire subtree without copying the old parent's configuration. Unsaved
+runtime sessions have no inherited pins. Finder remains permanent.
+
+**Keep in Dock** records a local addition. **Remove from Dock** records a local
+removal, including for inherited apps; descendants inherit both decisions and can
+override them again. Reordering saves local tile order without turning inherited
+pins into local additions. Otherwise ancestor order is inherited.
+
+Each context's `.context/state/dock.json` stores version 2 `pinned` (local
+additions), `removed` (local exclusions), and `order` arrays. Existing version 1
+pins remain explicit local additions; reading never rewrites files. Only the
+context edited is written, atomically, in version 2. Older shell versions do not
+understand exclusions/inheritance; do not edit these files with an older shell.
+Existing files update through filesystem events; first-time state creation is
+discovered within one second even when `.context/state` did not exist.
 
 ## Context organizer
 
@@ -202,12 +240,13 @@ work in `/etc/nixos` without sharing their own chat lists or tmux sessions.
 - New conversations belong to the launching context. Subagents inherit their
   conversation's owner; forks retain that owner but get a separate conversation
   identity. Ordinary metadata updates cannot transfer ownership.
-- The native session picker, search and quick-switch list show this context plus
-  logical descendants whose **configured canonical working directory** matches.
-  Siblings and parents are not implicitly visible. Missing directories are compared
-  by configured target, not their temporary fallback. Reparenting or changing a
-  work directory updates visibility through the catalog watcher without restarting
-  OpenCode. Parent picker rows show the originating context's breadcrumb.
+- Context history includes this context and all logical descendants, including
+  descendants with different or unavailable working directories. Siblings and
+  parents are not implicitly visible. Reparenting updates visibility through the
+  catalog watcher without restarting OpenCode. Parent picker rows show the
+  originating context's breadcrumb. Native project/directory filters still apply
+  to native-only search and quick-switch lists; the context history picker also
+  discovers descendant chats through their portable summaries.
 - Resuming a child conversation from a parent updates the **child's** library.
   Parent terminal checkpoints store a UUID/conversation/member reference, not a
   second copy of the child's conversation or attachments.
@@ -247,6 +286,15 @@ Use the OpenCode command palette's **Browse unowned conversations to assign to t
 context**, or **Assign unowned conversation to this context** for the current chat.
 Assignment is explicit and includes its subagents. An already owned conversation
 cannot be moved by opening it from another context.
+
+To transfer an owned chat, open its command palette and select **Move session to
+context**. Search for the destination breadcrumb (including nested contexts),
+then confirm. The conversation and its subagents must be idle. Native history,
+session IDs and working directory are preserved; portable-library ownership moves
+to the destination. Open that context and select the chat to continue. Source
+history receives a tombstone so synchronization will not resurrect it. If
+publication is interrupted, repeat the move to the same destination to finish;
+the picker marks that destination **finish interrupted move**.
 
 Without context identity, OpenCode retains its ordinary global/project behavior.
 The pinned OpenCode source has a small ownership/list-filter patch; the launcher
@@ -786,12 +834,15 @@ Foreground close performs no closed-library sweep. Periodic maintenance compares
 lightweight native-owner/head tokens, handles at most eight dirty owners using four
 independent workers, and audits one owner per minute for dependencies not reflected
 in native timestamps. Affected scopes read only their visible owners' rows/ledgers.
-Pending recovery shells fail preflight before expensive adapter work, retaining
-their saved recovery data.
+Failed chat recovery shells never veto checkpoints. Legacy chat exports remain
+as non-replaying archives for manual recovery; independent chat-library history
+is unaffected. Other unresolved recovery shells still fail preflight before
+expensive adapter work.
 
 Restore builds local loading panes and maps terminal windows before imports,
 external pane-directory checks, or app readiness. Up to sixteen pane startups
-run independently; pending markers clear only after real acknowledgement. Failures
+run independently. Chat pending markers clear after acknowledgement or a logged,
+best-effort failure; failed chat startup leaves a shell. Other application failures
 retain saved sessions instead of allowing recovery shells to replace their data.
 
 Regression gates: `test_context_performance.py` and isolated native persistence,
@@ -953,10 +1004,11 @@ Final boot and follow-up regression evidence is in
 Application launches are acknowledged before success is recorded. Failed editor
 sessions are now disposable: the pending marker clears, the failed session is
 dropped, and other windows continue. No unsaved-buffer recovery is attempted.
-A failed chat still leaves an explicitly pending recovery pane; periodic saves
-and managed destruction refuse to replace its saved workspace with a blank shell.
-Fix the logged cause, exit that placeholder, then explicitly run
-`context-checkpoint restore --context UUID --no-windows` or close/reopen the context.
+A failed chat reopening leaves a usable shell and clears its pending marker.
+Import and startup failures are logged, but never veto other panes, periodic saves,
+or context closure. Chat history remains in its independent native database/library
+for manual reopening. Older failed-chat recovery shells are unblocked on the next
+checkpoint or restore as well.
 Opening an already-open context still only switches to it. Neovim can save a fresh
 file/layout session immediately after discarding a failed restoration.
 

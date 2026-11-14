@@ -8,7 +8,7 @@ import "../../theme"
 RowLayout {
     id: root
 
-    readonly property bool popupVisible: contextMenu.visible
+    readonly property bool popupVisible: contextMenu.menuVisible
     // Compiled by Nix from shaders/tray-mono.frag (qsb output is not
     // hand-editable), then linked into the data dir by default.nix.
     readonly property url monoShader: "file://" + (Quickshell.env("XDG_DATA_HOME") || Quickshell.env("HOME") + "/.local/share") + "/quickshell/shaders/tray-mono.frag.qsb"
@@ -27,7 +27,7 @@ RowLayout {
             implicitWidth: 28
             implicitHeight: Theme.barItemHeight
             radius: height / 2
-            color: contextMenu.visible && contextMenu.anchorItem === trayItem ? Theme.barHoverFill : "transparent"
+            color: contextMenu.menuVisible && contextMenu.anchorItem === trayItem ? Theme.barHoverFill : "transparent"
 
             // App-supplied icons can be any color, so they are recolored to
             // follow the bar's black/white content; see shaders/tray-mono.frag.

@@ -25,8 +25,8 @@ hl.config({
 		disable_hyprland_logo = true, -- If true disables the random hyprland logo / anime girl background. :(
 		disable_splash_rendering = true, -- If true disables the splash screen.
 		focus_on_activate = false,
-		-- Keep delayed windows and inherited child launches with their originating app.
-		initial_workspace_tracking = 2,
+		-- Open new windows here, not on a long-lived launcher's original workspace.
+		initial_workspace_tracking = 0,
 	},
 })
 

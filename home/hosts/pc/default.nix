@@ -12,5 +12,6 @@
     pkgs.easyeffects
     pkgs.arduino
     pkgs.android-studio
+    (pkgs.callPackage ../../features/applications/insta360-link/package.nix { })
   ];
 }

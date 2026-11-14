@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import "theme"
 import "bar/components"
+import "menus"
 
 // Separate surface keeps desktop interaction testable without a layer-shell window.
 FocusScope {
@@ -27,7 +28,9 @@ FocusScope {
     signal iconSizeRequested(int size)
     signal sortRequested(string order)
     signal wallpaperRequested()
-    onDirectoryChanged: { selected = []; scrollOffset = 0; menu.visible = false; }
+    // Emitted on any click; the layer requests keyboard focus only after this.
+    signal interacted()
+    onDirectoryChanged: { selected = []; scrollOffset = 0; menu.close(); }
     onEntriesChanged: selected = selected.filter(name => entries.some(entry => entry.name === name))
     onMaxScrollChanged: scrollOffset = Math.min(scrollOffset, maxScroll)
 
@@ -43,12 +46,17 @@ FocusScope {
     function openSelection() { if (selected.length) action("open", selected); }
     function showMenu(x, y, item) {
         menu.itemMenu = item;
-        menu.popupX = x;
-        menu.popupY = Math.max(Theme.barHeight + 4, Math.min(y, height - menu.popupHeight - 6));
-        menu.visible = true;
+        const point = root.mapToItem(null, x, y);
+        ContextMenus.open({owner: menu, screen: root.QsWindow.window ? root.QsWindow.window.screen : Quickshell.screens[0],
+            position: point, entries: menu.items.map(item => ({
+                text: item.label || "", enabled: !item.separator, isSeparator: !!item.separator,
+                buttonType: item.checked !== undefined ? QsMenuButtonType.CheckBox : QsMenuButtonType.None,
+                checkState: item.checked ? Qt.Checked : Qt.Unchecked,
+                icon: "", shortcut: item.shortcut || "", operation: item.operation, hasChildren: false
+            })), activate: function(entry) { menu.activate(entry.operation); }});
     }
     Keys.onPressed: event => {
-        if (event.key === Qt.Key_Escape) { selected = []; menu.visible = false; }
+        if (event.key === Qt.Key_Escape) { selected = []; menu.close(); }
         else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) openSelection();
         else if (event.key === Qt.Key_A && event.modifiers & Qt.ControlModifier) selected = ordered.map(entry => entry.name);
         else if (event.key === Qt.Key_N && event.modifiers & Qt.ControlModifier && event.modifiers & Qt.ShiftModifier) action("new-folder", []);
@@ -74,8 +82,9 @@ FocusScope {
         property var previous: []
         property bool dragging: false
         onPressed: mouse => {
+            root.interacted();
             root.forceActiveFocus();
-            menu.visible = false;
+            menu.close();
             if (mouse.button === Qt.RightButton) {
                 root.selected = [];
                 root.showMenu(mouse.x, mouse.y, false);
@@ -164,8 +173,9 @@ FocusScope {
                     anchors.fill: parent
                     acceptedButtons: Qt.LeftButton | Qt.RightButton
                     onPressed: mouse => {
+                        root.interacted();
                         root.forceActiveFocus();
-                        menu.visible = false;
+                        menu.close();
                         if (mouse.button === Qt.RightButton) {
                             if (!tile.chosen) root.selected = [tile.modelData.name];
                             const point = mapToItem(root, mouse.x, mouse.y);
@@ -197,9 +207,12 @@ FocusScope {
         font { family: Theme.fontFamily; pixelSize: 12 }
     }
 
-    GuardedPopupWindow {
+    Item {
         id: menu
         objectName: "desktop-context-menu"
+        readonly property var node: ContextMenus.owner === menu ? ContextMenus.node : null
+        function close() { ContextMenus.close(menu); }
+        Component.onDestruction: close()
         property bool itemMenu: false
         property var items: itemMenu ? [
             { label: "Open", operation: "open" },
@@ -220,54 +233,12 @@ FocusScope {
             { label: "Medium Icons", operation: "medium", checked: root.iconSize === 48 },
             { label: "Large Icons", operation: "large", checked: root.iconSize === 64 }
         ]
-        anchorItem: root
-        popupWidth: 232
-        popupHeight: 2 * Theme.menuPadding + items.reduce((height, item) => height + (item.separator ? Theme.menuSeparatorHeight : Theme.menuRowHeight), 0)
         function activate(operation) {
-            visible = false;
             if (operation === "wallpaper") root.wallpaperRequested();
             else if (["name", "kind", "modified"].includes(operation)) root.sortRequested(operation);
             else if (["small", "medium", "large"].includes(operation)) root.iconSizeRequested(({small: 32, medium: 48, large: 64})[operation]);
             else root.action(operation === "folder" ? "open" : operation,
                 operation === "folder" || operation === "new-folder" ? [] : root.selected.slice());
         }
-        Column {
-            anchors { fill: parent; margins: Theme.menuPadding }
-            Repeater {
-                model: menu.items
-                delegate: Rectangle {
-                    id: menuRow
-                    required property var modelData
-                    width: menu.popupWidth - 2 * Theme.menuPadding
-                    height: modelData.separator ? Theme.menuSeparatorHeight : Theme.menuRowHeight
-                    radius: Theme.menuHighlightRadius
-                    color: hover.containsMouse && !modelData.separator ? Theme.menuHighlight : "transparent"
-                    Rectangle {
-                        visible: !!menuRow.modelData.separator
-                        anchors { left: parent.left; right: parent.right; verticalCenter: parent.verticalCenter; margins: 8 }
-                        height: 1; color: Theme.menuSeparator
-                    }
-                    Text {
-                        x: 5; anchors.verticalCenter: parent.verticalCenter
-                        text: menuRow.modelData.checked ? "✓" : ""
-                        color: "white"; font.pixelSize: 12
-                    }
-                    Text {
-                        x: 24; anchors.verticalCenter: parent.verticalCenter
-                        text: menuRow.modelData.label || ""
-                        color: Theme.menuText
-                        font { family: Theme.fontFamily; pixelSize: Theme.menuFontSize }
-                    }
-                    MouseArea {
-                        id: hover
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        enabled: !menuRow.modelData.separator
-                        onClicked: menu.activate(menuRow.modelData.operation)
-                    }
-                }
-            }
-        }
-        Shortcut { sequence: "Escape"; enabled: menu.visible; onActivated: menu.visible = false }
     }
 }

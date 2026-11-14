@@ -108,7 +108,7 @@ APPS = {
     "org.mozilla.firefox": ["firefox"],
     "com.microsoft.VSCode": ["code", "visual-studio-code"],
     "com.tinyspeck.slackmacgap": ["slack", "webapp-slack"],
-    "com.hnc.Discord": ["discord", "discord-canary", "webapp-discord"],
+    "com.hnc.Discord": ["discord", "discord-canary", "webapp-discord", "vesktop"],
     "com.openai.chat": ["chatgpt", "webapp-chatgpt"],
     "com.microsoft.Outlook": ["outlook", "webapp-outlook"],
     "com.microsoft.OneDrive": ["onedrive", "webapp-onedrive"],
@@ -288,8 +288,24 @@ def build(source: Path, destination: Path):
     temporary.replace(destination / "linux-mappings.json")
 
     write_index(destination)
+    link_finder_composites(source, destination)
     print(f"Built {destination}: {len(inventory)} retained sources, {len(links)} icon links")
     print(f"Filtered {len(placeholders)} placeholder records; removed {removed_aliases} old links; kept application-x-executable fallback")
+
+
+def link_finder_composites(source, destination):
+    """Finder artwork with no single macOS icon (build-finder-folder-full.py)."""
+    finder = source / "finder"
+    for size in SIZES:
+        image = finder / f"folder-full-{size}.png"
+        if not image.exists():
+            continue
+        directory = destination / f"{size}x{size}" / "places"
+        directory.mkdir(parents=True, exist_ok=True)
+        link = directory / "folder-full.png"
+        if link.is_symlink():
+            link.unlink()
+        link.symlink_to(os.path.relpath(image.resolve(), directory.resolve()))
 
 
 def write_index(destination):

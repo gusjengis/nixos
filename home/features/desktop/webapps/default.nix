@@ -1,6 +1,7 @@
 {
   config,
   lib,
+  pkgs,
   repoRoot,
   ...
 }:
@@ -60,6 +61,16 @@ in
 {
   config = lib.mkMerge [
     {
+      home.packages = [
+        (pkgs.writeShellApplication {
+          name = "context-browser";
+          runtimeInputs = [ pkgs.python3 ];
+          text = ''
+            export CONTEXT_BROWSER_ENABLED=${if config.desktopContexts.enable && config.desktopEnv.enable then "1" else "0"}
+            exec python3 -B "${repoRoot}/home/features/desktop/contexts/context_browser.py" "$@"
+          '';
+        })
+      ];
       xdg.dataFile = builtins.listToAttrs ((map entryLink alwaysEntries) ++ (map iconLink alwaysIcons));
     }
 

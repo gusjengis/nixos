@@ -1,0 +1,275 @@
+diff --git a/src/GlassLayerSurface.cpp b/src/GlassLayerSurface.cpp
+index 849a247..b780da6 100644
+--- a/src/GlassLayerSurface.cpp
++++ b/src/GlassLayerSurface.cpp
+@@ -318,7 +318,7 @@ void CGlassLayerSurface::sampleAndRedirect(PHLMONITOR monitor, float alpha) {
+     const bool forceLive = config.layersForceLiveResample && **config.layersForceLiveResample;
+     const auto* mac          = macShape();
+     const bool  macTintMoved = mac && currentMacTint() != m_lastMacTint;
+-    const bool  macProfileMoved = mac && mac->controlProfile != m_lastMacControlProfile;
++    const bool  macProfileMoved = mac && (mac->controlProfile != m_lastMacControlProfile || mac->material.blur != m_lastMacBlur);
+     const bool backgroundChanged = !m_hasCachedSample ||
+                                    currentGeneration != m_lastSceneGeneration ||
+                                     isAnimating || m_backgroundDirty || forceLive || regionBoxChanged || macTintMoved || macProfileMoved;
+@@ -350,13 +350,15 @@ void CGlassLayerSurface::sampleAndRedirect(PHLMONITOR monitor, float alpha) {
+             const float tint  = currentMacTint();
+             const auto  tp    = mac->controlProfile ? MacGlass::paramsForControl(tint) : MacGlass::paramsForTint(tint);
+             const float scale = monitor ? static_cast<float>(monitor->m_scale) : 1.0f;
+-            const float s1    = tp.blur.s1 * scale;
+-            const float s2    = tp.blur.s2 * scale;
++            const bool  blurSet = mac->material.blur[0] > 0.0f;
++            const float s1    = (blurSet ? mac->material.blur[0] : tp.blur.s1) * scale;
++            const float s2    = (blurSet ? mac->material.blur[1] : tp.blur.s2) * scale;
+             GlassRenderer::macBlur(m_sampleFramebuffer, s1, source, true);
+             GlassRenderer::copyFramebuffer(m_sampleFramebuffer, m_macNarrowFramebuffer, source);
+             GlassRenderer::macBlur(m_sampleFramebuffer, std::sqrt(std::max(s2 * s2 - s1 * s1, 0.0f)), source);
+             m_lastMacTint         = tint;
+             m_lastMacControlProfile = mac->controlProfile;
++            m_lastMacBlur           = mac->material.blur;
+             m_hasCachedSample     = true;
+             m_lastSceneGeneration = currentGeneration;
+             m_backgroundDirty     = false;
+@@ -574,6 +576,7 @@ void CGlassLayerSurface::compositeAndRestore(PHLMONITOR monitor, float alpha, EM
+             .monitorScale = scale,
+             .rects        = mac->rects,
+             .rectCount    = mac->rectCount,
++            .material     = mac->material,
+         };
+         const auto workDesc = g_pHyprRenderer->workBufferImageDescription();
+         const auto tf       = workDesc->value().transferFunction;
+diff --git a/src/GlassLayerSurface.hpp b/src/GlassLayerSurface.hpp
+index c295946..aa73028 100644
+--- a/src/GlassLayerSurface.hpp
++++ b/src/GlassLayerSurface.hpp
+@@ -58,6 +58,7 @@ class CGlassLayerSurface {
+     SP<Render::IFramebuffer> m_macNarrowFramebuffer;
+     float                    m_lastMacTint = -1.0f;
+     bool                     m_lastMacControlProfile = false;
++    std::array<float, 3>     m_lastMacBlur{-1.0f, 0.0f, 0.0f};
+     [[nodiscard]] const SMacLayerShape* macShape() const;
+     [[nodiscard]] float currentMacTint();
+     SP<Render::IFramebuffer> m_surfaceTempFramebuffer;
+diff --git a/src/GlassRenderer.cpp b/src/GlassRenderer.cpp
+index 96d3e5d..6b51dc3 100644
+--- a/src/GlassRenderer.cpp
++++ b/src/GlassRenderer.cpp
+@@ -173,6 +173,24 @@ void sampleBackground(SP<Render::IFramebuffer>& sampleFramebuffer, SP<Render::IF
+     glBlitFramebuffer(srcX0, srcY0, srcX1, srcY1,
+                       dstX0, dstY0, dstX1, dstY1,
+                       GL_COLOR_BUFFER_BIT, GL_LINEAR);
++
++    // Past the monitor edge, repeat the edge pixels instead of leaving black:
++    // a Dock 5 px above the bottom edge would otherwise blur black into its
++    // lower half. macOS behaves like clamp-to-edge there.
++    if (destinationClamped && srcX1 > srcX0 && srcY1 > srcY0) {
++        const auto extend = [](int sx0, int sy0, int sx1, int sy1, int dx0, int dy0, int dx1, int dy1) {
++            if (dx1 > dx0 && dy1 > dy0)
++                glBlitFramebuffer(sx0, sy0, sx1, sy1, dx0, dy0, dx1, dy1, GL_COLOR_BUFFER_BIT, GL_NEAREST);
++        };
++        extend(srcX0, srcY0, srcX1, srcY0 + 1, dstX0, 0, dstX1, dstY0);
++        extend(srcX0, srcY1 - 1, srcX1, srcY1, dstX0, dstY1, dstX1, sampleHeight);
++        extend(srcX0, srcY0, srcX0 + 1, srcY1, 0, dstY0, dstX0, dstY1);
++        extend(srcX1 - 1, srcY0, srcX1, srcY1, dstX1, dstY0, sampleWidth, dstY1);
++        extend(srcX0, srcY0, srcX0 + 1, srcY0 + 1, 0, 0, dstX0, dstY0);
++        extend(srcX1 - 1, srcY0, srcX1, srcY0 + 1, dstX1, 0, sampleWidth, dstY0);
++        extend(srcX0, srcY1 - 1, srcX0 + 1, srcY1, 0, dstY1, dstX0, sampleHeight);
++        extend(srcX1 - 1, srcY1 - 1, srcX1, srcY1, dstX1, dstY1, sampleWidth, sampleHeight);
++    }
+ }
+ 
+ void blendOwnContent(SP<Render::IFramebuffer>& sampleFramebuffer, PHLWINDOW window, PHLMONITOR monitor,
+@@ -680,7 +698,17 @@ void applyMacGlass(SP<Render::IFramebuffer> wideFramebuffer, SP<Render::IFramebu
+     if (!wideFramebuffer || !narrowFramebuffer || !targetFramebuffer || !shaderManager.isInitialized())
+         return;
+ 
+-    const auto tp = draw.controlProfile ? MacGlass::paramsForControl(draw.tint) : MacGlass::paramsForTint(draw.tint);
++    auto tp = draw.controlProfile ? MacGlass::paramsForControl(draw.tint) : MacGlass::paramsForTint(draw.tint);
++    const auto& material = draw.material;
++    if (material.lutSet)
++        tp.lut = material.lut;
++    if (material.chroma >= 0.0f)
++        tp.chroma = material.chroma;
++    if (material.blur[0] > 0.0f)
++        tp.blur = {material.blur[0], material.blur[1], material.blur[2]};
++    if (material.refraction[0] >= 0.0f)
++        tp.refraction = {material.refraction[0], material.refraction[1], material.refraction[2]};
++    const bool rimSet = material.rim[0] >= 0.0f;
+ 
+     const auto transform = Math::wlTransformToHyprutils(Math::invertTransform(g_pHyprRenderer->m_renderData.pMonitor->m_transform));
+     Mat3x3     glMatrix  = g_pHyprRenderer->projectBoxToTarget(rawBox, transform);
+@@ -752,14 +780,15 @@ void applyMacGlass(SP<Render::IFramebuffer> wideFramebuffer, SP<Render::IFramebu
+     glUniform1f(loc("refrA"), tp.refraction.amplitude);
+     glUniform1f(loc("refrW"), tp.refraction.width);
+     glUniform1f(loc("refrP"), tp.refraction.power);
+-    glUniform1f(loc("rimR0"), MacGlass::RIM_R0);
+-    glUniform1f(loc("rimRC"), MacGlass::RIM_RC);
+-    glUniform1f(loc("rimA1"), MacGlass::RIM_A1);
+-    glUniform1f(loc("rimL1"), MacGlass::RIM_L1);
+-    glUniform1f(loc("rimL2"), MacGlass::RIM_L2);
+-    glUniform1f(loc("rimSide"), MacGlass::RIM_SIDE);
+-    glUniform1f(loc("rimK"), MacGlass::RIM_K);
++    glUniform1f(loc("rimR0"), rimSet ? material.rim[0] : MacGlass::RIM_R0);
++    glUniform1f(loc("rimRC"), rimSet ? material.rim[1] : MacGlass::RIM_RC);
++    glUniform1f(loc("rimA1"), rimSet ? material.rim[2] : MacGlass::RIM_A1);
++    glUniform1f(loc("rimL1"), rimSet ? material.rim[3] : MacGlass::RIM_L1);
++    glUniform1f(loc("rimL2"), rimSet ? material.rim[4] : MacGlass::RIM_L2);
++    glUniform1f(loc("rimSide"), rimSet ? material.rim[5] : MacGlass::RIM_SIDE);
++    glUniform1f(loc("rimK"), rimSet ? material.rim[6] : MacGlass::RIM_K);
+     glUniform1f(loc("outlineAlpha"), MacGlass::OUTLINE_ALPHA * draw.outlineScale);
++    glUniform1f(loc("outlineSidePower"), material.outlineSidePower);
+     glUniform3f(loc("shadowKey"), MacGlass::SHADOW_KEY[0] * draw.shadowScale, MacGlass::SHADOW_KEY[1], MacGlass::SHADOW_KEY[2]);
+     glUniform3f(loc("shadowAmb"), MacGlass::SHADOW_AMB[0] * draw.shadowScale, MacGlass::SHADOW_AMB[1], MacGlass::SHADOW_AMB[2]);
+ 
+diff --git a/src/GlassRenderer.hpp b/src/GlassRenderer.hpp
+index 780ab25..9521c3f 100644
+--- a/src/GlassRenderer.hpp
++++ b/src/GlassRenderer.hpp
+@@ -161,6 +161,7 @@ struct SMacDraw {
+     bool     sdrGamma22   = false;
+     std::array<SMacRect, MAX_MAC_RECTS> rects{}; // logical px; scaled during upload
+     int      rectCount    = 0;
++    SMacMaterial material{};
+ };
+ 
+ void applyMacGlass(SP<Render::IFramebuffer> wideFramebuffer, SP<Render::IFramebuffer> narrowFramebuffer,
+diff --git a/src/PluginConfig.cpp b/src/PluginConfig.cpp
+index 95fad4c..d3daa87 100644
+--- a/src/PluginConfig.cpp
++++ b/src/PluginConfig.cpp
+@@ -740,6 +740,7 @@ struct SPendingLayer {
+     float                         macShadow = 1.0f;
+     float                         macOutline = 1.0f;
+     bool                          macControlProfile = false;
++    SMacMaterial                  macMaterial{};
+     float                         macTint = -1.0f;
+     bool                          macTangential = true;
+     bool                          macPlaceholderAdditive = false;
+@@ -859,6 +860,60 @@ static int handleLuaLayer(lua_State* L) {
+         }
+         lua_pop(L, 1);
+ 
++        lua_getfield(L, 2, "mac_material");
++        if (!lua_isnil(L, -1)) {
++            if (!lua_istable(L, -1))
++                return luaL_error(L, "hyprglass.layer: mac_material must be a table");
++            auto readArray = [&](const char* key, float* out, int count) -> int {
++                lua_getfield(L, -1, key);
++                if (lua_isnil(L, -1)) {
++                    lua_pop(L, 1);
++                    return 0;
++                }
++                if (!lua_istable(L, -1) || static_cast<int>(lua_rawlen(L, -1)) != count)
++                    return luaL_error(L, "hyprglass.layer: mac_material.%s must be an array of %d numbers", key, count);
++                for (int i = 0; i < count; ++i) {
++                    lua_rawgeti(L, -1, i + 1);
++                    if (lua_type(L, -1) != LUA_TNUMBER || !std::isfinite(lua_tonumber(L, -1)))
++                        return luaL_error(L, "hyprglass.layer: mac_material.%s entries must be finite numbers", key);
++                    out[i] = static_cast<float>(lua_tonumber(L, -1));
++                    lua_pop(L, 1);
++                }
++                lua_pop(L, 1);
++                return 1;
++            };
++            auto& material = entry.macMaterial;
++            if (readArray("lut", material.lut.data(), 17)) {
++                for (auto& v : material.lut)
++                    v = std::clamp(v, 0.0f, 1.0f);
++                material.lutSet = true;
++            }
++            if (readArray("blur", material.blur.data(), 3) &&
++                (material.blur[0] <= 0.0f || material.blur[1] < material.blur[0] || material.blur[2] < 0.0f || material.blur[2] > 1.0f))
++                return luaL_error(L, "hyprglass.layer: mac_material.blur needs 0 < s1 <= s2 and 0 <= w2 <= 1");
++            if (readArray("refraction", material.refraction.data(), 3) &&
++                (material.refraction[0] < 0.0f || material.refraction[1] <= 0.0f))
++                return luaL_error(L, "hyprglass.layer: mac_material.refraction needs amplitude >= 0 and width > 0");
++            if (readArray("rim", material.rim.data(), 7) &&
++                (material.rim[0] < 0.0f || material.rim[3] <= 0.0f || material.rim[4] <= 0.0f))
++                return luaL_error(L, "hyprglass.layer: mac_material.rim needs r0 >= 0 and positive lengths");
++            lua_getfield(L, -1, "chroma");
++            if (!lua_isnil(L, -1)) {
++                if (lua_type(L, -1) != LUA_TNUMBER || !std::isfinite(lua_tonumber(L, -1)) || lua_tonumber(L, -1) < 0.0)
++                    return luaL_error(L, "hyprglass.layer: mac_material.chroma must be a nonnegative number");
++                material.chroma = static_cast<float>(lua_tonumber(L, -1));
++            }
++            lua_pop(L, 1);
++            lua_getfield(L, -1, "outline_side_power");
++            if (!lua_isnil(L, -1)) {
++                if (lua_type(L, -1) != LUA_TNUMBER || !std::isfinite(lua_tonumber(L, -1)) || lua_tonumber(L, -1) < 0.0)
++                    return luaL_error(L, "hyprglass.layer: mac_material.outline_side_power must be a nonnegative number");
++                material.outlineSidePower = static_cast<float>(lua_tonumber(L, -1));
++            }
++            lua_pop(L, 1);
++        }
++        lua_pop(L, 1);
++
+         // Drop-shadow strength relative to the fitted Spotlight shadow.
+         lua_getfield(L, 2, "mac_shadow");
+         if (lua_isnumber(L, -1)) {
+@@ -908,7 +963,8 @@ void commitPendingLayers() {
+                 g_pGlobalState->layerNamespaceMacShapes[entry.ns] = {.inset = *entry.macInset, .radius = entry.macRadius, .shadow = entry.macShadow,
+                                                                     .outline = entry.macOutline, .controlProfile = entry.macControlProfile, .tint = entry.macTint, .tangential = entry.macTangential,
+                                                                     .placeholderAdditive = entry.macPlaceholderAdditive,
+-                                                                    .rects = entry.macRects, .rectCount = entry.macRectCount};
++                                                                    .rects = entry.macRects, .rectCount = entry.macRectCount,
++                                                                    .material = entry.macMaterial};
+                 // the mac shader composites the surface itself and needs the redirect
+                 g_pGlobalState->layerNamespaceMaskModes[entry.ns] = ELayerMaskMode::ALPHA;
+             }
+diff --git a/src/PluginConfig.hpp b/src/PluginConfig.hpp
+index 0b6dbdd..3d68b6d 100644
+--- a/src/PluginConfig.hpp
++++ b/src/PluginConfig.hpp
+@@ -401,6 +401,20 @@ struct SMacRect {
+     float x = 0.0f, y = 0.0f, width = 0.0f, height = 0.0f, radius = 0.0f;
+ };
+ 
++// Optional per-layer material overrides of the fitted profile. Negative first
++// elements inherit the profile value. Lengths are logical px at scale 1.
++struct SMacMaterial {
++    bool                  lutSet = false;
++    std::array<float, 17> lut{};                    // encoded output at g = 0,16,...,240,252
++    float                 chroma = -1.0f;
++    std::array<float, 3>  blur{-1.0f, 0.0f, 0.0f};  // s1, s2, w2
++    std::array<float, 3>  refraction{-1.0f, 0.0f, 0.0f}; // amplitude, width, power
++    std::array<float, 7>  rim{-1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f}; // r0, rc, a1, l1, l2, side, k
++    float                 outlineSidePower = 0.0f;  // > 0: outline alpha *= |normal.x|^power
++
++    bool operator==(const SMacMaterial&) const = default;
++};
++
+ struct SMacLayerShape {
+     float inset  = 0.0f;
+     float radius = -1.0f; // < 0: capsule
+@@ -412,4 +426,5 @@ struct SMacLayerShape {
+     bool placeholderAdditive = false; // semantic client ink marker: encoded RGB 124/255
+     std::array<SMacRect, MAX_MAC_RECTS> rects{}; // body logical px, relative to inset origin
+     int rectCount = 0; // zero preserves the single Spotlight shape
++    SMacMaterial material{};
+ };
+diff --git a/src/Shaders.hpp b/src/Shaders.hpp
+index b9b89aa..09cb83a 100644
+--- a/src/Shaders.hpp
++++ b/src/Shaders.hpp
+@@ -558,6 +558,7 @@ uniform float rimSide;
+ uniform float rimK;
+ 
+ uniform float outlineAlpha;
++uniform float outlineSidePower; // > 0: outline alpha scales with |normal.x|^power
+ uniform vec3 shadowKey;      // alpha, dy, sigma
+ uniform vec3 shadowAmb;
+ 
+@@ -666,7 +667,13 @@ void main() {
+     float sk = shadowKey.x * phi(-shapeLevel(q - vec2(0.0, shadowKey.y * pxScale)) / (shadowKey.z * pxScale));
+     float sa = shadowAmb.x * phi(-shapeLevel(q - vec2(0.0, shadowAmb.y * pxScale)) / (shadowAmb.z * pxScale));
+     float shadowA = 1.0 - (1.0 - sk) * (1.0 - sa);
+-    float darkA = 1.0 - (1.0 - shadowA) * (1.0 - outlineAlpha * covOut);
++    float oa = outlineAlpha;
++    if (outlineSidePower > 0.0 && covOut > 0.0) {
++        vec2 og = vec2(shapeLevel(q + vec2(0.25, 0.0)) - shapeLevel(q - vec2(0.25, 0.0)),
++                       shapeLevel(q + vec2(0.0, 0.25)) - shapeLevel(q - vec2(0.0, 0.25)));
++        oa *= pow(abs(og.x) / max(length(og), 1e-6), outlineSidePower);
++    }
++    float darkA = 1.0 - (1.0 - shadowA) * (1.0 - oa * covOut);
+     // Preserve encoded-space black shadow density when compositing in linear light.
+     if (workLinear == 1) darkA = 1.0 - pow(1.0 - darkA, 2.2);
+ 

@@ -25,7 +25,8 @@ from PySide6.QtTest import QTest
 def patched_source(upstream, destination):
     owner = Path(__file__).parent
     names = ['spotlight-layout.patch', 'spotlight-glass.patch', 'spotlight-suggestion.patch',
-             'spotlight-placement.patch', 'spotlight-parity.patch']
+             'spotlight-placement.patch', 'spotlight-parity.patch',
+             'spotlight-command-suggestions.patch']
     paths = set()
     for name in names:
         paths.update(re.findall(r'^--- a/(.*)$', (owner / name).read_text(), re.M))
@@ -34,8 +35,9 @@ def patched_source(upstream, destination):
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(upstream / name, target)
     for name in names:
-        subprocess.run(['patch', '--batch', '-p1', '-i', str(owner / name)], cwd=destination,
-                       capture_output=True, text=True, check=True)
+        result = subprocess.run(['patch', '--batch', '-p1', '-i', str(owner / name)], cwd=destination,
+                                capture_output=True, text=True)
+        assert result.returncode == 0, result.stdout + result.stderr
     return destination / 'src/server/src/ui/qml'
 
 
@@ -140,6 +142,8 @@ with tempfile.TemporaryDirectory(prefix='spotlight-qml-') as temporary:
     start = search.index('    readonly property string suggestionTitle:')
     end = search.index('    // Soft (query-focused)', start)
     bindings = search[start:end].replace('Launcher.', 'root.launcher.')
+    completer_state = search[search.index('    property bool completerRequested:'):start]
+    completer_state = completer_state.replace('Launcher.', 'root.launcher.')
     start = search.index('            Rectangle {\n                id: suggestionPill')
     end = search.index('            TextInput {', start)
     visuals = search[start:end].replace('id: suggestionPill', 'id: suggestionPill; objectName: "pill"')
@@ -150,6 +154,8 @@ Item {
     width: 550; height: 55
     property alias query: searchInput.text
     property alias cursor: searchInput.cursorPosition
+    property bool spotlightView: true
+COMPLETER_STATE
     property string currentTitle: "Slack"
     property QtObject commandView: QtObject {
         property string spotlightTitle: root.currentTitle
@@ -167,6 +173,7 @@ Item {
 BINDINGS
 VISUALS
 }'''.replace('PLACEHOLDER', placeholder_gate.replace('Launcher.', 'root.launcher.'))
+        .replace('COMPLETER_STATE', completer_state)
         .replace('BINDINGS', bindings).replace('VISUALS', visuals))
     pill = completion.findChild(QQuickItem, 'pill')
     placeholder = completion.findChild(QQuickItem, 'placeholder')
@@ -188,9 +195,24 @@ VISUALS
     completion.setProperty('cursor', 2)
     settle()
     assert pill.isVisible()
+    launcher = completion.property('launcher')
+    launcher.setProperty('hasCompleter', True)
+    completion.setProperty('currentTitle', 'Run Terminal Program')
+    completion.setProperty('query', 'te')
+    completion.setProperty('cursor', 2)
+    settle()
+    assert pill.isVisible() and completion.property('suggestionIcon') == 'icon://selected'
+    assert not completion.property('showCompleter')
+    completion.setProperty('completerRequested', True)
+    settle()
+    assert completion.property('showCompleter') and not pill.isVisible()
+    completion.setProperty('completerRequested', False)
+    settle()
+    assert pill.isVisible()
+    launcher.setProperty('hasCompleter', False)
     completion.setProperty('currentTitle', 'S' + 'a' * 200)
     settle()
     assert pill.width() <= completion.width() - pill.x()
-    print('PASS: selected-result completion, empty query, placeholder exclusion, cursor editing, long-title clipping')
+    print('PASS: selected-result completion, command argument preview/activation, empty query, placeholder exclusion, cursor editing, long-title clipping')
     assert not messages, messages
     print('PASS: no QML warnings')

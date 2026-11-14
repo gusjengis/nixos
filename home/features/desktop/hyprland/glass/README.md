@@ -14,6 +14,14 @@ surfaces; their material profiles and geometry still need separate validation.
 
 ## Source and compatibility
 
+`dock-ink-regions.patch` limits Dock's gray-124 additive ink to the running-dot
+band and separator gap. Icon artwork must always use ordinary premultiplied-over
+composition: gray pixels in Trash (especially when pressed) previously matched
+the ink marker and produced bright, blue-tinted contour lines. Launcher ink is
+unchanged. Region geometry follows `Dock.qml` / `DockTile.qml`; update the patch
+and `test-dock-ink.py` if that layout changes. The EGL test exercises actual
+compiled shaders with empty/full Trash, held/normal icons, SDR/HDR, and AA ink.
+
 Pinned Hyprglass upstream: `a54e7cd0232ca62a394aebebd553358dc6592652`.
 The patch first reverses upstream commit
 `b14733f81f6868f6bbbac7c2e2c47a8f665756eb`, which added the workspace-presentable
@@ -78,13 +86,202 @@ material beneath the surface, disables Hyprland's own blur for that window,
 and gives shape corners on the window's corners the window rounding.
 No config switch is involved; window glass and `subsurfaces` can stay off.
 
-The manager global is now version 2. Clients (Strata) leave the area
-transparent only at version 2. The protocol helper survives plugin reloads,
-so a running Hyprland keeps advertising version 1 until it restarts.
-Layer glass (Vicinae, QuickShell) still uses the fitted `macglass` shader.
+Clients leave the sidebar transparent only with manager version 2 or newer.
+The toolbar extension below advertises manager version 3 through a separately
+versioned resident helper, so it can coexist with helpers from older plugin
+loads. Layer glass can select Apple presets through `apple-layer.patch` below.
 
 Offline shader check: `24-apple-glass-hyprglass/harness.py` runs
 `appleglass.frag` headless against the numpy model and the Mac captures.
+
+## Apple layer presets (`apple-layer.patch`)
+
+The twelfth patch routes `hyprglass.layer(namespace, { mac_apple = name, ... })`
+through AppleGlass. Presets `apple-dock`, `apple-menu`, and `apple-widgets` use
+decoded Apple GPU uniforms at glass diffusion 1. The renderer adds continuous
+corners, ovalized normals, the 13-tap QuartzCore backdrop pyramid, and the
+diffuse key/fill highlight with vibrant-color-matrix blending. Existing inset,
+radius and rectangle geometry remains available; client content is composited
+above the glass, including additive placeholder ink.
+
+Dock, Vicinae, dropdowns and panels select these presets in `glass.lua`.
+The context work (Kanban) widget selects `apple-menu`; dictation selects the
+higher-contrast `apple-widgets` material.
+
+## System presets (`apple-system-presets.patch`)
+
+`apple-control-center` and `apple-notification` (in `AppleSystemPresets.inc`) come
+from the running macOS 27.0.1 ControlCenter and NotificationCenter processes, read
+through LLDB: live CAFilter inputs, highlight effects and vibrant colour matrices
+(`MacOS Theme/27-real-glass/data/live-{cc,nc}-final.json`). Those inputs were
+replayed through Apple's CARenderer, and the GPU uniforms it produced were decoded
+into these presets. No screenshot fitting is involved.
+
+Verified in nested Hyprland: interiors over black/gray/white are CC 32/118/204 and
+notifications 32/83/108. Apple's own renderer gives identical values for the same
+inputs.
+
+Wi‑Fi uses two materials on macOS too (captured live, `data/live-wifi-menu.json`,
+`data/live-cc-wifi.json`). The menu-bar Wi‑Fi menu is menu material (`apple-menu`,
+used by the bar popup). Wi‑Fi opened inside Control Center is Control Center
+material (`apple-control-center`, used by `quickshell-cc-detail`). Apple scales
+refraction/bleed/shadow heights with surface size, while these presets use fixed values.
+
+Not reproduced yet: on macOS, ControlCenter draws a separate 50 pt, 10% black
+shadow layer beneath its glass, and the glass samples that darkened backdrop
+(real white reads 186). NotificationCenter has similar custom shadow layers. This
+backdrop work is a separate pass. Do not fold it into the preset tone.
+Apple presets use dark appearance. The shared `quickshell/theme/glass-tint`
+file now controls their glass diffusion live: Dock/widgets vary blur and blur-fill;
+menus also interpolate Apple's measured face matrices and luma compression.
+Values are clamped to 0..1, and layer `mac_tint` overrides still take precedence.
+
+`shared-tint.patch` extends this resolver to Control Center, notifications and
+Finder's active/inactive toolbar and sidebar. Window-item passes resolve the same
+shared value at draw time instead of retaining a fixed preset. The opaque
+`apple-toolbar-base` backing plane is intentionally unchanged.
+
+Apple DesignLibrary diffusion sweeps (0, .125, .25, .375, .5, .625, .75, .875, 1)
+confirmed Control Center's fixed face matrix, blur radius `4*min(2*t,1)` before
+backdrop scaling, and normal blur-fill `max(2*t-1,0)`. Notifications use regular
+face-matrix/fill interpolation while retaining their own .4 holding tone,
+geometry and rim. Inactive toolbars keep Finder's captured black=.08 endpoint.
+Sidebar fill follows the sidebar response (.25/.5/1 at clear/half/full), retaining
+its existing face and bleed calibration. The fitted Dock tooltip carries the
+fitted profile's tint deltas onto its measured full-tint LUT and blur endpoints;
+this remains a fitted approximation, not an extracted Apple tooltip recipe.
+
+Focused render regression (Pillow, Hyprland, QuickShell and grim required):
+
+```sh
+python test-shared-tint.py /nix/store/.../lib/libhyprglass.so --strata
+```
+
+This creates a temporary hidden parent output hosting a private nested compositor,
+then cleans up its processes/output and restores workspaces. It checks all eight
+translucent Apple presets, fitted tooltip, per-layer tint override, return to full
+tint, and (with `--strata`) real window sidebar/toolbar regions. `GRIM_BINARY` can
+select a matching grim executable. Clear/half/full renders and actual Strata
+window regions passed with plugin 0.9.7; return-to-full card pixels were identical.
+
+Evidence and harness: `MacOS Theme/27-real-glass`. Menus versus CARenderer have
+mean error 0.07–0.43/255; widgets 0.07–0.30/255. Dock checker/stripes versus the
+real Dock have mean error about 2/255, with larger residuals at end caps. Nested
+Hyprland versus the offline harness differs at most 2/255 on tested checker and
+photo regions. These measurements do not establish HDR or arbitrary-scale parity.
+
+## Finder toolbar (`apple-toolbar.patch`)
+
+Protocol version 3 adds up to 16 independently named rounded material regions
+beside the original sidebar region. Changes latch on the surface commit;
+removal, helper stop/restart, and surface destruction have a C regression check
+in the package's `checkPhase`. Each region owns its backdrop cache. Helper ABI 2
+uses a separate exported symbol to avoid reusing an incompatible resident helper.
+
+`apple-toolbar`, `apple-toolbar-inactive`, and `apple-toolbar-base` reproduce
+the live Finder toolbar recipe extracted through LLDB, then decoded from Apple
+CARenderer GPU uniforms. Active inner refraction is -18/9, outer refraction
+16/16; inactive outer refraction/highlight opacity is zero. The backdrop scale
+is 0.125. These are toolbar-specific settings, not the generic menu preset.
+
+Strata's `finder-toolbar.patch` selects these materials on focus changes and
+uses extracted 13pt SF symbols. Search expands to a 325px cap and collapses to
+a 36px button when its calculated width falls below 180px. The measured formula
+is 0.75 * toolbar width - 478, based on Finder's 156px sidebar. Version 2 keeps
+the CSS toolbar fallback; version 1 keeps opaque fallback for all client glass.
+
+Release Nix artifacts passed private nested-Hyprland captures at window widths
+800, 1000, 1120, and 1400, plus inactive 1400. The owner approved temporary
+hidden-output hosting after fully isolated GPU backends failed allocation;
+test windows/output were removed afterward. Offline masked comparison against
+CARenderer gives mean maximum-channel error below 0.8/255 on uniform inputs and
+1.8/255 on tested patterns. Edge differences remain; this is not pixel-perfect
+parity across backgrounds or sidebar widths. Evidence and reproduction notes:
+`MacOS Theme/28-strata-toolbar/README.md` in the session archive.
+
+## Per-layer materials (`dock-material.patch`)
+
+Lua `mac_material` on `hyprglass.layer()` overrides parts of the fitted
+profile for one namespace: `lut` (17 encoded outputs at g = 0,16,...,240,252),
+`chroma`, `blur = {s1, s2, w2}`, `refraction = {amplitude, width, power}`,
+`rim = {r0, rc, a1, l1, l2, side, k}` and `outline_side_power` (outline alpha
+times |normal.x|^power: side-only outlines). Lengths are logical px. Unknown
+keys are ignored by older builds, so the Lua stays loadable.
+
+The patch also edge-extends the background sample past the monitor edge
+instead of clearing it to black. Before, a layer whose shadow padding left the
+screen (the Dock, top-bar menus) blurred black into its glass near that edge.
+
+The Dock (`quickshell-dock`) and its label (`quickshell-dock-tip`) use this.
+Measurements and fit: MacOS Theme session `26-dock/README.md`.
+
+### Dock hover labels (`dock-tooltip.patch`)
+
+`mac_material.dock_tooltip = true` renders a single 26 px circular capsule with
+a rounded 7 px pointer. The configured glass box includes both; the pointer
+uses the body's backdrop, tint, refraction and rim. The hidden attachment edge
+is excluded from distance/rim calculations to avoid a seam through the pointer.
+This measured silhouette replaces the separate, flat-colored client triangle.
+
+Quickshell uses icon-sized hover targets with gaps between adjacent labels;
+click targets remain whole slots. A dedicated `no_anim` layer rule prevents
+Hyprland from sliding the reused tooltip surface between icons. Label ownership
+uses item identity, so late exits from identically named apps cannot hide the
+new tooltip. QML regression: `quickshell -p ../quickshell/test_dock_tooltip.qml`.
+
+`test-dock-tooltip.py LIBRARY REFERENCE_DIR OUTPUT_DIR` compiles the shader
+embedded in the built library and compares capsule edges and pointer against
+`26-dock/mac/hover-{black,gray,white}.png`, excluding text. Measured mean errors:
+4.04, 3.92 and 6.03/255 respectively with the corrected 127 px reference body.
+That comparison excludes text. Typography is separately checked using
+`quickshell/test_dock_label_render.qml` and `test_dock_label_appearance.py`:
+14 px SF Pro, optical size 17, -0.25 px tracking, native unhinted rendering,
+18 px baseline and 13 px side padding. Fixed-placement text coverage RMS
+improves about 60% against three Mac backgrounds. Six CoreText-measured label
+advances agree within 0.6 px; this is not pixel-perfect text rasterization.
+Evidence: `MacOS Theme/26-dock/typography/README.md`. Precise reveal timing and
+physical HDR parity remain unverified.
+
+### Dock menus (`dock-menu.patch`)
+
+`mac_material.callout = { x, height }` adds a pointer below an Apple-material
+(`mac_apple`) body: tip `x` pt from the body's left edge (negative: from the
+right), `height` pt tall. The configured glass box includes the pointer. The
+half-profile is measured from the macOS 27 Dock menu at 2x; the body's bottom
+edge across the pointer is treated as interior so depth, refraction and rim have
+no seam. A 0.6-alpha, 1 px dark rim (0.5 pt at 2x) is added outside downward-facing
+edges, weighted by n.y², so the side outline continues round the tip as on macOS.
+`quickshell-dock-menu` and `quickshell-dock-menu-end` use it.
+`test-dock-menu.py LIBRARY REFERENCE_PGM OUTPUT_DIR` compiles the installed
+shader and compares its contour with `MacOS Theme/29-dock-menu/mac/
+trash-pointer-2x.pgm`: mean 0.34 pt, max 0.69 pt. Only the left-anchored case is
+rendered by that test.
+
+## HDR screenshots and screensharing (`hdr-mirror.patch`)
+
+The matching Hyprland fork renders HDR displays and SDR captures through two
+framebuffer attachments. Its ordinary surface shaders write both; custom glass
+shaders must do the same. Writing only location 0 leaves location 1 undefined,
+corrupting glass and redirected shell content in screenshots and screen shares.
+
+Apple glass, its client-surface composite (including additive placeholder ink),
+and the fitted glass/tooltip shader now write location 1 explicitly. The capture
+output unpremultiplies the linear working color, removes the monitor's SDR
+luminance scaling, encodes actual sRGB, then premultiplies again. Display output
+is unchanged. SDR working buffers retain their original encoded values.
+
+Focused GPU regression, using `moderngl` and `numpy`:
+
+```sh
+python test-hdr-mirror.py /nix/store/.../lib/libhyprglass.so [PREVIOUS_LIBRARY]
+```
+
+This renders the actual packaged shaders into separate floating-point display
+and capture attachments. It checks 27 combinations of SDR/HDR, SDR white levels,
+gamma 2.2, opacity, translucent ink and additive placeholders. An optional old
+library verifies unchanged display pixels. Version 0.9.8 fails this capture
+check; 0.9.9 passes. This is GPU attachment-level proof, not a physical-display
+measurement or an end-to-end PipeWire recording.
 
 ## Manual application and build
 
@@ -92,16 +289,17 @@ In a separate Hyprglass checkout at the pinned upstream revision:
 
 ```sh
 git checkout --detach a54e7cd0232ca62a394aebebd553358dc6592652
-for patch in experimental hdr-encoding linear-shadow refraction launcher-shape config-lifecycle layer-shadow surface-material portable-backend apple-glass; do
+for patch in experimental hdr-encoding linear-shadow refraction launcher-shape config-lifecycle layer-shadow surface-material portable-backend apple-glass dock-material apple-layer apple-system-presets apple-toolbar capture-target shared-tint dock-tooltip hdr-mirror; do
     git apply --check "/etc/nixos/home/features/desktop/hyprland/glass/$patch.patch"
     git apply "/etc/nixos/home/features/desktop/hyprland/glass/$patch.patch"
 done
+cp /etc/nixos/home/features/desktop/hyprland/glass/AppleSystemPresets.inc src/
 ```
 
 Apply the complete patch once; do not separately reverse `b14733f` first.
 Build the patched source against the matching fork, not generic Hyprland headers.
 `package.nix` provides the reproducible build recipe: fixed upstream revision
-and source hash, all ten patches in the order above, and an explicit matching
+and source hash, all patches in the order above, and an explicit matching
 `hyprland` argument.
 The Hyprland Home Manager module imports it and deploys the immutable compiled
 library at `~/.local/share/hyprglass/libhyprglass.so`. Its owning Lua configuration
@@ -116,8 +314,10 @@ pinned Hyprland source and use that patched compositor's installed headers.
   restricts glass to `vicinae`, `quickshell-menu`, `quickshell-panel`,
   notification cards and Control Center group/detail surfaces. Old pill/tile
   declarations remain for the shipped separate-window integration.
-- A 110px inset reserves space for the shader's shadow. Negative radius chooses
-  a capsule for the empty field and 23px continuous corners for expanded results.
+- A 110px inset reserves space for the shader's shadow. Vicinae uses a fixed
+  28.5px radius: half the 57px empty field's height, retained for expanded results
+  so the top corners do not change shape. Negative radius still selects automatic
+  capsule/23px rounding for other callers.
 - `plugin:hyprglass:mac:tint` defaults to `1.0`; the fitted slider range is `0..1`.
 - Lua layer options `mac_inset` and `mac_radius` select the fitted shader and
   alpha-mask redirect. Runtime layer configuration commits immediately.
@@ -232,6 +432,35 @@ pinned Hyprland source and use that patched compositor's installed headers.
 - Grouped presentation, notification/Sound backgrounds, additive glyph peaks
   156/246/255, and rendered mid-tint warp are captured in `16-linux-glass-proof`.
   Private test runtime does not exercise real PipeWire selection or physical input.
+
+## Desktop-affinity implementation
+
+`desktop-affinity.patch` adds a render pass after background wallpaper rendering,
+before desktop icons and applications. `DesktopTint.inc` converts/downsamples the
+live work buffer to encoded RGBA8 at 1/8 logical resolution; only complete
+background damage is sampled, excluding stale foreground work-buffer pixels.
+`DesktopTintMath.hpp` preserves SkyLight's integral-image indexing, fractional
+area, six-bit quantization, and encoded Display-P3 Chameleon composition.
+Wallpaper fades and neutral planes therefore share actual frames, not clocks.
+
+Protocol v4 guarantees `apple-content`, `apple-footer`, and
+`apple-sidebar-inactive`. Toolbar/base and sidebar glass body fills consume that
+same window tone. The resident helper uses its own v3 symbol, preserving earlier
+helper objects across hot reload. The capture pass is removed before unload;
+GL samples and shader are released with AppleGlass state.
+
+Apple layer surfaces accept `mac_neutral_rects` (up to 32 body-local rectangles:
+`x`, `y`, `width`, `height`, `radius`, optional `hovered`) and optional
+`mac_neutral_clip` (`x`, `y`, `width`, `height`). Neutral cards draw between glass
+and client foreground. Geometry updates replace the previous neutral declaration
+to bound storage while scrolling. Status advertises `desktopTint: true`;
+QuickShell retains its CPU fallback until capability and geometry are ready.
+
+Package checks include native oracle fixtures in `test-desktop-affinity.cpp` and
+the protocol commit/lifetime test. Private GL rendering verified body/toolbar
+tracking within 1/255 of the same-frame material during a wallpaper fade, plus
+active/inactive sidebar, footer, and QuickShell cards. This does not establish
+every HDR/multi-monitor edge case.
 
 ## Handoff
 

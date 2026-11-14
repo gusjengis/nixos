@@ -1,4 +1,6 @@
 import { execFile } from "node:child_process"
+import { homedir } from "node:os"
+import { join } from "node:path"
 
 const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
 const SPINNER_INTERVAL_MS = 80
@@ -98,16 +100,15 @@ export const TmuxStatusPlugin = async () => {
 
   function checkUnfocused(check, onResult) {
     execFile(
-      "tmux",
-      ["display-message", "-p", "-t", pane, "#{session_attached} #{window_active} #{pane_active}"],
+      "python3",
+      [join(process.env.XDG_CONFIG_HOME || join(homedir(), ".config"), "tmux/plugins/opencode-viewed.py"), pane],
       { timeout: 500, killSignal: "SIGKILL" },
-      (error, stdout) => {
-        if (disposed || error || check !== completionCheck) {
+      (error) => {
+        if (disposed || check !== completionCheck) {
           return
         }
 
-        const [attached, activeWindow, activePane] = stdout.trim().split(" ")
-        onResult(!(Number(attached) > 0 && activeWindow === "1" && activePane === "1"))
+        onResult(Boolean(error))
       },
     )
   }
@@ -127,15 +128,12 @@ export const TmuxStatusPlugin = async () => {
     })
   }
 
-  function markErroredIfUnfocused() {
-    const check = ++completionCheck
+  // A failed session needs resuming whether or not it was seen, so the error
+  // stays until the next prompt starts work (cancelCompletion on busy status).
+  function markErrored() {
+    completionCheck += 1
     completed = false
-    errored = false
-
-    checkUnfocused(check, (unfocused) => {
-      errored = unfocused
-      updateIcon()
-    })
+    errored = true
   }
 
   function updateIcon() {
@@ -228,7 +226,12 @@ export const TmuxStatusPlugin = async () => {
           sessionStates.clear()
           pendingInput.clear()
         }
-        markErroredIfUnfocused()
+        // A manual interrupt is not a failure requiring attention.
+        if (event.properties.error?.name === "MessageAbortedError") {
+          cancelCompletion()
+        } else {
+          markErrored()
+        }
         updateIcon()
         return
       }

@@ -1,0 +1,43 @@
+diff --git a/src/server/src/ui/qml/launcher/SearchBar.qml b/src/server/src/ui/qml/launcher/SearchBar.qml
+--- a/src/server/src/ui/qml/launcher/SearchBar.qml
++++ b/src/server/src/ui/qml/launcher/SearchBar.qml
+@@ -12,1 +12,6 @@
+     readonly property LauncherAppearance appearance: (root.Window.window as LauncherWindow)?.appearance ?? null
++    // Selecting a command previews it like any other result. Argument entry
++    // starts only when activation explicitly requests focus in the completer.
++    property bool completerRequested: false
++    readonly property bool showCompleter: Launcher.hasCompleter && (!spotlightView || completerRequested)
++
+@@ -17,1 +22,1 @@
+-        if (!Launcher.searchInteractive || Launcher.hasCompleter || Launcher.compacted || Launcher.showBackButton)
++        if (!Launcher.searchInteractive || root.showCompleter || Launcher.compacted || Launcher.showBackButton)
+@@ -104,2 +109,2 @@
+-            Layout.fillWidth: !Launcher.hasCompleter
+-            Layout.preferredWidth: Launcher.hasCompleter ? searchInputMetrics.advanceWidth : -1
++            Layout.fillWidth: !root.showCompleter
++            Layout.preferredWidth: root.showCompleter ? searchInputMetrics.advanceWidth : -1
+@@ -214,1 +219,1 @@
+-                    text: Launcher.hasCompleter ? "..." : Launcher.searchPlaceholder
++                    text: root.showCompleter ? "..." : Launcher.searchPlaceholder
+@@ -231,2 +236,3 @@
+                 onTextEdited: {
++                    root.completerRequested = false;
+                     root.setKeyboardSelection(false);
+@@ -498,1 +504,1 @@
+-            visible: Launcher.hasCompleter
++            visible: root.showCompleter
+@@ -581,4 +587,5 @@
+         function onCompleterChanged() {
++            root.completerRequested = false;
+             if (!Launcher.hasCompleter && !searchInput.activeFocus) {
+                 searchInput.forceActiveFocus();
+             }
+@@ -587,5 +594,7 @@
+         function onCompleterFocusRequested() {
+-            if (Launcher.hasCompleter)
++            if (Launcher.hasCompleter) {
++                root.completerRequested = true;
+                 argCompleter.focusFirst();
++            }
+         }
+         function onCompleterValidationFailed() {

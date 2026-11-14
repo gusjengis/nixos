@@ -1,0 +1,43 @@
+diff --git a/src/GlassLayerSurface.cpp b/src/GlassLayerSurface.cpp
+--- a/src/GlassLayerSurface.cpp
++++ b/src/GlassLayerSurface.cpp
+@@ -1,2 +1,19 @@
+     glUniform1i(loc("placeholderAdditive"), additive ? 1 : 0);
++    // DockTile artwork can contain gray 124 too. Only the indicator band and
++    // separator gap belong to the additive-ink protocol, never app/Trash pixels.
++    // Layout contract: Dock.qml (89 high, 8 side padding, 73 pitch, 32 gap),
++    // DockTile.qml (running dots at y=81). Include 1 px filtering margins.
++    const bool dockInk = mac.apple == "apple-dock";
++    glUniform1i(loc("placeholderRectCount"), dockInk ? 2 : 0);
++    if (dockInk) {
++        const float localW = rawBox.w / scale, localH = rawBox.h / scale;
++        const float pad = inset / scale, bodyW = localW - 2.0f * pad;
++        const float regions[] = {
++            pad / localW, (pad + 80.0f) / localH,
++            (pad + bodyW) / localW, (pad + 86.0f) / localH,
++            (pad + bodyW - 98.0f) / localW, (pad + 11.0f) / localH,
++            (pad + bodyW - 95.0f) / localW, (pad + 78.0f) / localH,
++        };
++        glUniform4fv(loc("placeholderRects[0]"), 2, regions);
++    }
+     {
+diff --git a/src/Shaders.hpp b/src/Shaders.hpp
+--- a/src/Shaders.hpp
++++ b/src/Shaders.hpp
+@@ -1,2 +1,4 @@
+ uniform sampler2D bgTex;      // monitor-sized copy of the target (placeholderAdditive only)
++uniform int placeholderRectCount; // zero: unrestricted (launcher); Dock: explicit ink regions
++uniform vec4 placeholderRects[2]; // normalized client-local min.xy/max.zw
+ uniform vec2 maskUVOffset;
+@@ -1,4 +1,10 @@
+     vec4 surf = texture(tex, muv);
+     if (surf.a <= 0.0) discard;
+-    if (placeholderAdditive == 1) {
++    bool inkRegion = placeholderRectCount == 0;
++    for (int i = 0; i < placeholderRectCount; ++i) {
++        vec4 r = placeholderRects[i];
++        inkRegion = inkRegion || (all(greaterThanEqual(v_texcoord, r.xy)) &&
++                                  all(lessThan(v_texcoord, r.zw)));
++    }
++    if (placeholderAdditive == 1 && inkRegion) {
+         vec3 ink = toSrgb(surf.rgb / surf.a);

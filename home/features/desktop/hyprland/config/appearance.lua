@@ -64,6 +64,14 @@ hl.window_rule({
 	rounding_power = 2,
 })
 
+-- URL routing explicitly focuses the current context's browser. Chromium's
+-- global singleton activation must never pull us into another context.
+hl.window_rule({
+	name = "chromium-focus-on-activate",
+	match = { class = "^(chromium|chromium-browser)$" },
+	focus_on_activate = not require("desktop-features").contexts,
+})
+
 hl.curve("easeOutQuint", { type = "bezier", points = { { 0.23, 1 }, { 0.32, 1 } } })
 hl.curve("easeInOutCubic", { type = "bezier", points = { { 0.65, 0.05 }, { 0.36, 1 } } })
 hl.curve("linear", { type = "bezier", points = { { 0, 0 }, { 1, 1 } } })
@@ -107,7 +115,14 @@ hl.layer_rule({
 
 hl.layer_rule({
 	name = "quickshell-dropdown-no-animation",
-	match = { namespace = "^quickshell-(menu|panel|inbox|cc-.*|notification-card)$" },
+	match = { namespace = "^quickshell-(menu|panel|inbox|cc-.*|notification-card|dock-menu(-end)?)$" },
+	no_anim = true,
+})
+
+-- Dock labels disappear/reappear at each icon; never tween a shared surface.
+hl.layer_rule({
+	name = "quickshell-dock-tooltip-no-animation",
+	match = { namespace = "^quickshell-dock-tip$" },
 	no_anim = true,
 })
 

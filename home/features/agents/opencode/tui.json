@@ -3,7 +3,6 @@
   "plugin": [
     "./tui-plugins/tmux-theme.js",
     "./tui-plugins/context-persistence.js",
-    "./tui-plugins/context-library.tsx",
-    "./tui-plugins/context-stale.tsx"
+    "./tui-plugins/context-library.tsx"
   ]
 }

@@ -1,0 +1,133 @@
+diff --git a/src/AppleGlass.cpp b/src/AppleGlass.cpp
+--- a/src/AppleGlass.cpp
++++ b/src/AppleGlass.cpp
+@@ -1,4 +1,7 @@
+ #include "AppleGlass.hpp"
++#include "DesktopTintMath.hpp"
++#include "RenderGuards.hpp"
++#include "Shaders.hpp"
+ #include "Globals.hpp"
+ #include "GlassRenderer.hpp"
+ #include "WindowGeometry.hpp"
+@@ -259,1 +262,4 @@
+             {"apple-toolbar-base", makeToolbarBase()},
++            {"apple-content", makeToolbarBase()},
++            {"apple-footer", makeToolbarBase()},
++            {"apple-sidebar-inactive", makeToolbarBase()},
+@@ -332,3 +338,6 @@
++#include "DesktopTint.inc"
++
+ void clearStates() {
+     states().clear();
++    clearDesktopSamples();
+ }
+@@ -342,2 +351,3 @@
+-        const auto params = paramsForTint(m_data.presetName, tint);
++        const auto params = desktopParams(m_data.presetName, paramsForTint(m_data.presetName, tint),
++            m_data.monitor.lock(), m_data.windowBox);
+         m_data.state->draw(m_data.monitor.lock(), params, m_data.glassBox, m_data.radii, m_data.windowBox, m_data.windowRadius,
+diff --git a/src/AppleGlass.hpp b/src/AppleGlass.hpp
+--- a/src/AppleGlass.hpp
++++ b/src/AppleGlass.hpp
+@@ -12,1 +12,2 @@
+ #include <GLES3/gl32.h>
++#include "PluginConfig.hpp"
+@@ -119,1 +120,3 @@
+ [[nodiscard]] SParams paramsForTint(std::string_view name, float tint);
++void queueDesktopCapture();
++void drawNeutralCards(PHLMONITOR monitor, const SNeutralCards& cards, const CBox& rawBox, float inset, float alpha);
+diff --git a/src/main.cpp b/src/main.cpp
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -254,1 +254,2 @@
++        case RENDER_POST_WALLPAPER: AppleGlass::queueDesktopCapture(); break;
+         case RENDER_PRE_WINDOWS: g_pGlobalState->dedupe.resetEpoch(); break;
+@@ -990,1 +991,2 @@
+     g_pHyprRenderer->m_renderPass.removeAllOfType("CAppleGlassPassElement");
++    g_pHyprRenderer->m_renderPass.removeAllOfType("CDesktopAffinityCapture");
+diff --git a/protocols/hyprglass-item-v1.xml b/protocols/hyprglass-item-v1.xml
+--- a/protocols/hyprglass-item-v1.xml
++++ b/protocols/hyprglass-item-v1.xml
+@@ -27,1 +27,1 @@
+-  <interface name="hyprglass_item_manager_v1" version="3">
++  <interface name="hyprglass_item_manager_v1" version="4">
+@@ -102,1 +102,1 @@
+-  <interface name="hyprglass_item_v1" version="3">
++  <interface name="hyprglass_item_v1" version="4">
+diff --git a/src/item-helper/helper.c b/src/item-helper/helper.c
+--- a/src/item-helper/helper.c
++++ b/src/item-helper/helper.c
+@@ -341,1 +341,1 @@
+-    struct wl_global* global = wl_global_create(display, &hyprglass_item_manager_v1_interface, 3, NULL, bind_manager);
++    struct wl_global* global = wl_global_create(display, &hyprglass_item_manager_v1_interface, 4, NULL, bind_manager);
+@@ -431,1 +431,1 @@
+-const struct hyprglass_item_helper_v1_api hyprglass_item_helper_v2_api = {
++const struct hyprglass_item_helper_v1_api hyprglass_item_helper_v3_api = {
+diff --git a/src/item-helper/hyprglass_item_helper_api.h b/src/item-helper/hyprglass_item_helper_api.h
+--- a/src/item-helper/hyprglass_item_helper_api.h
++++ b/src/item-helper/hyprglass_item_helper_api.h
+@@ -104,1 +104,1 @@
+-extern const struct hyprglass_item_helper_v1_api hyprglass_item_helper_v2_api;
++extern const struct hyprglass_item_helper_v1_api hyprglass_item_helper_v3_api;
+diff --git a/src/ItemHints.cpp b/src/ItemHints.cpp
+--- a/src/ItemHints.cpp
++++ b/src/ItemHints.cpp
+@@ -87,1 +87,1 @@
+-        if (void* adopted = dlsym(RTLD_DEFAULT, "hyprglass_item_helper_v2_api")) {
++        if (void* adopted = dlsym(RTLD_DEFAULT, "hyprglass_item_helper_v3_api")) {
+@@ -121,1 +121,1 @@
+-        void* symbol = dlsym(handle, "hyprglass_item_helper_v2_api");
++        void* symbol = dlsym(handle, "hyprglass_item_helper_v3_api");
+diff --git a/src/PluginConfig.hpp b/src/PluginConfig.hpp
+--- a/src/PluginConfig.hpp
++++ b/src/PluginConfig.hpp
+@@ -419,1 +419,8 @@
++struct SNeutralCards {
++    std::array<SMacRect, 32> rects{};
++    std::array<bool, 32> hovered{};
++    int count = 0;
++    std::optional<SMacRect> clip;
++};
++
+ struct SMacLayerShape {
+@@ -433,1 +440,2 @@
+     std::string apple;
++    SNeutralCards neutral;
+diff --git a/src/PluginConfig.cpp b/src/PluginConfig.cpp
+--- a/src/PluginConfig.cpp
++++ b/src/PluginConfig.cpp
+@@ -750,1 +750,2 @@
+     std::string                   macApple;
++    SNeutralCards                 neutral;
+@@ -755,1 +756,3 @@
++#include "DesktopTintConfig.inc"
++
+ static int handleLuaLayer(lua_State* L) {
+@@ -763,1 +766,2 @@
++        entry.neutral = readNeutralCards(L);
+         lua_getfield(L, 2, "exclude");
+@@ -956,1 +960,8 @@
+-    s_pendingLayers.push_back(std::move(entry));
++    // Geometry/hover updates replace the previous neutral declaration, retaining
++    // the original namespace configuration and bounded storage during scrolling.
++    const auto previous = std::find_if(s_pendingLayers.rbegin(), s_pendingLayers.rend(), [&](const auto& old) {
++        return entry.neutral.count > 0 && old.neutral.count > 0 && old.ns == entry.ns;
++    });
++    if (previous != s_pendingLayers.rend()) *previous = std::move(entry);
++    else s_pendingLayers.push_back(std::move(entry));
++
+@@ -986,1 +990,1 @@
+-                                                                    .material = entry.macMaterial, .apple = entry.macApple};
++                                                                    .material = entry.macMaterial, .apple = entry.macApple, .neutral = entry.neutral};
+diff --git a/src/GlassLayerSurface.cpp b/src/GlassLayerSurface.cpp
+--- a/src/GlassLayerSurface.cpp
++++ b/src/GlassLayerSurface.cpp
+@@ -654,1 +654,2 @@
++    AppleGlass::drawNeutralCards(monitor, mac.neutral, rawBox, mac.inset, alpha);
+     // Client surface on top.
+diff --git a/src/Diagnostics.cpp b/src/Diagnostics.cpp
+--- a/src/Diagnostics.cpp
++++ b/src/Diagnostics.cpp
+@@ -423,1 +423,1 @@
+-        return std::format("{{\n  \"schema\": {}, \"version\": \"{}\", \"active\": {}, \"shaders\": \"{}\", \"itemProtocol\": {}, \"macRects\": true, \"macPlaceholder\": true,\n"
++        return std::format("{{\n  \"schema\": {}, \"version\": \"{}\", \"active\": {}, \"shaders\": \"{}\", \"itemProtocol\": {}, \"macRects\": true, \"macPlaceholder\": true, \"desktopTint\": true,\n"

@@ -1,0 +1,109 @@
+diff --git a/data/protocols/hyprglass-item-v1.xml b/data/protocols/hyprglass-item-v1.xml
+--- a/data/protocols/hyprglass-item-v1.xml
++++ b/data/protocols/hyprglass-item-v1.xml
+@@ -27,1 +27,1 @@
+-  <interface name="hyprglass_item_manager_v1" version="3">
++  <interface name="hyprglass_item_manager_v1" version="4">
+@@ -102,1 +102,1 @@
+-  <interface name="hyprglass_item_v1" version="3">
++  <interface name="hyprglass_item_v1" version="4">
+diff --git a/src/ui/window/composition/layout.rs b/src/ui/window/composition/layout.rs
+--- a/src/ui/window/composition/layout.rs
++++ b/src/ui/window/composition/layout.rs
+@@ -202,2 +202,3 @@
+             &toolbar,
++            &footer_cap,
+             &[
+diff --git a/src/ui/compositor_glass.rs b/src/ui/compositor_glass.rs
+--- a/src/ui/compositor_glass.rs
++++ b/src/ui/compositor_glass.rs
+@@ -43,1 +43,2 @@
+ const TOOLBAR_VERSION: u32 = 3;
++const DESKTOP_TINT_VERSION: u32 = 4;
+@@ -69,1 +70,1 @@
+-            state.manager = Some(registry.bind(name, version.min(TOOLBAR_VERSION), queue, ()));
++            state.manager = Some(registry.bind(name, version.min(DESKTOP_TINT_VERSION), queue, ()));
+@@ -114,1 +115,2 @@
+     toolbar: bool,
++    desktop_tint: bool,
+@@ -136,1 +138,2 @@
+         let toolbar = manager.version() >= TOOLBAR_VERSION;
++        let desktop_tint = manager.version() >= DESKTOP_TINT_VERSION;
+@@ -144,1 +147,2 @@
+             toolbar,
++            desktop_tint,
+@@ -188,1 +192,1 @@
+-pub(in crate::ui) fn follow_chrome(cap: &gtk::Box, toolbar: &gtk::Box, regions: &[gtk::Widget]) {
++pub(in crate::ui) fn follow_chrome(cap: &gtk::Box, toolbar: &gtk::Box, footer: &gtk::Box, regions: &[gtk::Widget]) {
+@@ -191,1 +195,2 @@
+     let weak_toolbar = toolbar.downgrade();
++    let weak_footer = footer.downgrade();
+@@ -215,1 +220,4 @@
++        if item.desktop_tint {
++            window.add_css_class("desktop-tint-composited");
++        }
+         realized.replace(Some(SidebarGlass {
+@@ -229,1 +237,2 @@
+             let weak_toolbar = weak_toolbar.clone();
++            let weak_footer = weak_footer.clone();
+@@ -237,1 +246,1 @@
+-                    update(glass, &cap, &toolbar, &regions, window);
++                    update(glass, &cap, &toolbar, &weak_footer, &regions, window);
+@@ -250,1 +259,2 @@
+         let regions = regions.clone();
++        let weak_footer = weak_footer.clone();
+@@ -261,1 +271,1 @@
+-                update(glass, &cap, &toolbar, &regions, &window);
++                update(glass, &cap, &toolbar, &weak_footer, &regions, &window);
+@@ -270,1 +280,2 @@
+             window.remove_css_class(TOOLBAR_CLASS);
++            window.remove_css_class("desktop-tint-composited");
+@@ -278,1 +289,2 @@
+     toolbar: &gtk::Box,
++    footer: &gtk::glib::WeakRef<gtk::Box>,
+@@ -291,1 +303,4 @@
+-    let column = (active && cap.has_css_class("over-sidebar"))
++    if glass.item.desktop_tint && glass.active != Some(active) {
++        glass.item.item.set_preset(if active { SIDEBAR_PRESET } else { "apple-sidebar-inactive" }.to_owned());
++    }
++    let column = ((active || glass.item.desktop_tint) && cap.has_css_class("over-sidebar"))
+@@ -305,1 +320,9 @@
+-        let css = if glass.item.toolbar {
++        let css = if glass.item.desktop_tint {
++            "window.desktop-tint-composited { --finder-content: transparent; --finder-footer: transparent; background: transparent; } \
++             window.desktop-tint-composited.inactive .sidebar-shell, \
++             window.desktop-tint-composited.inactive .sidebar-cap.over-sidebar, \
++             window.desktop-tint-composited.inactive .footer-cap.over-sidebar, \
++             window.desktop-tint-composited.inactive .sidebar-split > .sidebar-shell, \
++             window.desktop-tint-composited.inactive .sidebar-split > separator.wide \
++             { background: transparent; box-shadow: none; }".to_owned()
++        } else if glass.item.toolbar {
+@@ -348,1 +371,18 @@
++        if glass.item.desktop_tint {
++            let footer_bounds = footer.upgrade().and_then(|f| f.compute_bounds(window));
++            let footer_y = footer_bounds.filter(|b| b.height() > 0.0)
++                .map_or(f64::from(window.height()), |b| f64::from(b.y()));
++            shapes.push(Some(Rect {
++                x: offset_x + f64::from(clear_width),
++                y: offset_y + f64::from(clear_height),
++                width: f64::from((window.width() - clear_width).max(0)),
++                height: (footer_y - f64::from(clear_height)).max(0.0),
++            }));
++            shapes.push(Some(Rect {
++                x: offset_x + f64::from(clear_width),
++                y: offset_y + footer_y,
++                width: f64::from((window.width() - clear_width).max(0)),
++                height: (f64::from(window.height()) - footer_y).max(0.0),
++            }));
++        }
+         let focus_changed = glass.active != Some(active);
+@@ -351,1 +392,5 @@
+-                let preset = if slot == 0 {
++                let preset = if glass.item.desktop_tint && slot + 2 == shapes.len() {
++                    "apple-content"
++                } else if glass.item.desktop_tint && slot + 1 == shapes.len() {
++                    "apple-footer"
++                } else if slot == 0 {
+@@ -363,1 +408,1 @@
+-                    if slot == 0 { 0.0 } else { 18.0 },
++                    if slot == 0 || (glass.item.desktop_tint && slot + 2 >= shapes.len()) { 0.0 } else { 18.0 },

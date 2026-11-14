@@ -23,6 +23,33 @@ QtObject {
     readonly property color danger: wallpaperColors.danger || "#ef8d8d"
     readonly property color border: wallpaperColors.border || "#344052"
 
+    // AppKit contentBackground / CAChameleonLayer. Independent of Liquid Glass
+    // and the wallpaper's extracted accent palette. WallpaperTint supplies a
+    // window-local sample; these shared roles use the focused screen as default.
+    property var desktopTintState: ({})
+    readonly property double desktopTintGeneration: desktopTintState.generation || 0
+    readonly property var neutralPalette: desktopTintState.default || ({})
+    readonly property color windowSurface: neutralColor(neutralPalette.surface, "#1e1e1e")
+    readonly property color cardSurface: neutralColor(neutralPalette.card, "#363639")
+    readonly property color cardSurfaceHover: neutralColor(neutralPalette.hover, "#454548")
+    readonly property color neutralBorder: neutralColor(neutralPalette.border, "#4a4a4d")
+
+    function neutralColor(rgb, fallback) {
+        return rgb && rgb.length === 3 ? Qt.rgba(rgb[0], rgb[1], rgb[2], 1) : fallback;
+    }
+
+    property var desktopTintFile: FileView {
+        path: (Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state") + "/wallpaper/desktop-tint.json"
+        preload: true
+        watchChanges: true
+        printErrors: false
+        onFileChanged: reload()
+        onLoaded: {
+            try { desktopTintState = JSON.parse(text()); }
+            catch (error) { console.warn("Cannot load desktop tint:", error); }
+        }
+    }
+
     // Mac notch mode adds 74 physical rows at 2x scale.
     readonly property int barHeight: 30
     readonly property int barScrimHeight: 183
@@ -46,7 +73,9 @@ QtObject {
     // Liquid Glass dropdowns. Radii and padding must match the hyprglass
     // layers configured in hyprland/config/glass.lua.
     property bool glassActive: false
+    property bool glassStatusKnown: false
     property bool groupedGlassActive: false
+    property bool desktopTintComposited: false
     readonly property int glassShadowPadding: 80
     readonly property int menuRadius: 13
     readonly property int panelRadius: 22
@@ -54,8 +83,11 @@ QtObject {
     readonly property int menuRowHeight: 24
     readonly property int menuPadding: 5
     readonly property int menuSeparatorHeight: 11
-    readonly property int menuTextInset: 12
-    readonly property int menuFontSize: 14
+    readonly property int menuTextInset: 16
+    readonly property int menuFontSize: 13
+    readonly property font menuFont: Qt.font({family: fontFamily, pixelSize: menuFontSize,
+        weight: Font.Normal, variableAxes: {opsz: 17, wght: 400}, letterSpacing: -0.25,
+        hintingPreference: Font.PreferNoHinting})
     readonly property color menuText: Qt.rgba(1, 1, 1, 0.9)
     readonly property color menuSecondaryText: Qt.rgba(1, 1, 1, 0.42)
     readonly property color menuSeparator: Qt.rgba(1, 1, 1, 0.12)
@@ -70,10 +102,13 @@ QtObject {
                     const status = JSON.parse(text);
                     glassActive = status.features && status.features.layers && status.features.layers.active === true;
                     groupedGlassActive = glassActive && status.macRects === true;
+                    desktopTintComposited = glassActive && status.desktopTint === true;
                 } catch (error) {
                     glassActive = false;
                     groupedGlassActive = false;
+                    desktopTintComposited = false;
                 }
+                glassStatusKnown = true;
             }
         }
     }
@@ -82,7 +117,7 @@ QtObject {
     property var glassProbeTimer: Timer {
         interval: 3000
         repeat: true
-        running: !glassActive || !groupedGlassActive
+        running: !glassActive || !groupedGlassActive || !desktopTintComposited
         triggeredOnStart: true
         onTriggered: {
             if (!glassProbe.running)

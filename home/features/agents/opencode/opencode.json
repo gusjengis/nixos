@@ -90,8 +90,8 @@
             "output": ["text"]
           },
           "limit": {
-            "context": 49152,
-            "output": 8192
+            "context": 65536,
+            "output": 65536
           }
         },
         "phi4-mini": {

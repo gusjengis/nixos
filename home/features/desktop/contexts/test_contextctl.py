@@ -401,21 +401,28 @@ class ContextTests(unittest.TestCase):
         self.assertEqual(ctl.local_state()["mappings"][item["id"]], "s4")
         restore.assert_not_called()
 
-    def test_create_runtime_mapping_saved_before_notes(self):
+    def test_create_runtime_restores_saved_windows_without_default_launches(self):
+        import persistence
         item = ctl.create('Projects/Quote " and \\ unicode é')
 
         def backend(arguments, **kwargs):
             statement = arguments[2]
             if ".create(" in statement:
                 self.runtime([{"id": "s8", "name": 'Projects/Quote " and \\ unicode é'}], "s8")
-            if "show_special" in statement:
-                self.assertEqual(ctl.local_state()["mappings"][item["id"]], "s8")
             return Mock(returncode=0, stdout="ok", stderr="")
 
+        def restore(context, runtime_id):
+            self.assertEqual(context["id"], item["id"])
+            self.assertEqual(runtime_id, "s8")
+            self.assertEqual(ctl.local_state()["mappings"][item["id"]], "s8")
+
         self.run.side_effect = backend
-        ctl.open_context(item["id"])
-        self.assertEqual(self.run.call_count, 2)
-        self.assertIn("show_special('notes')", self.run.call_args.args[0][2])
+        with patch.object(persistence, "restore", side_effect=restore) as saved_restore:
+            ctl.open_context(item["id"])
+        saved_restore.assert_called_once()
+        self.assertEqual(self.run.call_count, 1)
+        self.assertIn(".create(", self.run.call_args.args[0][2])
+        self.spawn.assert_not_called()
         self.assertNotIn("é", self.run.call_args_list[0].args[0][2])
 
     def test_stale_mapping_close_reopen(self):
@@ -790,7 +797,7 @@ class ContextTests(unittest.TestCase):
                 with self.subTest(command=command):
                     self.assertEqual(ctl.main([command]), 0)
         self.assertEqual(self.spawn.call_args_list[0].args[0],
-                         ["strata", str(ctl.root() / "Projects/Alpha")])
+                         [str(Path.home() / ".nix-profile/bin/strata"), str(ctl.root() / "Projects/Alpha")])
         self.assertEqual(self.spawn.call_args_list[1].args[0][0], "obsidian")
 
     def test_files_reads_current_working_directory_not_stale_catalog_setting(self):
@@ -804,7 +811,7 @@ class ContextTests(unittest.TestCase):
         ctl.atomic_json(metadata, data)
         with contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(ctl.main(["files", "--runtime", "s2"]), 0)
-        self.assertEqual(self.spawn.call_args.args[0], ["strata", str(cwd)])
+        self.assertEqual(self.spawn.call_args.args[0], [str(Path.home() / ".nix-profile/bin/strata"), str(cwd)])
 
     def test_files_cold_catalog_ignores_offline_working_directories(self):
         self.mapped()
@@ -819,7 +826,7 @@ class ContextTests(unittest.TestCase):
         with patch.object(Path, "is_dir", directory), contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(ctl.main(["files"]), 0)
         self.assertEqual(self.spawn.call_args.args[0],
-                         ["strata", str(ctl.root() / "Projects/Alpha")])
+                         [str(Path.home() / ".nix-profile/bin/strata"), str(ctl.root() / "Projects/Alpha")])
 
     def test_notes_does_not_probe_even_selected_working_directory(self):
         item = self.mapped()
@@ -843,11 +850,11 @@ class ContextTests(unittest.TestCase):
         with contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(ctl.main(["files"]), 0)
         self.assertEqual(self.spawn.call_args.args[0],
-                         ["strata", str(ctl.root() / "Projects/Alpha")])
+                         [str(Path.home() / ".nix-profile/bin/strata"), str(ctl.root() / "Projects/Alpha")])
         self.runtime([{"id": "s99", "name": "Runtime only"}], "s99")
         with contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(ctl.main(["files"]), 0)
-        self.assertEqual(self.spawn.call_args.args[0], ["strata", str(Path.home())])
+        self.assertEqual(self.spawn.call_args.args[0], [str(Path.home() / ".nix-profile/bin/strata"), str(Path.home())])
         self.spawn.reset_mock()
         with contextlib.redirect_stderr(io.StringIO()):
             self.assertEqual(ctl.main(["files", "--runtime", "s2"]), 1)
@@ -873,7 +880,7 @@ class ContextTests(unittest.TestCase):
                 contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(ctl.main(["files", "--session-directory", "--runtime", "s2"]), 0)
         self.assertEqual(self.spawn.call_args.args[0],
-                         ["strata", str(ctl.root() / "Projects/Alpha")])
+                         [str(Path.home() / ".nix-profile/bin/strata"), str(ctl.root() / "Projects/Alpha")])
 
     def test_files_session_directory_matches_normal_when_same_and_falls_back_without_context(self):
         self.mapped()
@@ -884,7 +891,7 @@ class ContextTests(unittest.TestCase):
             self.assertEqual(self.spawn.call_args.args[0], normal)
             self.runtime([{"id": "s99", "name": "Runtime only"}], "s99")
             self.assertEqual(ctl.main(["files", "--session-directory"]), 0)
-        self.assertEqual(self.spawn.call_args.args[0], ["strata", str(Path.home())])
+        self.assertEqual(self.spawn.call_args.args[0], [str(Path.home() / ".nix-profile/bin/strata"), str(Path.home())])
 
     def test_catalog_atomic_unchanged_and_activation(self):
         item = self.mapped()
@@ -909,6 +916,27 @@ class ContextTests(unittest.TestCase):
         self.assertIsNone(value["active_context"])
         self.assertIsNone(value["contexts"][0]["runtime_id"])
         self.run.assert_not_called()
+
+    def test_stale_signature_follows_live_compositor(self):
+        self.mapped()
+        stale = os.environ["HYPRLAND_INSTANCE_SIGNATURE"]
+        runtime = Path(os.environ["XDG_RUNTIME_DIR"])
+        empty = "live-empty"
+        holder = "live-holder"
+        for name in (empty, holder):
+            (runtime / "hypr" / name).mkdir(parents=True)
+            (runtime / "hypr" / name / "hyprland.lock").write_text("4244\nwayland-1\n")
+        ctl.atomic_json(runtime / f"hyprland-sessions-{holder}.json", {"sessions": [], "active": None})
+        liveness = patch.object(ctl, "compositor_live", side_effect=lambda _, value: value != stale)
+        with liveness:
+            self.assertEqual(ctl.signature(), holder)
+            value = ctl.publish(record_activation=True)
+        self.assertIsNone(value["active_context"])
+        self.assertTrue(str(ctl.runtime_path("desktop-contexts")).endswith(f"{holder}.json"))
+        with patch.object(ctl, "compositor_live", return_value=True):
+            self.assertEqual(ctl.signature(), stale)
+        with patch.object(ctl, "compositor_live", return_value=False):
+            self.assertEqual(ctl.signature(), stale)
 
     def test_rename_repository_context_rejected(self):
         item = ctl.create("Repo", "work/Repo")
@@ -1009,7 +1037,8 @@ class ContextTests(unittest.TestCase):
             with self.assertRaises(KeyboardInterrupt):
                 ctl.watch()
         self.assertTrue(ctl.runtime_path("desktop-contexts").exists())
-        self.run.assert_called_once_with(["hyprctl", "-j", "clients"], capture_output=True, text=True, timeout=3)
+        self.run.assert_called_once_with(["hyprctl", "-j", "clients"], capture_output=True, text=True, timeout=3,
+                                         env=dict(os.environ, HYPRLAND_INSTANCE_SIGNATURE=ctl.signature()))
         self.spawn.assert_not_called()
 
     def test_mutation_lock_excludes_other_file_descriptors(self):

@@ -1,0 +1,75 @@
+diff --git a/chrome/browser/ui/color/BUILD.gn b/chrome/browser/ui/color/BUILD.gn
+--- a/chrome/browser/ui/color/BUILD.gn
++++ b/chrome/browser/ui/color/BUILD.gn
+@@ -68,11 +68,7 @@ source_set("mixers") {
+     sources += [ "chromeos/native_chrome_color_mixer_chromeos.cc" ]
+   }
+ 
+-  if (is_linux) {
+-    sources += [ "linux/native_chrome_color_mixer_linux.cc" ]
+-  }
+-
+-  if (is_mac) {
++  if (is_mac || is_linux) {
+     sources += [ "mac/native_chrome_color_mixer_mac.cc" ]
+   }
+ 
+diff --git a/chrome/browser/themes/theme_service_aura_linux.cc b/chrome/browser/themes/theme_service_aura_linux.cc
+--- a/chrome/browser/themes/theme_service_aura_linux.cc
++++ b/chrome/browser/themes/theme_service_aura_linux.cc
+@@ -114,6 +110,8 @@ ThemeServiceAuraLinux::~ThemeServiceAuraLinux() = default;
+ 
+ ui::SystemTheme ThemeServiceAuraLinux::GetDefaultSystemTheme() const {
+-  return GetSystemThemeForProfile(profile());
++  // Use the shared Chromium theme, as macOS does, rather than GTK/Qt
++  // overrides saved in the Linux profile.
++  return ui::SystemTheme::kDefault;
+ }
+ 
+ void ThemeServiceAuraLinux::UseTheme(ui::SystemTheme system_theme) {
+@@ -173,12 +175,8 @@ void ThemeServiceAuraLinux::FixInconsistentPreferencesIfNeeded() {
+ ThemeService::BrowserColorScheme ThemeServiceAuraLinux::GetBrowserColorScheme()
+     const {
+-  // If using the system theme (GTK or QT), always use the system color scheme
+-  // as well.  This prevents eg. setting the color scheme to light when the
+-  // system theme is dark, which may lead to white text on white backgrounds.
+-  if (UsingSystemTheme()) {
+-    return ThemeService::BrowserColorScheme::kSystem;
+-  }
+-  return ThemeService::GetBrowserColorScheme();
++  // Keep browser chrome dark even when a profile saved an explicit light
++  // scheme; --force-dark-mode alone only overrides the native OS preference.
++  return ThemeService::BrowserColorScheme::kDark;
+ }
+ 
+ // static
+diff --git a/chrome/browser/ui/views/frame/browser_frame_view_linux.cc b/chrome/browser/ui/views/frame/browser_frame_view_linux.cc
+--- a/chrome/browser/ui/views/frame/browser_frame_view_linux.cc
++++ b/chrome/browser/ui/views/frame/browser_frame_view_linux.cc
+@@ -96,8 +96,8 @@ bool BrowserFrameViewLinux::ShouldDrawRestoredFrameShadow() const {
+ }
+ 
+ void BrowserFrameViewLinux::OnWindowButtonOrderingChange() {
+-  auto* provider = views::WindowButtonOrderProvider::GetInstance();
+-  layout_->SetButtonOrdering(provider->leading_buttons(),
+-                             provider->trailing_buttons());
++  // Window management lives in the compositor. Empty orderings hide caption
++  // buttons and remove their layout reservation, including in the tab strip.
++  layout_->SetButtonOrdering({}, {});
+ 
+   // We can receive OnWindowButtonOrderingChange events before we've been added
+@@ -190,12 +190,10 @@ BrowserLayoutParams BrowserFrameViewLinux::GetBrowserLayoutParams() const {
+ }
+ 
+ bool BrowserFrameViewLinux::CaptionButtonsOnLeadingEdge() const {
+-  auto* const provider = views::WindowButtonOrderProvider::GetInstance();
+-  return !provider->leading_buttons().empty();
++  return false;
+ }
+ 
+ bool BrowserFrameViewLinux::CaptionButtonsOnTrailingEdge() const {
+-  auto* const provider = views::WindowButtonOrderProvider::GetInstance();
+-  return !provider->trailing_buttons().empty();
++  return false;
+ }
+ 

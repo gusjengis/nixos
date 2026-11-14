@@ -23,6 +23,7 @@ import organization
 import context_chat_state as chat_state
 import context_chat_worker as worker
 import chat_recovery as recovery
+import opencode_backend as backend
 
 
 _batch = ContextVar("chat_library_sync_batch", default=None)
@@ -43,7 +44,7 @@ def local_root():
 
 
 def database_path():
-    return Path(os.environ.get("OPENCODE_DB", str(Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local/share")) / "opencode/opencode.db"))).resolve()
+    return backend.default_database().resolve()
 
 
 def database_key(database):
@@ -78,24 +79,17 @@ def write_json(path, value):
         ctl.atomic_json(path, value)
 
 
-def visibility(contexts, only=None, resolve_roots=True):
+def visibility(contexts, only=None):
     nodes = {node["id"]: node for node in organization.resolve(contexts)}
-    targets = {}
-
-    def target(item):
-        if item["id"] not in targets:
-            path = Path(item["working_directory_path"])
-            targets[item["id"]] = path.resolve() if resolve_roots else path
-        return targets[item["id"]]
-
-    # Canonicalize only roots relevant to requested scopes, once per root.
+    # Chat ownership follows the logical hierarchy, independently of work roots.
+    # Never probe external directories to decide which descendants are visible.
     return {context["id"]: [item for item in contexts if item["id"] == context["id"] or
-            (context["id"] in nodes[item["id"]]["ancestors"] and target(item) == target(context))]
+            context["id"] in nodes[item["id"]]["ancestors"]]
             for context in contexts if only is None or context["id"] in only}
 
 
-def visible_contexts(context, contexts, resolve_roots=True):
-    return visibility(contexts, only={context["id"]}, resolve_roots=resolve_roots)[context["id"]]
+def visible_contexts(context, contexts):
+    return visibility(contexts, only={context["id"]})[context["id"]]
 
 
 def storage(context):
@@ -122,7 +116,7 @@ def native_rows(database, owner=None, chat=None, session=None):
             parameters.append(session)
         rows = db.execute("SELECT id, parent_id, directory, metadata, time_updated, title FROM session" + condition, parameters).fetchall()
     result = {}
-    pending_ids = recovery.pending_native_ids(database)
+    pending_ids = recovery.pending_native_ids(database) | backend.pending_ids(database)
     for sid, parent, directory, raw, updated, title in rows:
         if sid in pending_ids:
             continue
@@ -176,7 +170,7 @@ def sync_context(context, database, hydrate=False, only_chat=None):
                 else:
                     raise recovery.RecoveryConflict("Archive advanced across interrupted publication; histories retained")
     rows = native_rows(database, context["id"], only_chat)
-    pending_ids = recovery.pending_native_ids(database)
+    pending_ids = recovery.pending_native_ids(database) | backend.pending_ids(database)
     rows = {sid: row for sid, row in rows.items() if sid not in pending_ids}
     roots = {}
     for row in rows.values():
@@ -292,14 +286,14 @@ def scope_path(context, database):
     return local_root() / "scopes" / key / (context["id"] + ".json")
 
 
-def publish_scopes(contexts, database, visibility_only=False, only=None, resolve_roots=True):
-    views = visibility(contexts, only=only, resolve_roots=resolve_roots)
+def publish_scopes(contexts, database, visibility_only=False, only=None):
+    views = visibility(contexts, only=only)
     relevant = {item["id"] for visible in views.values() for item in visible}
     rows = {}
     if database.is_file() and not visibility_only:
         for owner in relevant:
             rows.update(native_rows(database, owner))
-    hidden = set()
+    hidden = recovery.pending_native_ids(database) | backend.pending_ids(database)
     if database.is_file() and not visibility_only:
         for context in contexts:
             if context["id"] not in relevant:
@@ -310,7 +304,7 @@ def publish_scopes(contexts, database, visibility_only=False, only=None, resolve
                     continue
                 record = ledger["chats"].get(row["chat"])
                 deleted = record and record.get("deleted", False)
-                if deleted or (record and row["id"] != record["local_id"]):
+                if deleted:
                     hidden.add(row["id"])
     labels = {node["id"]: node["breadcrumb"] for node in organization.resolve(contexts)}
     for context in contexts:
@@ -320,13 +314,23 @@ def publish_scopes(contexts, database, visibility_only=False, only=None, resolve
         previous = ctl.read_json(scope_path(context, database), {})
         write_json(scope_path(context, database), {"context_id": context["id"],
                    "ids": sorted(item["id"] for item in visible),
-                   "hidden": previous.get("hidden", []) if visibility_only else sorted(hidden),
+                   "hidden": sorted(set(previous.get("hidden", [])) | hidden) if visibility_only else sorted(hidden),
                    "labels": {item["id"]: labels[item["id"]] for item in visible}})
 
 
 def known_databases():
     values = ctl.read_json(local_root() / "databases.json", [])
-    return sorted({Path(value).resolve() for value in values} | {database_path()})
+    selected = database_path()
+    databases = {Path(value).resolve() for value in values} | {selected}
+    profile = backend.load_profile()
+    if profile:
+        legacy = Path(profile["legacy_database"]).resolve()
+        modern = Path(profile["database"]).resolve()
+        if selected == modern:
+            databases.discard(legacy)
+        elif selected == legacy:
+            databases.discard(modern)
+    return sorted(databases)
 
 
 def refresh_scopes(contexts):
@@ -334,7 +338,7 @@ def refresh_scopes(contexts):
     with library_lock(blocking=False) as acquired:
         if acquired:
             for database in known_databases():
-                publish_scopes(contexts, database, visibility_only=True, resolve_roots=False)
+                publish_scopes(contexts, database, visibility_only=True)
             return True
     return False
 
@@ -343,7 +347,7 @@ def sync_all(contexts=None, database=None, hydrate=False, only=None, errors=None
     contexts = contexts if contexts is not None else ctl.scan(check_working_directories=False)
     if scope_only is None and only is not None:
         # Update selected owners and ancestors that can display their histories.
-        views = visibility(contexts, resolve_roots=False)
+        views = visibility(contexts)
         scope_only = {owner for owner, visible in views.items() if any(item["id"] in only for item in visible)}
     databases = [Path(database).resolve()] if database else known_databases()
     for path in databases:
@@ -353,7 +357,7 @@ def sync_all(contexts=None, database=None, hydrate=False, only=None, errors=None
             with use_database(path):
                 chats._cli(["db", "SELECT 1"], str(Path.home()))
         if not path.is_file():
-            publish_scopes(contexts, path, only=scope_only, resolve_roots=False)
+            publish_scopes(contexts, path, only=scope_only)
             continue
         for context in contexts:
             if only is None or context["id"] in only:
@@ -369,7 +373,7 @@ def sync_all(contexts=None, database=None, hydrate=False, only=None, errors=None
                     if errors is None:
                         raise
                     errors.append((context["id"], exc))
-        publish_scopes(contexts, path, only=scope_only, resolve_roots=False)
+        publish_scopes(contexts, path, only=scope_only)
 
 
 def sync_dirty(contexts, errors=None, limit=8):
@@ -416,9 +420,9 @@ def sync_dirty(contexts, errors=None, limit=8):
         write_json(stamps_path, stamps)
         if dirty:
             only = {context["id"] for context, _ in batch}
-            views = visibility(contexts, resolve_roots=False)
+            views = visibility(contexts)
             affected = {owner for owner, visible in views.items() if any(item["id"] in only for item in visible)}
-            publish_scopes(contexts, database, only=affected, resolve_roots=False)
+            publish_scopes(contexts, database, only=affected)
 
 
 def reference(selection, contexts=None):
@@ -477,7 +481,7 @@ def selected_context(owner=None):
         if selected is None:
             raise ValueError("Conversation owner is unavailable")
         contexts = [selected if item["id"] == owner else item for item in contexts]
-    visible = visible_contexts(context, contexts, resolve_roots=False)
+    visible = visible_contexts(context, contexts)
     if owner is None:
         return context, visible
     selected = next((item for item in visible if item["id"] == owner), None)
@@ -652,7 +656,7 @@ def _ensure_conversation(owner, chat, member=None, expected_revision=None, datab
                     chats._cli(["db", "SELECT 1"], str(Path.home()))
             sync_context(context, database, hydrate=True, only_chat=chat)
             viewer = os.environ.get("CONTEXT_ID", owner)
-            publish_scopes(ctl.known_contexts(), database, only={viewer}, resolve_roots=False)
+            publish_scopes(ctl.known_contexts(), database, only={viewer})
             index, current, head_path, observed = read_index(context)
             record = ctl.read_json(ledger_path(context, database), {"chats": {}})["chats"].get(chat)
             entry = index["chats"].get(chat)
@@ -700,6 +704,8 @@ def ensure_conversation(owner, chat, member=None, expected_revision=None, databa
     """Single-flight selected family; no unrelated archive or global library gate."""
     context, _ = selected_context(owner)
     database = Path(database or database_path()).resolve()
+    if any(record["owner"] == owner and record["chat"] == chat for record in backend.pending_handoffs(database)):
+        raise recovery.RecoveryWaiting("This conversation is completing its V1 history handoff; other conversations remain available")
     path = state_file(context, database)
     def existing():
         state = check_conversation(owner, chat, database=database)
@@ -744,7 +750,7 @@ def launch(native, arguments):
         # Publish conservative local visibility immediately, retaining old-copy
         # exclusions. Canonical aliases and portable imports refresh after UI startup.
         contexts = [context if item["id"] == context["id"] else item for item in ctl.known_contexts()]
-        publish_scopes(contexts, database, visibility_only=True, only={context["id"]}, resolve_roots=False)
+        publish_scopes(contexts, database, visibility_only=True, only={context["id"]})
         os.environ.update(CONTEXT_ID=context["id"], CONTEXT_DIRECTORY=context["path"],
                           OPENCODE_CONTEXT_SCOPE_FILE=str(scope_path(context, database)))
     else:
@@ -772,6 +778,11 @@ def main():
             command.add_argument("--member")
             command.add_argument("--expected-revision")
     commands.add_parser("unowned")
+    command = commands.add_parser("destinations")
+    command.add_argument("--session")
+    command = commands.add_parser("move")
+    command.add_argument("--session", required=True)
+    command.add_argument("--target", required=True)
     args = parser.parse_args()
     if args.command == "launch":
         launch(args.native, args.arguments)
@@ -783,6 +794,10 @@ def main():
         print(json.dumps(ensure_conversation(args.owner, args.chat, args.member, args.expected_revision)))
     elif args.command == "unowned":
         print(json.dumps(unowned(ctl.find_context(os.environ["CONTEXT_ID"]))))
+    elif args.command in {"destinations", "move"}:
+        import context_chat_move
+        print(json.dumps(context_chat_move.destinations(args.session) if args.command == "destinations" else
+                         context_chat_move.move(args.session, args.target)))
     elif os.environ.get("CONTEXT_ID"):
         context, visible = selected_context()
         sync_all(visible, database_path(), hydrate=False, only={item["id"] for item in visible}, scope_only={context["id"]})

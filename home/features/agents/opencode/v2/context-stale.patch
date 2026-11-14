@@ -1,0 +1,120 @@
+--- a/packages/tui/src/app.tsx
++++ b/packages/tui/src/app.tsx
+@@ -1,4 +1,5 @@
+ import { existsSync } from "fs"
++import { DesktopStaleOverlay, installDesktopStaleKeys } from "./context/desktop-stale"
+ import path from "path"
+ import { render, useRenderer, useTerminalDimensions } from "@opentui/solid"
+ import "./component/spinner-renderable"
+@@ -502,6 +503,7 @@
+   const sessionTabs = useSessionTabs()
+   const panels = usePanel()
+   const keymap = Keymap.use()
++  installDesktopStaleKeys(keymap)
+   const event = useEvent()
+   const client = useClient()
+   const toast = useToast()
+@@ -1479,6 +1481,7 @@
+         <Reconnecting managed={client.restart !== undefined} />
+       </Show>
+       <MigrationOverlay />
++      <DesktopStaleOverlay />
+       <Toast />
+     </box>
+   )
+--- a/packages/tui/src/context/route.tsx
++++ b/packages/tui/src/context/route.tsx
+@@ -1,4 +1,5 @@
+ import { createStore, reconcile } from "solid-js/store"
++import { desktopStale } from "./desktop-stale"
+ import type { LocationRef } from "@opencode/client"
+ import { createSimpleContext } from "./helper"
+ import type { PromptInfo } from "../prompt/history"
+@@ -39,6 +40,7 @@
+         return store
+       },
+       navigate(route: Route) {
++        if (!desktopStale.allowRoute(route)) return
+         setStore(reconcile(route))
+       },
+     }
+--- a/packages/tui/src/ui/dialog.tsx
++++ b/packages/tui/src/ui/dialog.tsx
+@@ -1,4 +1,5 @@
+ import { useRenderer, useTerminalDimensions } from "@opentui/solid"
++import { desktopStale } from "../context/desktop-stale"
+ import {
+   batch,
+   children,
+@@ -469,7 +470,7 @@
+           copyOnSelectEnabled() ? (event) => copyOnSelectRelease(event, renderer, toast, clipboard) : undefined
+         }
+       >
+-        <Show when={value.stack.length}>
++        <Show when={!desktopStale.blocked() && value.stack.length}>
+           <Dialog onClose={() => value.clear()} size={value.size} centered={value.centered}>
+             {/* Render each entry once: inserting the element function directly would re-run it, remounting
+                 the dialog with fresh state, whenever a signal it reads at its root (e.g. a top-level <Show>) changes. */}
+--- a/packages/tui/src/component/prompt/index.tsx
++++ b/packages/tui/src/component/prompt/index.tsx
+@@ -9,6 +9,7 @@
+   stripAnsiSequences,
+   type KeyEvent,
+ } from "@opentui/core"
++import { desktopStale } from "../../context/desktop-stale"
+ import { createEffect, createMemo, onMount, createSignal, onCleanup, on, Show, Switch, Match, For } from "solid-js"
+ import path from "path"
+ import { useLocal } from "../../context/local"
+@@ -728,6 +729,26 @@
+     }
+   })
+ 
++  createEffect(() => {
++    if (props.visible === false) return
++    onCleanup(desktopStale.bindPrompt({
++      id: () => stashSessionID,
++      capture: () => ({ prompt: {
++        input: store.prompt.text,
++        parts: [...store.prompt.files, ...store.prompt.agents, ...(store.prompt.skills ?? []), ...store.prompt.pasted],
++        v2: JSON.parse(JSON.stringify(unwrap(store.prompt))),
++      }, mode: store.mode, cursor: input.cursorOffset }),
++      restore: (draft) => {
++        const saved = (draft.prompt as any).v2
++        if (!saved) throw new Error("Draft format cannot be restored by OpenCode 2; preserved recovery copy remains available.")
++        ref.set(saved)
++        setStore("mode", draft.mode === "shell" ? "shell" : "normal")
++        input.cursorOffset = draft.cursor ?? 0
++      },
++      blur: () => input.blur(),
++    }))
++  })
++
+   onCleanup(() => {
+     disposed = true
+     if (store.prompt.text) {
+@@ -739,7 +760,7 @@
+ 
+   createEffect(() => {
+     if (!input || input.isDestroyed) return
+-    if (props.visible === false || disabled() || dialog.stack.length > 0) {
++    if (props.visible === false || disabled() || dialog.stack.length > 0 || desktopStale.blocked()) {
+       if (input.focused) input.blur()
+       input.focusable = false
+       return
+@@ -1121,6 +1142,8 @@
+       setStore("prompt", "text", input.plainText)
+       syncExtmarksWithPromptParts()
+     }
++    if (!(await desktopStale.beforeSubmit())) return false
++    const staleRejection = props.sessionID ? desktopStale.submission(props.sessionID) : undefined
+     if (move.creating()) return false
+     if (auto()?.visible) return false
+     const trimmed = store.prompt.text.trim()
+@@ -1200,6 +1223,7 @@
+       input.cursorOffset = measure(entry.text)
+     }
+     const fail = (title: string, error: unknown) => {
++      staleRejection?.(error)
+       toast.show({ title, message: errorMessage(error), variant: "error" })
+       restoreEntry()
+     }

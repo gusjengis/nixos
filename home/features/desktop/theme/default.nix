@@ -9,6 +9,7 @@
   config,
   lib,
   pkgs,
+  inputs,
   repoRoot,
   ...
 }:
@@ -19,6 +20,14 @@ let
   iconThemeName = "MacOS-Native";
   kvantumTheme = "KvAdaptaDark";
   iconPython = pkgs.python3.withPackages (ps: [ ps.pillow ps.cairosvg ps.watchdog ]);
+  tintPython = pkgs.python3.withPackages (ps: [ ps.pillow ps.numpy ]);
+  desktopTint = pkgs.writeShellApplication {
+    name = "desktop-tint";
+    runtimeInputs = [ inputs.hyprland.packages.${pkgs.stdenv.hostPlatform.system}.hyprland ];
+    text = ''
+      exec ${tintPython}/bin/python3 "${configRoot}/desktop_tint.py" "$@"
+    '';
+  };
   macosIcons = pkgs.writeShellApplication {
     name = "macos-icons";
     runtimeInputs = [ iconPython pkgs.gtk3 pkgs.fontconfig ];
@@ -31,7 +40,21 @@ in
   home.packages = [
     pkgs.papirus-icon-theme
     macosIcons
-  ];
+  ] ++ lib.optionals config.desktopEnv.enable [ desktopTint ];
+
+  systemd.user.services.desktop-tint = lib.mkIf config.desktopEnv.enable {
+    Unit = {
+      Description = "macOS desktop-affinity color for neutral surfaces";
+      After = [ "graphical-session.target" ];
+      PartOf = [ "graphical-session.target" ];
+    };
+    Service = {
+      ExecStart = "${desktopTint}/bin/desktop-tint watch";
+      Restart = "on-failure";
+      RestartSec = 2;
+    };
+    Install.WantedBy = [ "graphical-session.target" ];
+  };
 
   # The complete writable theme and its original inputs are repository-owned.
   # Application-generated icons land in the same tree through this link.

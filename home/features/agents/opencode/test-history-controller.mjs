@@ -1,4 +1,14 @@
 import assert from "node:assert/strict"
+
+test("restored native copies remain separate and portable summaries cannot reroute them", () => {
+  const metadata = { desktop_context: { id: "owner", chat: "chat" } }
+  const rows = mergeHistory([
+    { id: "original", title: "Original", metadata },
+    { id: "replacement", title: "Replacement", metadata },
+  ], [{ owner: "owner", chat: "chat", nativeID: "replacement" }])
+  assert.deepEqual(new Set(rows.map((row) => row.nativeID)), new Set(["original", "replacement"]))
+  assert.equal(new Set(rows.map((row) => row.key)).size, 2)
+})
 import { test } from "node:test"
 import { createHistoryController, historyKey, historyStatus, mergeHistory } from "./history-controller.mjs"
 

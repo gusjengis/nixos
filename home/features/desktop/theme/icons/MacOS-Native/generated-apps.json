@@ -16,6 +16,14 @@
     "artwork": "app-sources/8ae07b7d8aacf99ad428d0bd3b499c541389402a7c1d2894395d2f216da69696.png"
   },
   {
+    "name": "Mario Kart Wii",
+    "icon": "applications-games",
+    "desktop": "/home/gusjengis/.local/share/applications/mario-kart-wii.desktop",
+    "source": "/home/gusjengis/.nix-profile/share/icons/Papirus/128x128/apps/applications-games.svg",
+    "fingerprint": "1d5172a4ba4c505056124f03467b95b0e69d6d8413ca32092ac008e6eba08282",
+    "artwork": "app-sources/1c22510c983aa158970ccf26fc3e88898793c009ec79e009ac7d4fe9c3450b39.png"
+  },
+  {
     "name": "ATLauncher",
     "icon": "atlauncher",
     "desktop": "/home/gusjengis/.nix-profile/share/applications/atlauncher.desktop",
@@ -46,6 +54,14 @@
     "source": "/home/gusjengis/.nix-profile/share/icons/hicolor/scalable/apps/btop.svg",
     "fingerprint": "bd4cc50508a1c75b8522aff13de5d407247bc14aeb7134a00195dbf87b9214fc",
     "artwork": "app-sources/215547f620261e0078cd63dcd6771d9d02084e7ced1e519d3fbc6f0dc456db54.png"
+  },
+  {
+    "name": "Insta360 Link Controller",
+    "icon": "camera-web",
+    "desktop": "/home/gusjengis/.nix-profile/share/applications/insta360-link-controller.desktop",
+    "source": "/home/gusjengis/.nix-profile/share/icons/Papirus/128x128/devices/camera-web.svg",
+    "fingerprint": "4bb93b5a3f314f37de0b70a5b9874a2f2e9bd3e3cee5e35ca6b0f28051ac4573",
+    "artwork": "app-sources/e414047d87845d0083eafad3fe1da3dd15cbea5bcd315e92a016f26b09731d63.png"
   },
   {
     "name": "Chromium",
@@ -175,6 +191,77 @@
     "fingerprint": "5b5e27f05442b80a6dcac8b32f7e9443cc5cd9f4cc920249c9abda21efa96f0e",
     "artwork": "app-sources/b1a71391cd864b085614eb394b48e30dda32d9fc839ac1d67968f3360de2ce56.png",
     "override": "/home/gusjengis/.local/share/applications/macbook.desktop"
+  },
+  {
+    "name": "Super Smash Bros. Ultimate",
+    "icon": "macos-native-absolute-09ece5255392e4a2",
+    "desktop": "/home/gusjengis/.local/share/applications/ssbu.desktop",
+    "source": "/home/gusjengis/Games/Switch/icons/ssbu-emblem.png",
+    "fingerprint": "7e37420e7a2249cb3bda8f4227f36f35bca16030238b3825af261dda4e00ea84",
+    "artwork": "app-sources/4c7a4621a87741bd117c35c1015d63ee56f30dedb20e87d1d4a12647278c9314.png",
+    "override": "/home/gusjengis/.local/share/applications/ssbu.desktop"
+  },
+  {
+    "name": "WoW Forever",
+    "icon": "macos-native-absolute-5658f2306f2504fb",
+    "desktop": "/home/gusjengis/.local/share/applications/wow-forever.desktop",
+    "source": "/home/gusjengis/Games/icons/wow-forever.png",
+    "fingerprint": "a9a790e1d080bba449beb2af245cb448d6e228d284e3f1d8a4fcbe349e5ced14",
+    "artwork": "app-sources/95a8fb0d2d7e1d8bed68f841cfe00f966e5572ebbdaa787b00d3f7f764ec9227.png",
+    "override": "/home/gusjengis/.local/share/applications/wow-forever.desktop"
+  },
+  {
+    "name": "The Legend of Zelda: Breath of the Wild",
+    "icon": "macos-native-absolute-61fd1f194e96603b",
+    "desktop": "/home/gusjengis/.local/share/applications/savagewind-botw.desktop",
+    "source": "/home/gusjengis/Games/Switch/icons/botw-emblem.png",
+    "fingerprint": "6cc1110718352aafe08f71565b2de03a61acc9b9456532daae8f45ad48f84554",
+    "artwork": "app-sources/cf2a9e1e49a729fa4fc86f2bff36fb5c6220766549f7ea061ccf4ef4c09a8efe.png",
+    "override": "/home/gusjengis/.local/share/applications/savagewind-botw.desktop"
+  },
+  {
+    "name": "Eden \u2014 Nintendo Switch",
+    "icon": "macos-native-absolute-8835c4797251665e",
+    "desktop": "/home/gusjengis/.local/share/applications/eden-switch.desktop",
+    "source": "/home/gusjengis/Games/Switch/apps/eden/AppDir/dev.eden_emu.eden.svg",
+    "fingerprint": "4b999d8d32a40ce405d2553277227273498bd8994b8231fd442ce18d24213b96",
+    "artwork": "app-sources/b4a7f63b5811cc7bd14621e2c8c12d620a5be4a40d7d663b7d48597ce7cd4357.png",
+    "override": "/home/gusjengis/.local/share/applications/eden-switch.desktop"
+  },
+  {
+    "name": "Battle.net",
+    "icon": "macos-native-absolute-b5ca8f2c7b6d5e8b",
+    "desktop": "/home/gusjengis/.local/share/applications/battle-net.desktop",
+    "source": "/home/gusjengis/Games/icons/battle-net.png",
+    "fingerprint": "f00ec2d7014f5ef4d4d8d4414be71211244a272115f3e4540521171987913826",
+    "artwork": "app-sources/739815e744953ee43c066252250811178ce159382ed06ed288149ae91164cb71.png",
+    "override": "/home/gusjengis/.local/share/applications/battle-net.desktop"
+  },
+  {
+    "name": "The Legend of Zelda: Tears of the Kingdom",
+    "icon": "macos-native-absolute-c5cda719342259fa",
+    "desktop": "/home/gusjengis/.local/share/applications/totk-native.desktop",
+    "source": "/home/gusjengis/Games/Switch/icons/totk-emblem.png",
+    "fingerprint": "25c28e0a20639e2d8f67dffdf37efcdbbd444267150277e62f480a8542499059",
+    "artwork": "app-sources/5edde1e453d8fd8dffd5834a482ff14d95b5a9cfe6f30cd09889da0237b81d30.png",
+    "override": "/home/gusjengis/.local/share/applications/totk-native.desktop"
+  },
+  {
+    "name": "Mario Kart Wii",
+    "icon": "macos-native-absolute-d27da206a4014ede",
+    "desktop": "/home/gusjengis/.local/share/applications/mario-kart-wii.desktop",
+    "source": "/home/gusjengis/Games/Switch/icons/mkw-emblem.png",
+    "fingerprint": "ee6f26ea2a1d6b8e72e2c4943e8228d54f1cb7cf8bd8887793314f97de611947",
+    "artwork": "app-sources/d86f70eb8a87cd841a4ebc790dc2c69d116bf9ba5e81863be95d9a8f1e4db112.png",
+    "override": "/home/gusjengis/.local/share/applications/mario-kart-wii.desktop"
+  },
+  {
+    "name": "Super Smash Bros. Ultimate",
+    "icon": "macos-native-absolute-e1434e3cbe1819f0",
+    "desktop": "/home/gusjengis/.local/share/applications/windowsmash.desktop",
+    "source": "/home/gusjengis/Games/Switch/open-smash-ultimate/docs/assets/windowsmash.ico",
+    "fingerprint": "00adf8b02c4d0992e05e2e722f4bd6056c38b64405b1f8aabaa5661b1a23dda7",
+    "artwork": "app-sources/2ec93a61cb1eeb2a39081b92686d05b9fac2115720dfa482a078cd6683ea47c5.png"
   },
   {
     "name": "Mailspring",
@@ -313,6 +400,14 @@
     "artwork": "app-sources/0b8a215550d6eb35dbbf090cefd0ef9c513933d84ea75ed8806fe161d0f38e5e.png"
   },
   {
+    "name": "Reboot into Windows",
+    "icon": "system-reboot",
+    "desktop": "/run/current-system/sw/share/applications/reboot-into-windows.desktop",
+    "source": "/home/gusjengis/.nix-profile/share/icons/Papirus/128x128/apps/system-reboot.svg",
+    "fingerprint": "07c3667b07ee1f0a9176e22d10115002fc7aae390c3ae73582b57c17b516b908",
+    "artwork": "app-sources/3f22009d02a25b0270e5ad49466bf21ea74dbeea5695dbd537bc4a98e9f79402.png"
+  },
+  {
     "name": "Vicinae",
     "icon": "vicinae",
     "desktop": "/home/gusjengis/.nix-profile/share/applications/vicinae.desktop",
@@ -351,6 +446,14 @@
     "source": "/home/gusjengis/.local/share/icons/hicolor/128x128/apps/webapp-excel.png",
     "fingerprint": "d633adb44b1d3392f770a8bb1c0f2070265d71e9553320bee280c09352b545ef",
     "artwork": "app-sources/693d28e53ed2410114f4ba4c960cf20ff83eedcd8a0bdcc0fb293d104167ca29.png"
+  },
+  {
+    "name": "Google Messages",
+    "icon": "webapp-google-messages",
+    "desktop": "/home/gusjengis/.local/share/applications/webapp-google-messages.desktop",
+    "source": "/home/gusjengis/.local/share/icons/hicolor/128x128/apps/webapp-google-messages.png",
+    "fingerprint": "14b7e4e45f041ee591227072e068c9d4605111b76cabe0809bc61d6c381e9dcd",
+    "artwork": "app-sources/59f3a366bd08a04dca66dda2063319a80e41c3f711d5beeab73e11e9bef2e1a2.png"
   },
   {
     "name": "Google Photos",

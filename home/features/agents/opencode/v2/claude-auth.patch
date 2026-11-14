@@ -1,0 +1,30 @@
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -77,8 +77,9 @@
+             const connection = await ctx.integration.connection.active(INTEGRATION_ID);
+             if (!connection)
+                 return false;
+-            const credential = await ctx.integration.connection.resolve(connection);
+-            return credential?.type === "oauth" && credential.methodID === METHOD_ID;
++            // Listing the active connection is metadata-only. resolve() may
++            // refresh OAuth, so defer that operation to the Anthropic HTTP hook.
++            return connection.type === "credential" && connection.method === "oauth";
+         };
+         let subscription = false;
+         const loadConnection = async () => {
+--- a/dist/credentials.js
++++ b/dist/credentials.js
+@@ -1,1 +1,3 @@
+-import { execSync } from "node:child_process";
++import { execFile } from "node:child_process";
++import { promisify } from "node:util";
++const execFileAsync = promisify(execFile);
+@@ -305,1 +307,1 @@
+-function refreshViaCli(configDir, requireConfigDir = false) {
++async function refreshViaCli(configDir, requireConfigDir = false) {
+@@ -322,1 +324,1 @@
+-            execSync("claude -p . --model haiku", {
++            await execFileAsync("claude", ["-p", ".", "--model", "haiku"], {
+@@ -633,1 +635,1 @@
+-    const cliSucceeded = refreshViaCli(target.configDir, isSuffixedAccount);
++    const cliSucceeded = await refreshViaCli(target.configDir, isSuffixedAccount);

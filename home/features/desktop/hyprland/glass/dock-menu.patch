@@ -1,0 +1,167 @@
+diff --git a/src/AppleGlass.cpp b/src/AppleGlass.cpp
+index f38ce10..6557a94 100644
+--- a/src/AppleGlass.cpp
++++ b/src/AppleGlass.cpp
+@@ -697,6 +697,7 @@ void CState::draw(PHLMONITOR monitor, const SParams& params, const CBox& glassBo
+     i1("preserveHue", params.preserveHue);
+     i1("continuousCorners", params.continuousCorners);
+     f1("ovalization", params.ovalization);
++    glUniform2f(loc("callout"), params.calloutX, params.calloutH);
+     {
+         // CASDFKeyFillHighlightEffect -> sdf_diffuse_kf_highlight uniforms (DKF.md)
+         const auto& h   = params.highlightLayer;
+diff --git a/src/AppleGlass.hpp b/src/AppleGlass.hpp
+index 26cf7c4..541ba11 100644
+--- a/src/AppleGlass.hpp
++++ b/src/AppleGlass.hpp
+@@ -95,6 +95,10 @@ struct SParams {
+     // Shape: Apple continuous corners (supercircle SDF) and normal ovalization.
+     bool  continuousCorners = false;
+     float ovalization       = 0.0f;
++    // Dock menu pointer below the body, pt: tip x from the left (<0: from the right)
++    // and height. The glass box includes it; zero height draws a plain body.
++    float calloutX = 0.0f;
++    float calloutH = 0.0f;
+ 
+     // Separate glass-highlight layer (CASDFKeyFillHighlightEffect + vibrantColorMatrix).
+     struct SHighlightLayer {
+diff --git a/src/GlassLayerSurface.cpp b/src/GlassLayerSurface.cpp
+index c63cf3b..8a337df 100644
+--- a/src/GlassLayerSurface.cpp
++++ b/src/GlassLayerSurface.cpp
+@@ -620,7 +620,9 @@ void CGlassLayerSurface::compositeApple(PHLMONITOR monitor, const SMacLayerShape
+     auto        target = g_pHyprRenderer->m_renderData.currentFB;
+     if (!preset || !layerSurface || !target || !monitor)
+         return;
+-    const auto params = AppleGlass::paramsForTint(mac.apple, currentMacTint());
++    auto params = AppleGlass::paramsForTint(mac.apple, currentMacTint());
++    params.calloutX = mac.material.callout[0];
++    params.calloutH = mac.material.callout[1];
+     const float scale = static_cast<float>(monitor->m_scale);
+ 
+     // Same shape rules as the fitted path (GlassRenderer::applyMacGlass), framebuffer px.
+diff --git a/src/PluginConfig.cpp b/src/PluginConfig.cpp
+index aaad881..6070af6 100644
+--- a/src/PluginConfig.cpp
++++ b/src/PluginConfig.cpp
+@@ -917,6 +917,8 @@ static int handleLuaLayer(lua_State* L) {
+             if (readArray("refraction", material.refraction.data(), 3) &&
+                 (material.refraction[0] < 0.0f || material.refraction[1] <= 0.0f))
+                 return luaL_error(L, "hyprglass.layer: mac_material.refraction needs amplitude >= 0 and width > 0");
++            if (readArray("callout", material.callout.data(), 2) && (material.callout[1] < 0.0f || material.callout[1] > 64.0f))
++                return luaL_error(L, "hyprglass.layer: mac_material.callout needs a pointer height of 0..64");
+             if (readArray("rim", material.rim.data(), 7) &&
+                 (material.rim[0] < 0.0f || material.rim[3] <= 0.0f || material.rim[4] <= 0.0f))
+                 return luaL_error(L, "hyprglass.layer: mac_material.rim needs r0 >= 0 and positive lengths");
+diff --git a/src/PluginConfig.hpp b/src/PluginConfig.hpp
+index b90872f..209e9e2 100644
+--- a/src/PluginConfig.hpp
++++ b/src/PluginConfig.hpp
+@@ -412,6 +412,7 @@ struct SMacMaterial {
+     std::array<float, 7>  rim{-1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f}; // r0, rc, a1, l1, l2, side, k
+     float                 outlineSidePower = 0.0f;  // > 0: outline alpha *= |normal.x|^power
+     bool                  dockTooltip = false; // 26 px capsule plus rounded 7 px pointer
++    std::array<float, 2>  callout{0.0f, 0.0f};   // Dock menu pointer: tip x (<0: from right), height
+ 
+     bool operator==(const SMacMaterial&) const = default;
+ };
+diff --git a/src/Shaders.hpp b/src/Shaders.hpp
+index 2d9be70..a63fe9a 100644
+--- a/src/Shaders.hpp
++++ b/src/Shaders.hpp
+@@ -989,6 +989,7 @@ uniform int preserveHue;
+ // ovalization blends the normal toward an elliptical radial normal (SdfFragmentUniforms arg.w).
+ uniform int continuousCorners;
+ uniform float ovalization;
++uniform vec2 callout;         // Dock menu pointer, pt: tip x (<0: from right), height
+ 
+ // Separate glass-highlight layer: sdf_diffuse_kf_highlight + vibrant_color_matrix_sover
+ // (QuartzCore TdkfBvcm pipeline), drawn over the finished glass. Lengths in points.
+@@ -1059,7 +1060,7 @@ vec3 supercircleSdf(vec2 p, vec2 hs, float r) {
+ }
+ 
+ // Rounded box: (distance px, outward unit normal). Corner order matches `radii`.
+-vec3 sdg(vec2 fp) {
++vec3 sdBody(vec2 fp, vec4 shapeRect) {
+     vec2 h = shapeRect.zw * 0.5;
+     vec2 p = fp - shapeRect.xy - h;
+     float r = p.x > 0.0 ? (p.y > 0.0 ? radii.z : radii.y) : (p.y > 0.0 ? radii.w : radii.x);
+@@ -1085,6 +1086,62 @@ vec3 sdg(vec2 fp) {
+     return res;
+ }
+ 
++// macOS 27 Dock menu pointer, measured at 2x: half-profile in pt from the
++// shoulder on the body's bottom edge to the rounded tip, at 10 pt height.
++const vec2 CALLOUT[12] = vec2[12](vec2(17.0, 0.0), vec2(14.86, 0.25), vec2(12.0, 0.75), vec2(10.76, 1.25),
++                                  vec2(9.84, 1.75), vec2(9.29, 2.25), vec2(7.03, 4.75), vec2(4.56, 7.75),
++                                  vec2(3.61, 8.75), vec2(2.83, 9.25), vec2(1.73, 9.75), vec2(0.0, 10.0));
++
++// Body plus pointer as one silhouette. The body's bottom edge across the
++// pointer is interior, so neither rim nor depth shows a seam at the join.
++vec3 sdg(vec2 fp) {
++    if (callout.y <= 0.0)
++        return sdBody(fp, shapeRect);
++    vec4 rect = shapeRect;
++    rect.w -= callout.y * px;
++    vec3 body = sdBody(fp, rect);
++    float tipX = rect.x + (callout.x < 0.0 ? rect.z : 0.0) + callout.x * px;
++    vec2 p = vec2(fp.x - tipX, fp.y - rect.y - rect.w) / px;   // pt, +y below the body
++    float side = p.x < 0.0 ? -1.0 : 1.0;
++    vec2 ap = vec2(abs(p.x), p.y);
++    vec2 scale = vec2(1.0, callout.y / 10.0);
++    float d2 = 1e20;
++    float f = -1.0;
++    vec2 c = vec2(0.0);
++    vec2 a = CALLOUT[0] * scale;
++    for (int i = 1; i < 12; ++i) {
++        vec2 b = CALLOUT[i] * scale;
++        vec2 e = b - a;
++        vec2 q = a + e * clamp(dot(ap - a, e) / dot(e, e), 0.0, 1.0);
++        float l = dot(ap - q, ap - q);
++        if (l < d2) { d2 = l; c = q; }
++        if (ap.x <= a.x && ap.x >= b.x) f = mix(a.y, b.y, (a.x - ap.x) / max(a.x - b.x, 1e-6));
++        a = b;
++    }
++    float dp = sqrt(d2);
++    vec2 away = (ap - c) / max(dp, 1e-6) * vec2(side, 1.0);
++    bool inPointer = p.y >= 0.0 && p.y <= f;
++    if (body.x >= 0.0 && !inPointer)
++        return dp * px < body.x ? vec3(dp * px, away) : body;
++    if (body.x >= 0.0)
++        return vec3(-dp * px, -away);
++    float depth = -body.x / px;
++    vec2 n = body.yz;
++    if (ap.x < CALLOUT[0].x && n.y > 0.7) {
++        // Bottom edge was nearest: use the shoulders and the remaining edges.
++        vec2 toShoulder = vec2(side * CALLOUT[0].x - p.x, -p.y);
++        depth = length(toShoulder);
++        n = toShoulder / max(depth, 1e-6);
++        float top = p.y + rect.w / px;
++        float left = (fp.x - rect.x) / px;
++        float right = (rect.x + rect.z - fp.x) / px;
++        if (top < depth) { depth = top; n = vec2(0.0, -1.0); }
++        if (left < depth) { depth = left; n = vec2(-1.0, 0.0); }
++        if (right < depth) { depth = right; n = vec2(1.0, 0.0); }
++    }
++    return dp < depth ? vec3(-dp * px, -away) : vec3(-depth * px, n);
++}
++
+ vec4 src(vec2 fp, float r) { return textureLod(tex, (fp - texOrigin) / texSize, lodBias + blurLod(r)); }
+ 
+ float dkfLobe(float depth, float fw, float height, float cosSpread, float ndotl, float curvature, bool specular) {
+@@ -1322,6 +1379,15 @@ void main() {
+         }
+     }
+ 
++    // Dock menu: macOS draws a dark rim just outside downward-facing edges,
++    // continuing the side line around the pointer tip (29-dock-menu capture).
++    if (callout.y > 0.0 && n.y > 0.0) {
++        float w = max(1.0, 0.5 * px);
++        float band = clamp(0.5 + dpx / fwpx, 0.0, 1.0) * clamp(0.5 - (dpx - w) / fwpx, 0.0, 1.0);
++        float a = 0.6 * band * n.y * n.y;
++        o = o * (1.0 - a) + vec4(0.0, 0.0, 0.0, a);
++    }
++
+     if (workLinear == 1 && o.a > 0.0)
+         o.rgb = fromSrgb(clamp(o.rgb / o.a, 0.0, 1.0)) * o.a;
+     fragColor = o * opacity;

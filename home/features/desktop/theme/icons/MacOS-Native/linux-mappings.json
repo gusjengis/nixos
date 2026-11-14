@@ -1995,6 +1995,7 @@
       "apps/com.hnc.Discord",
       "apps/discord",
       "apps/discord-canary",
+      "apps/vesktop",
       "apps/webapp-discord"
     ]
   },

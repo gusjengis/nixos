@@ -1,0 +1,102 @@
+diff --git a/chrome/browser/themes/theme_service_aura_linux.cc b/chrome/browser/themes/theme_service_aura_linux.cc
+--- a/chrome/browser/themes/theme_service_aura_linux.cc
++++ b/chrome/browser/themes/theme_service_aura_linux.cc
+@@ -112,4 +112,7 @@
+ void ThemeServiceAuraLinux::UseTheme(ui::SystemTheme system_theme) {
++  // Browser appearance uses the captured macOS provider. GTK/Qt continue to
++  // serve platform integration, but must not install a theme supplier.
++  system_theme = ui::SystemTheme::kDefault;
+   if (system_theme == ui::SystemTheme::kDefault) {
+     UseDefaultTheme();
+   } else if (auto* linux_ui_theme = ui::GetLinuxUiTheme(system_theme)) {
+@@ -136,3 +139,3 @@
+ bool ThemeServiceAuraLinux::IsSystemThemeDistinctFromDefaultTheme() const {
+-  return true;
++  return false;
+ }
+@@ -177,3 +180,3 @@
+-  return ValidateSystemTheme(static_cast<ui::SystemTheme>(
+-      profile->GetPrefs()->GetInteger(prefs::kSystemTheme)));
++  // Ignore GTK/Qt choices saved by an earlier Linux build.
++  return ValidateSystemTheme(ui::SystemTheme::kDefault);
+ }
+diff --git a/chrome/browser/resources/settings/appearance_page/appearance_page.ts b/chrome/browser/resources/settings/appearance_page/appearance_page.ts
+--- a/chrome/browser/resources/settings/appearance_page/appearance_page.ts
++++ b/chrome/browser/resources/settings/appearance_page/appearance_page.ts
+@@ -483,6 +483,4 @@
+   /** @return Whether to show the "USE GTK" button. */
+   protected showUseGtk_(): boolean {
+-    const themeId = this.themeIdPref_?.value;
+-    return (!!themeId || this.systemTheme_ !== SystemTheme.GTK) &&
+-        !this.appearanceBrowserProxy_.isChildAccount();
++    return false;
+   }
+@@ -490,6 +488,4 @@
+   /** @return Whether to show the "USE QT" button. */
+   protected showUseQt_(): boolean {
+-    const themeId = this.themeIdPref_?.value;
+-    return (!!themeId || this.systemTheme_ !== SystemTheme.QT) &&
+-        !this.appearanceBrowserProxy_.isChildAccount();
++    return false;
+   }
+diff --git a/ui/gfx/platform_font_skia.cc b/ui/gfx/platform_font_skia.cc
+--- a/ui/gfx/platform_font_skia.cc
++++ b/ui/gfx/platform_font_skia.cc
+@@ -205,3 +205,20 @@
++#if BUILDFLAG(IS_LINUX)
++  // CoreText selects the text optical master (opsz=17), not the public
++  // variable SF Pro font's default display master (opsz=28). This private
++  // family pins that axis while retaining regular/medium/bold/italic.
++  family = "Chromium UI SF Pro";
++  size_pixels = 13;
++  style = Font::NORMAL;
++  weight = Font::Weight::NORMAL;
++  // The settings above replaced GTK's face. Query this face's rendering
++  // settings too, rather than retaining rendering parameters for GTK's font.
++  FontRenderParamsQuery query;
++  query.families.push_back(family);
++  query.pixel_size = size_pixels;
++  query.weight = weight;
++  params = gfx::GetFontRenderParams(query, nullptr);
++#endif
++
+   bool success = false;
+   sk_sp<SkTypeface> typeface =
+       CreateSkTypeface(style & Font::ITALIC, weight, &family, &success);
+diff --git a/chrome/browser/ui/views/chrome_typography_provider.cc b/chrome/browser/ui/views/chrome_typography_provider.cc
+--- a/chrome/browser/ui/views/chrome_typography_provider.cc
++++ b/chrome/browser/ui/views/chrome_typography_provider.cc
+@@ -131,3 +131,3 @@
+-#if BUILDFLAG(IS_MAC)
++#if BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
+     details.typeface = "Menlo";
+ #elif BUILDFLAG(IS_WIN)
+@@ -206,4 +206,4 @@
+-#if BUILDFLAG(IS_MAC)
++#if BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
+   constexpr int kTitlePlatformHeight = 19;
+   constexpr int kBodyTextLargePlatformHeight = 16;
+   constexpr int kBodyTextSmallPlatformHeight = 15;
+diff --git a/ui/base/webui/web_ui_util.cc b/ui/base/webui/web_ui_util.cc
+--- a/ui/base/webui/web_ui_util.cc
++++ b/ui/base/webui/web_ui_util.cc
+@@ -45,7 +45,7 @@
+ std::string GetFontFamilyMd() {
+ #if BUILDFLAG(IS_LINUX)
+-  return "Roboto, " + GetFontFamily();
++  return GetFontFamily();
+ #else
+   return GetFontFamily();
+ #endif
+ }
+@@ -227,2 +227,6 @@
+ std::string GetFontFamily() {
++#if BUILDFLAG(IS_LINUX)
++  // Browser-owned WebUI (including omnibox results) shares the Views face.
++  return "\"Chromium UI SF Pro\", sans-serif";
++#else
+   std::string font_family = l10n_util::GetStringUTF8(IDS_WEB_FONT_FAMILY);
+@@ -242,2 +246,3 @@
+   return font_family;
++#endif
+ }

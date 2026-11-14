@@ -1,0 +1,16 @@
+{
+  "$schema": "https://opencode.ai/v2/cli.json",
+  "theme": { "name": "github" },
+  "plugins": [
+    "-opencode.notifications",
+    "./tui-plugins/tmux-theme",
+    "./tui-plugins/context-persistence"
+  ],
+  "diffs": { "wrap": "word", "single": true },
+  "prompt": { "editor": true },
+  "session": { "sidebar": "auto", "scrollbar": false, "thinking": "show", "tps": true },
+  "animations": true,
+  "tabs": {
+    "mode": "off"
+  }
+}

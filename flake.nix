@@ -7,6 +7,10 @@
     nixpkgs-obsidian.url = "nixpkgs/nixpkgs-unstable";
     # Keep system and Home Manager package sets independent during migration.
     nixpkgs-system.url = "github:NixOS/nixpkgs/nixos-unstable";
+    lanzaboote = {
+      url = "github:nix-community/lanzaboote/v1.2.0";
+      inputs.nixpkgs.follows = "nixpkgs-system";
+    };
     disko = {
       url = "github:nix-community/disko";
       inputs.nixpkgs.follows = "nixpkgs-system";
@@ -63,6 +67,8 @@
       url = "github:anomalyco/opencode/v1.19.3";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    # Keep V1 available for original-database exports and rollback during V2 migration.
+    opencode-v2.url = "github:anomalyco/opencode/v2.2.6";
   };
 
   outputs =
@@ -100,12 +106,20 @@
                   version = manifest.package.version;
                   src = source;
                   patches = (oldAttrs.patches or [ ]) ++ [
-                    ./home/features/desktop/strata/window-rim.patch
+                    ./home/features/desktop/strata/finder-toolbar.patch
+                    ./home/features/desktop/strata/wallpaper-tint.patch
+                    ./home/features/desktop/strata/desktop-affinity.patch
                   ];
                   cargoDeps = strataPkgs.rustPlatform.importCargoLock {
                     lockFile = "${source}/Cargo.lock";
                   };
-                  postPatch = "";
+                  postPatch = ''
+                    cp ${./home/features/desktop/strata/wallpaper-tint.rs} src/ui/wallpaper_tint.rs
+                    substituteInPlace src/finder.css src/ui/compositor_glass.rs \
+                      --replace-fail '@finder_content' 'var(--finder-content, @finder_content)'
+                    substituteInPlace src/finder.css \
+                      --replace-fail 'background-color: #303030;' 'background-color: var(--finder-footer, #303030);'
+                  '';
                   STRATA_BUILD_COMMIT = source.rev;
                   STRATA_UPDATER = "disabled";
                   STRATA_TRUSTED_COMMAND_PATH = strataPkgs.lib.makeBinPath [

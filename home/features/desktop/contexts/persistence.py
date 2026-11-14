@@ -366,8 +366,8 @@ def inventory(context, sessions):
     if not os.environ.get("HYPRLAND_INSTANCE_SIGNATURE"):
         return {"windows": [], "desktop": None, "warnings": []}
     raw = ctl.clients()
-    monitors = json.loads(run(["hyprctl", "-j", "monitors"]))
-    active = json.loads(run(["hyprctl", "-j", "activewindow"]))
+    monitors = json.loads(run(["hyprctl", "-j", "monitors"], env=ctl.hyprctl_environment()))
+    active = json.loads(run(["hyprctl", "-j", "activewindow"], env=ctl.hyprctl_environment()))
     attachments = []
     for tm, session in sessions:
         for client in tm.rows("list-clients", ["client_pid", "session_id", "client_tty"], "-t", session["observed_id"]):
@@ -663,6 +663,21 @@ def editor_snapshot(endpoint):
     raise CheckpointError(f"Neovim snapshot RPC invalid after 3 attempts: {detail}; previous checkpoint retained")
 
 
+def chat_pane(pane):
+    return bool(pane.get("chat") or pane.get("chat_library") or pane.get("command") == "opencode")
+
+
+def failed_chat_restore(tm, target, pane, error, *, shell=False):
+    if not chat_pane(pane):
+        return False
+    report(f"Chat {pane['id']}: {error}; automatic reopening skipped, saved chat remains available")
+    if shell:
+        tm.call("respawn-pane", "-k", "-t", target, "-c", str(Path.home()), os.environ.get("SHELL", "/bin/sh"))
+    tm.call("set-option", "-pu", "-t", target, "@persistence-chat-socket")
+    tm.call("set-option", "-pu", "-t", target, "@persistence-recovery-pending")
+    return True
+
+
 def adapter_capture(tm, pane, destination, context, errors):
     local = pane.pop("local")
     if local.get("@persistence-recovery-pending") == "1" and pane["command"] != "nvim":
@@ -883,17 +898,35 @@ def checkpoint(reason="periodic", context_id=None, socket_path=None, operation=N
             if reason in ("periodic", "shutdown") and lifecycle.get(identifier or "local") == "closed":
                 continue
             selected = [(tm, value) for own, tm, value in captured if (own["id"] if own else None) == identifier]
+            previous = latest(context)
+            # Older failed chat imports left ordinary shells marked pending.
+            # Chat history is independent of terminal topology; those shells
+            # must not veto saving or closing the rest of the context.
+            old_panes = {pane["id"]: pane for session in ctl.read_json(previous[0] / "tmux.json")
+                         for window in session["windows"] for pane in window["panes"]} if previous else {}
+            for tm, session in selected:
+                for window in session["windows"]:
+                    for pane in window["panes"]:
+                        local = pane.get("local", {})
+                        if (local.get("@persistence-recovery-pending") == "1"
+                                and failed_chat_restore(tm, local["pane_id"], old_panes.get(pane["id"], pane),
+                                                        "previous automatic reopening did not finish")):
+                            local.pop("@persistence-recovery-pending", None)
+                            local.pop("@persistence-chat-socket", None)
             pending = [pane["id"] for _, session in selected for window in session["windows"]
                        for pane in window["panes"] if pane.get("local", {}).get("@persistence-recovery-pending") == "1"
                        and pane["command"] != "nvim"]
             if pending:
                 raise CheckpointError(f"Pane {pending[0]} is an unresolved recovery shell; exit it and explicitly retry restoration. Previous checkpoint retained")
-            previous = latest(context)
+            archived_chats = tuple(archive + "/" for _, session in selected for window in session["windows"]
+                                   for pane in window["panes"] if pane["command"] in ("bash", "zsh", "fish", "sh")
+                                   for old in [old_panes.get(pane["id"], {})]
+                                   if (archive := old.get("chat_archive") or old.get("chat")))
             if previous:
                 # Editor artifacts are disposable. Corruption in one must not
                 # prevent a fresh capture; other adapters keep their guarantees.
                 for name in previous[1]["artifacts"]:
-                    if not name.startswith("nvim/"):
+                    if not name.startswith(("nvim/", *archived_chats)):
                         validate(*previous, prefix=name)
             if not selected:
                 continue
@@ -909,9 +942,10 @@ def checkpoint(reason="periodic", context_id=None, socket_path=None, operation=N
                         try:
                             tree.files[name] = artifact.read_bytes()
                         except Exception:
-                            if not name.startswith("nvim/"):
+                            if not name.startswith(("nvim/", *archived_chats)):
                                 raise
-                            broken_editors.add(name.split("/")[1])
+                            if name.startswith("nvim/"):
+                                broken_editors.add(name.split("/")[1])
             warnings = [f"Context {value['orphaned_context_id']} is unavailable; session {value['name']} saved in machine-local recovery"
                         for _tm, value in selected if value.get("orphaned_context_id")]
             pane_adapters = {}
@@ -924,7 +958,15 @@ def checkpoint(reason="periodic", context_id=None, socket_path=None, operation=N
                             pane.update(copy.deepcopy(pane_adapters[key]))
                         else:
                             adapter_capture(tm, pane, destination, context, warnings)
-                            pane_adapters[key] = {k: copy.deepcopy(pane[k]) for k in ("editor", "chat", "chat_library", "chat_cwd", "arguments") if k in pane}
+                            # Legacy chat exports may predate the independent
+                            # library. Keep their bytes for manual recovery even
+                            # when the terminal now contains only a shell; an
+                            # archive is not an automatic restore instruction.
+                            old_pane = old_panes.get(pane["id"], {})
+                            archive = old_pane.get("chat_archive") or old_pane.get("chat")
+                            if archive and not chat_pane(pane) and pane["command"] in ("bash", "zsh", "fish", "sh"):
+                                pane["chat_archive"] = archive
+                            pane_adapters[key] = {k: copy.deepcopy(pane[k]) for k in ("editor", "chat", "chat_archive", "chat_library", "chat_cwd", "arguments") if k in pane}
             desktop = inventory(context, selected)
             warnings.extend(desktop.pop("warnings"))
             retained_path = local_root() / f"retained-{identifier or 'local'}.json"
@@ -979,6 +1021,8 @@ def checkpoint(reason="periodic", context_id=None, socket_path=None, operation=N
                                 pane["command"] = "nvim"
                         if pane.get("chat"):
                             roots.add(pane["chat"])
+                        if pane.get("chat_archive"):
+                            roots.add(pane["chat_archive"])
             # Prune only artifacts absent from the merged logical workspace.
             for name in list(tree.files):
                 if not any(name.startswith(root + "/") for root in roots):
@@ -998,7 +1042,7 @@ def checkpoint(reason="periodic", context_id=None, socket_path=None, operation=N
                     "migrated_from": (previous[1]["id"] if previous and previous[1]["version"] == 1
                                       else previous[1].get("migrated_from") if previous else None),
                 }, previous[1] if previous and previous[1]["version"] == 2 else None,
-                    discard_prefixes=("nvim/",))
+                    discard_prefixes=("nvim/", *archived_chats))
                 storage.remove_v1()
                 # Raw server-wide dumps are unnecessary: native normalized
                 # records already contain supported topology/program strategies.
@@ -1222,7 +1266,9 @@ def restore_tmux(base, manifest, context, errors, tm, server_id=None, acknowledg
                 live_panes = {p["@persistence-id"]: p["pane_id"] for p in live_rows}
                 for live_pane in live_rows:
                     if live_pane["@persistence-recovery-pending"] == "1":
-                        errors.append(f"Pane {live_pane['@persistence-id']}: unresolved recovery shell; exit it and explicitly retry restoration")
+                        saved_pane = next((p for p in window["panes"] if p["id"] == live_pane["@persistence-id"]), {})
+                        if not failed_chat_restore(tm, live_pane["pane_id"], saved_pane, "previous automatic reopening did not finish"):
+                            errors.append(f"Pane {live_pane['@persistence-id']}: unresolved recovery shell; exit it and explicitly retry restoration")
                 if live_window and all(p["id"] in live_panes for p in window["panes"]):
                     links[window["id"]] = (session_target, win_target)
                     return
@@ -1277,7 +1323,10 @@ def restore_tmux(base, manifest, context, errors, tm, server_id=None, acknowledg
                         # A visible shell is an honest recovery failure, not a
                         # replacement for the saved editor/chat. Never let its
                         # later periodic scan erase the failed item's snapshot.
-                        tm.call("set-option", "-p", "-t", target, "@persistence-recovery-pending", "1")
+                        if failed_chat_restore(tm, target, pane, "; ".join(errors[pane_errors:]), shell=True):
+                            del errors[pane_errors:]
+                        else:
+                            tm.call("set-option", "-p", "-t", target, "@persistence-recovery-pending", "1")
                     tm.call("select-pane", "-t", target, "-T", pane["title"])
                     restored_panes.append((pane, target))
                 if not restored_panes:
@@ -1348,7 +1397,7 @@ def acknowledge_program(tm, target, pane, command, base, context):
 def finish_acknowledgements(pending, mapping, errors):
     # All terminal windows have already been shown. Independent readiness waits
     # share a bounded pool instead of serial 30-second deadlines per pane.
-    def complete(record):
+    def restore_program(record):
         sid, tm, target, pane, command, base, context = record[:7]
         if command is None:
             issues = []
@@ -1368,6 +1417,15 @@ def finish_acknowledgements(pending, mapping, errors):
         acknowledge_program(tm, target, pane, command, base, context)
         tm.call("set-option", "-pu", "-t", target, "@persistence-recovery-pending")
         return sid
+
+    def complete(record):
+        try:
+            return restore_program(record)
+        except Exception as exc:
+            sid, tm, target, pane = record[:4]
+            if failed_chat_restore(tm, target, pane, exc, shell=True):
+                return sid
+            raise
 
     with ThreadPoolExecutor(max_workers=16) as pool:
         jobs = {pool.submit(complete, record): record[0] for record in pending}
@@ -1427,7 +1485,7 @@ def restore(context, runtime_id=None, tm=None, windows=True):
 def restore_windows(desktop, mapping, context, runtime_id, errors, warnings=None):
     warnings = warnings if warnings is not None else errors
     failed = set()
-    monitors = json.loads(run(["hyprctl", "-j", "monitors"]))
+    monitors = json.loads(run(["hyprctl", "-j", "monitors"], env=ctl.hyprctl_environment()))
     if not monitors:
         raise CheckpointError("No monitors available")
     names = {m["name"] for m in monitors}
@@ -1565,4 +1623,7 @@ def main():
 
 
 if __name__ == "__main__":
+    # Helpers import persistence lazily. Keep their exception classes identical
+    # to those raised by this CLI's tmux client.
+    sys.modules.setdefault("persistence", sys.modules[__name__])
     sys.exit(main())

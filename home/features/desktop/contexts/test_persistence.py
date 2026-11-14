@@ -125,6 +125,24 @@ class EditorReadinessTests(unittest.TestCase):
 
 
 class ProgramReadinessTests(unittest.TestCase):
+    def test_failed_chat_acknowledgement_is_nonblocking_and_leaves_usable_shell(self):
+        for pane in ({"id": "chat", "command": "opencode", "chat_library": {"id": "saved"}},
+                     {"id": "legacy", "command": "sh", "chat": "opencode/legacy"}):
+            with self.subTest(pane=pane):
+                tm = Mock()
+                mapping = {"session": {"complete": True}}
+                errors = []
+                with patch.object(p, "await_program", side_effect=p.CheckpointError("chat startup failed")), \
+                        patch.object(p, "report"):
+                    p.finish_acknowledgements([("session", tm, "%0", pane, ["opencode"], None, None)], mapping, errors)
+                self.assertEqual(errors, [])
+                self.assertTrue(mapping["session"]["complete"])
+                self.assertEqual(tm.call.call_args_list[0].args[:4], ("respawn-pane", "-k", "-t", "%0"))
+                self.assertEqual(tm.call.call_args_list[-2].args,
+                                 ("set-option", "-pu", "-t", "%0", "@persistence-chat-socket"))
+                self.assertEqual(tm.call.call_args_list[-1].args,
+                                 ("set-option", "-pu", "-t", "%0", "@persistence-recovery-pending"))
+
     def test_shell_restoration_waits_until_tmux_child_executes_shell(self):
         tm = Mock()
         tm.rows.side_effect = [[{"pane_id": "%0", "pane_current_command": "tmux"}],
@@ -1090,7 +1108,7 @@ class PersistenceTests(unittest.TestCase):
         panes = self.dest.rows("list-panes", ["@persistence-id", "pane_current_command"], "-a")
         self.assertTrue(all(q["pane_current_command"] in ("sh", "bash") for q in panes))
 
-    def test_failed_program_placeholder_cannot_replace_saved_recovery_on_next_scan(self):
+    def test_failed_chat_import_never_blocks_checkpoint_or_close(self):
         self.session("failed chat", self.a)
         self.session("independent healthy", self.a)
         original = p.adapter_capture
@@ -1106,23 +1124,73 @@ class PersistenceTests(unittest.TestCase):
 
         with patch.object(p, "adapter_capture", side_effect=capture):
             self.save()
-        before = self.saved()[1]["id"]
+        saved_base, saved_manifest, _ = self.saved()
+        chat_bytes = {name: (saved_base / name).read_bytes() for name in saved_manifest["artifacts"]
+                      if name.startswith("opencode/")}
         with patch.object(p.chats, "restore", side_effect=RuntimeError("native import unavailable")):
             p.restore(self.a, tm=self.dest, windows=False)
         pending = [row for row in self.dest.rows("list-panes", ["pane_id", "pane_pid", "@persistence-recovery-pending"], "-a")
                    if row["@persistence-recovery-pending"] == "1"]
-        self.assertEqual(len(pending), 1)
+        self.assertEqual(pending, [])
+        self.assertEqual(ctl.read_json(p.local_root() / f"retained-{self.a['id']}.json")["sessions"], [])
         self.discovery.return_value = [self.dest]
-        with self.assertRaises(p.CheckpointError):
-            self.save()
-        self.assertEqual(self.saved()[1]["id"], before)
+        p.checkpoint("periodic", context_id=self.a["id"], socket_path=self.dest.socket)
+        p.checkpoint("close", context_id=self.a["id"], socket_path=self.dest.socket)
+        base, _, saved = self.saved()
+        self.assertTrue(chat_bytes)
+        self.assertTrue(any(pane.get("chat_archive") for session in saved for window in session["windows"]
+                            for pane in window["panes"]))
+        for name, data in chat_bytes.items():
+            self.assertEqual((base / name).read_bytes(), data)
         self.assertEqual(len(self.dest.rows("list-sessions", ["session_id"])), 2)
         with patch.object(p.chats, "restore") as retry:
             p.restore(self.a, tm=self.dest, windows=False)
         retry.assert_not_called()
         self.assertEqual(len(self.dest.rows("list-panes", ["pane_id"], "-a")), 2)
-        self.assertEqual(self.dest.call("display-message", "-p", "-t", pending[0]["pane_id"], "#{pane_pid}"), pending[0]["pane_pid"])
-        self.assertTrue(ctl.read_json(p.local_root() / f"retained-{self.a['id']}.json")["sessions"])
+
+    def test_old_failed_chat_placeholder_no_longer_vetoes_close(self):
+        target = self.session("old failed chat", self.a)
+        original = p.adapter_capture
+
+        def capture(tm, pane, destination, context, errors):
+            original(tm, pane, destination, context, errors)
+            pane["chat_library"] = {"context_id": context["id"], "session_id": "saved-chat"}
+
+        with patch.object(p, "adapter_capture", side_effect=capture):
+            self.save()
+        self.tm.call("set-option", "-p", "-t", target, "@persistence-recovery-pending", "1")
+        self.tm.call("set-option", "-p", "-t", target, "@persistence-chat-socket", self.tm.socket)
+        p.checkpoint("close", context_id=self.a["id"], socket_path=self.tm.socket)
+        row = self.tm.rows("list-panes", ["@persistence-recovery-pending"], "-t", target)[0]
+        self.assertEqual(row["@persistence-recovery-pending"], "")
+
+    def test_checkpoint_cli_handles_unregistered_terminal_environment(self):
+        self.session("plain shell", cwd=self.a["path"])
+        result = subprocess.run([sys.executable, "-B", p.__file__, "save", "--context", self.a["id"],
+                                 "--socket", self.tm.socket, "--reason", "close"],
+                                capture_output=True, text=True, timeout=15)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_missing_failed_chat_export_does_not_veto_close(self):
+        target = self.session("failed missing chat", self.a)
+        original = p.adapter_capture
+
+        def capture(tm, pane, destination, context, errors):
+            original(tm, pane, destination, context, errors)
+            pane["chat"] = f"opencode/{pane['id']}"
+            p.chats.capture({"session_id": None, "directory": context["cwd"]},
+                            destination / pane["chat"], context["cwd"])
+
+        with patch.object(p, "adapter_capture", side_effect=capture):
+            self.save()
+        _, manifest, _ = self.saved()
+        for name, artifact in manifest["artifacts"].items():
+            if name.startswith("opencode/"):
+                for chunk in artifact["chunks"]:
+                    p.checkpoint_store(self.a).object(chunk).unlink(missing_ok=True)
+        self.tm.call("set-option", "-p", "-t", target, "@persistence-recovery-pending", "1")
+        p.checkpoint("close", context_id=self.a["id"], socket_path=self.tm.socket)
+        p.validate(*p.latest(self.a))
 
     def test_desktop_restore_reuses_windows_and_restores_placement_without_spawning(self):
         window = {"id": "terminal-id", "session": "session-id", "order": 0, "monitor": "DP-1",

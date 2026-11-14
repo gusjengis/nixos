@@ -16,10 +16,14 @@ async function fixture(t) {
   return { env: { OPENCODE_CONTEXT_STATE_FILE: path }, record, save }
 }
 
-test("unchanged local open reads authoritative verdict without spawning a helper", async (t) => {
-  const { env } = await fixture(t)
+test("local opens ignore outdated mappings and never spawn a helper", async (t) => {
+  const { env, record, save } = await fixture(t)
+  await save({ ...record, selected_root: "replacement", freshness: "outdated" })
   const client = createHistoryClient({ env, command: () => { throw new Error("No CLI on local open") } })
-  assert.equal(await client.open({ owner: "owner", chat: "chat", nativeID: "native" }, () => {}), "native")
+  const row = { owner: "owner", chat: "chat", nativeID: "native", local: true }
+  assert.equal(await client.open(row, () => {}), "native")
+  assert.equal(client.verified(row, "native"), true)
+  assert.equal(attachHistoryState([row], { conversations: { "owner/chat": { ...record, selected_root: "replacement" } } })[0].nativeID, "native")
 })
 
 test("portable ensure must publish verified mapping; successful exit alone is insufficient", async (t) => {

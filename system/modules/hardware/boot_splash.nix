@@ -29,8 +29,8 @@ in
 {
   options.bootSplash.enable = lib.mkEnableOption "Darwin-style graphical boot for desktop machines";
 
-  config = lib.mkIf (config.bootSplash.enable && config.grub.enable) {
-    boot.loader.grub = {
+  config = lib.mkIf config.bootSplash.enable {
+    boot.loader.grub = lib.mkIf config.grub.enable {
       # GRUB cannot center an unscaled image during the hidden countdown.
       # Keep that frame black instead of stretching a low-resolution bitmap.
       theme = null;

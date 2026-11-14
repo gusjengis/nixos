@@ -29,7 +29,12 @@ Scope {
             color: "transparent"
             WlrLayershell.layer: WlrLayer.Bottom
             WlrLayershell.namespace: "quickshell-context-desktop"
-            WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
+            // Hyprland's follow_mouse hands keyboard focus to any hovered
+            // OnDemand layer, so stray cursor drift onto the wallpaper would
+            // steal focus from windows. Accept keyboard only after a click on
+            // the desktop, and give it up once the pointer leaves.
+            property bool keyboardWanted: false
+            WlrLayershell.keyboardFocus: keyboardWanted ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
 
             DesktopSurface {
                 id: surface
@@ -39,10 +44,15 @@ Scope {
                 error: files.error
                 iconSize: preferences.iconSize
                 sortBy: preferences.sortBy
+                onInteracted: window.keyboardWanted = true
                 onAction: (operation, names) => files.run(operation, names)
                 onIconSizeRequested: size => preferences.iconSize = size
                 onSortRequested: order => preferences.sortBy = order
                 onWallpaperRequested: Quickshell.execDetached(["quickshell", "ipc", "call", "wallpaper", "open"])
+
+                HoverHandler {
+                    onHoveredChanged: if (!hovered) window.keyboardWanted = false
+                }
             }
             Connections {
                 target: files

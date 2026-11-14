@@ -1,0 +1,25 @@
+--- a/packages/cli/src/commands/commands.ts
++++ b/packages/cli/src/commands/commands.ts
+@@ -166,6 +166,11 @@
+       description: "manage integrations and credentials",
+       globalFlags: ServerFlags,
+       commands: [
++        Spec.make("bridge-current", { description: "Read and renew the selected OpenAI credential for the local quota widget" }),
++        Spec.make("bridge-select", {
++          description: "Select a saved local OpenAI workspace profile",
++          params: { profile: Argument.Literals("profile", ["personal", "business"]) },
++        }),
+         Spec.make("list", {
+           description: "list integrations and credentials",
+           params: {
+--- a/packages/cli/src/index.ts
++++ b/packages/cli/src/index.ts
+@@ -48,6 +48,8 @@
+   acp: () => import("./commands/handlers/acp"),
+   api: () => import("./commands/handlers/api"),
+   auth: {
++    "bridge-current": () => import("./commands/handlers/auth/bridge-current"),
++    "bridge-select": () => import("./commands/handlers/auth/bridge-select"),
+     list: () => import("./commands/handlers/auth/list"),
+     login: () => import("./commands/handlers/auth/login"),
+     logout: () => import("./commands/handlers/auth/logout"),

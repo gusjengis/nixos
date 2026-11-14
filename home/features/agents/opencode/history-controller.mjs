@@ -7,7 +7,8 @@ export function mergeHistory(native, summaries, hidden = []) {
   for (const session of native) {
     if (session.parentID || excluded.has(session.id)) continue
     const marker = session.metadata?.desktop_context
-    const key = marker ? historyKey(marker.id, marker.chat) : session.id
+    const familyKey = marker ? historyKey(marker.id, marker.chat) : session.id
+    const key = rows.has(familyKey) ? `${familyKey}:${session.id}` : familyKey
     rows.set(key, { key, owner: marker?.id, chat: marker?.chat, title: session.title,
       updated: session.time?.updated ?? 0, nativeID: session.id, session, local: true })
   }
@@ -18,7 +19,7 @@ export function mergeHistory(native, summaries, hidden = []) {
     rows.set(key, { ...local, ...summary, key,
       title: summary.title || local?.title || `Conversation ${summary.chat}`,
       updated: summary.updated ?? local?.updated ?? 0,
-      nativeID: summary.nativeID ?? local?.nativeID,
+      nativeID: local?.nativeID ?? summary.nativeID,
       local: Boolean(summary.nativeID ?? local?.nativeID) })
   }
   return [...rows.values()].sort((a, b) => b.updated - a.updated || a.key.localeCompare(b.key))

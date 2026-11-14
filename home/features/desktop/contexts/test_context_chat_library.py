@@ -11,6 +11,7 @@ from contextlib import closing
 from unittest.mock import Mock, patch
 
 import context_chat_library as library
+import context_chat_move as chat_move
 import contextctl as ctl
 import organization
 import persistence
@@ -36,11 +37,34 @@ class ScopeTests(IsolatedChatTest):
         contexts = ctl.scan()
         return {context["id"] for context in library.visible_contexts(ctl.find_context(item["id"]), contexts)}
 
-    def test_scope_uses_logical_descendants_and_configured_roots(self):
-        self.assertEqual(self.visible(self.parent), {item["id"] for item in (self.parent, self.child, self.sibling, self.grandchild)})
+    def test_move_destinations_include_nested_contexts_and_other_workdirs(self):
+        options = {item["id"]: item for item in chat_move.destinations()}
+        self.assertEqual(options[self.child["id"]]["title"], "NixOS / Context")
+        self.assertIn(self.other["id"], options)
+        self.assertIn(self.grandchild["id"], options)
+
+    def test_scope_restores_superseded_copies_but_keeps_explicit_deletions_hidden(self):
+        context = ctl.find_context(self.child["id"])
+        database = self.base / "fixture.db"
+        database.touch()
+        library.write_json(library.ledger_path(context, database), {"chats": {
+            "chat": {"local_id": "replacement"},
+            "deleted": {"local_id": "deleted", "deleted": True},
+        }})
+        rows = {identifier: {"id": identifier, "owner": context["id"], "parent": None, "chat": chat}
+                for identifier, chat in [("original", "chat"), ("replacement", "chat"), ("deleted", "deleted")]}
+        library.write_json(library.scope_path(context, database), {"hidden": ["original", "deleted"]})
+        with patch.object(library, "native_rows", return_value=rows), \
+                patch.object(library.recovery, "pending_native_ids", return_value=set()), \
+                patch.object(library.backend, "pending_ids", return_value=set()):
+            library.publish_scopes(ctl.scan(), database)
+        self.assertEqual(ctl.read_json(library.scope_path(context, database))["hidden"], ["deleted"])
+
+    def test_scope_uses_all_logical_descendants_regardless_of_work_root(self):
+        self.assertEqual(self.visible(self.parent), {item["id"] for item in (self.parent, self.child, self.sibling, self.other, self.grandchild)})
         self.assertEqual(self.visible(self.child), {self.child["id"]})
-        # Intervening different-workdir context does not erase matching deeper descendants.
-        self.assertEqual(self.visible(self.other), {self.other["id"]})
+        # Intervening different-workdir contexts retain their deeper descendants.
+        self.assertEqual(self.visible(self.other), {self.other["id"], self.grandchild["id"]})
         with patch.object(library, "native_rows", side_effect=AssertionError("Watcher must not touch SQLite")):
             library.refresh_scopes(ctl.scan())
         scope = ctl.read_json(library.scope_path(ctl.find_context(self.parent["id"]), library.database_path()))
@@ -49,11 +73,11 @@ class ScopeTests(IsolatedChatTest):
         library.refresh_scopes(ctl.scan())
         self.assertNotIn(self.child["id"], ctl.read_json(library.scope_path(ctl.find_context(self.parent["id"]), library.database_path()))["ids"])
 
-    def test_missing_targets_do_not_match_via_fallback_and_symlinks_match(self):
+    def test_missing_targets_and_symlinks_do_not_change_hierarchy_scope(self):
         with ctl.mutation_lock():
             ctl.set_working_directory(self.parent["id"], str(self.base / "missing-a"))
             ctl.set_working_directory(self.child["id"], str(self.base / "missing-b"))
-        self.assertEqual(self.visible(self.parent), {self.parent["id"]})
+        self.assertEqual(self.visible(self.parent), {item["id"] for item in (self.parent, self.child, self.sibling, self.other, self.grandchild)})
         alias = self.base / "repo-link"
         alias.symlink_to(self.work, target_is_directory=True)
         ctl.set_working_directory(self.parent["id"], str(alias))
@@ -322,6 +346,82 @@ class NativeLibraryTests(ScopeTests):
     def index(self):
         archive = library.storage(self.child_context())
         return archive, archive.load()
+
+    def test_move_family_preserves_native_history_and_can_move_back(self):
+        child_id = "ses_movingsubagent"
+        child = {"info": dict(self.fixture["info"], id=child_id, parentID=self.sid), "messages": []}
+        child["info"]["metadata"] = {"desktop_context": {
+            "id": self.child["id"], "chat": self.sid, "session": child_id}}
+        self.import_chat(child)
+        before = library.chats._export(self.sid, str(self.work))
+        with patch.dict(os.environ, {"CONTEXT_ID": self.parent["id"]}):
+            moved = chat_move.move(child_id, self.sibling["id"])
+            rows = library.native_rows(library.database_path())
+            self.assertEqual({rows[sid]["owner"] for sid in (self.sid, child_id)}, {self.sibling["id"]})
+            self.assertEqual(rows[child_id]["member"], child_id)
+            self.assertEqual(rows[child_id]["parent"], self.sid)
+            after = library.chats._export(self.sid, str(self.work))
+            self.assertEqual(before["messages"], after["messages"])
+            self.assertEqual(before["info"]["directory"], after["info"]["directory"])
+            source = library.read_index(self.child_context())[0]
+            self.assertTrue(source["chats"][self.sid]["deleted"])
+            target = library.read_index(ctl.find_context(self.sibling["id"]))[0]
+            self.assertFalse(target["chats"][moved["chat"]]["deleted"])
+            returned = chat_move.move(self.sid, self.child["id"])
+            self.assertNotEqual(returned["chat"], self.sid)
+            library.sync_all(hydrate=True)
+            self.assertEqual(library.native_rows(library.database_path())[self.sid]["owner"], self.child["id"])
+
+    def test_interrupted_move_retries_publication_without_changing_identity(self):
+        original = library.sync_context
+        def fail_target(context, *args, **kwargs):
+            if context["id"] == self.sibling["id"]:
+                raise RuntimeError("destination temporarily unavailable")
+            return original(context, *args, **kwargs)
+        with patch.dict(os.environ, {"CONTEXT_ID": self.parent["id"]}):
+            with patch.object(library, "sync_context", side_effect=fail_target):
+                with self.assertRaisesRegex(RuntimeError, "temporarily unavailable"):
+                    chat_move.move(self.sid, self.sibling["id"])
+            row = library.native_rows(library.database_path())[self.sid]
+            options = {item["id"]: item for item in chat_move.destinations(self.sid)}
+            self.assertTrue(options[self.sibling["id"]]["retry"])
+            with self.assertRaisesRegex(ValueError, "original destination"):
+                chat_move.move(self.sid, self.child["id"])
+            result = chat_move.move(self.sid, self.sibling["id"])
+            self.assertEqual(result["chat"], row["chat"])
+            self.assertFalse(list((library.local_root() / "transfers").rglob("*.json")))
+
+    def test_failed_source_capture_does_not_change_ownership(self):
+        with patch.dict(os.environ, {"CONTEXT_ID": self.parent["id"]}), \
+                patch.object(library, "sync_context", side_effect=RuntimeError("capture failed")):
+            with self.assertRaisesRegex(RuntimeError, "capture failed"):
+                chat_move.move(self.sid, self.sibling["id"])
+        self.assertEqual(library.native_rows(library.database_path())[self.sid]["owner"], self.child["id"])
+
+    def test_move_cli_to_different_workdir_restores_only_in_destination(self):
+        target_work = self.base / "destination-work"
+        target_work.mkdir()
+        library.ctl.set_working_directory(self.sibling["id"], str(target_work))
+        response = subprocess.run([sys.executable, "-B", library.__file__, "move", "--session", self.sid,
+                                   "--target", self.sibling["id"]], env=dict(os.environ, CONTEXT_ID=self.parent["id"]),
+                                  text=True, capture_output=True, check=True)
+        moved = json.loads(response.stdout)
+        with patch.dict(os.environ, {"CONTEXT_ID": self.parent["id"]}):
+            summaries = library.list_summaries()["conversations"]
+            self.assertTrue(any(item["owner"] == self.sibling["id"] and item["chat"] == moved["chat"]
+                                and not item["deleted"] for item in summaries))
+            ready = library.ensure_conversation(self.sibling["id"], moved["chat"])
+            self.assertEqual(ready["session_id"], self.sid)
+            scope = ctl.read_json(library.scope_path(self.parent, library.database_path()))
+            self.assertIn(self.sibling["id"], scope["ids"])
+        self.environment("after-move-device")
+        with patch.dict(os.environ, {"CONTEXT_ID": self.sibling["id"]}):
+            restored = library.ensure_conversation(self.sibling["id"], moved["chat"])
+        exported = library.chats._export(restored["session_id"], str(target_work))
+        self.assertEqual(exported["info"]["metadata"]["desktop_context"]["id"], self.sibling["id"])
+        with patch.dict(os.environ, {"CONTEXT_ID": self.child["id"]}):
+            with self.assertRaisesRegex(ValueError, "deleted"):
+                library.ensure_conversation(self.child["id"], self.sid)
 
     def test_all_owned_chats_saved_without_open_panes_and_parent_only_references(self):
         second = {"info": dict(self.fixture["info"], id="ses_otherconversation", title="Second"), "messages": []}

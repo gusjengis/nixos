@@ -1,0 +1,58 @@
+diff --git a/components/renderer_context_menu/views/toolkit_delegate_views.cc b/components/renderer_context_menu/views/toolkit_delegate_views.cc
+--- a/components/renderer_context_menu/views/toolkit_delegate_views.cc
++++ b/components/renderer_context_menu/views/toolkit_delegate_views.cc
+@@ -8,5 +8,6 @@
+ #include <utility>
+ 
++#include "build/build_config.h"
+ #include "ui/base/mojom/menu_source_type.mojom.h"
+ #include "ui/gfx/geometry/rect.h"
+ #include "ui/gfx/image/image.h"
+@@ -34,6 +35,16 @@ void ToolkitDelegateViews::RunMenuAt(views::Widget* parent,
+ }
+ 
+ void ToolkitDelegateViews::Init(ui::SimpleMenuModel* menu_model) {
++#if BUILDFLAG(IS_LINUX)
++  // The prebuilt MenuItemView constructor bypasses the platform menu-model
++  // factory. Use the same factory as browser-chrome context menus so the
++  // Quickshell runner receives page, link, image and editable-content menus.
++  // Website-drawn DOM menus do not reach this delegate.
++  menu_runner_ = std::make_unique<views::MenuRunner>(
++      menu_model,
++      views::MenuRunner::HAS_MNEMONICS | views::MenuRunner::CONTEXT_MENU);
++  return;
++#endif
+   menu_adapter_ = std::make_unique<views::MenuModelAdapter>(menu_model);
+   std::unique_ptr<views::MenuItemView> menu_view = menu_adapter_->CreateMenu();
+   menu_view_ = menu_view.get();
+@@ -50,5 +61,9 @@ void ToolkitDelegateViews::Cancel() {
+ }
+ 
+ void ToolkitDelegateViews::RebuildMenu() {
+-  menu_adapter_->BuildMenu(menu_view_);
++  // Model-backed runners snapshot the current model when shown. They do not
++  // own the legacy delegate's MenuItemView.
++  if (menu_view_) {
++    menu_adapter_->BuildMenu(menu_view_);
++  }
+ }
+diff --git a/chrome/browser/ui/views/renderer_context_menu/render_view_context_menu_views.cc b/chrome/browser/ui/views/renderer_context_menu/render_view_context_menu_views.cc
+--- a/chrome/browser/ui/views/renderer_context_menu/render_view_context_menu_views.cc
++++ b/chrome/browser/ui/views/renderer_context_menu/render_view_context_menu_views.cc
+@@ -414,9 +414,13 @@ void RenderViewContextMenuViews::Show() {
+   base::CurrentThread::ScopedAllowApplicationTasksInNativeNestedLoop allow;
+   RunMenuAt(top_level_widget, screen_point, params().source_type);
+ 
+-  auto* submenu_view = static_cast<ToolkitDelegateViews*>(toolkit_delegate())
+-                           ->menu_view()
+-                           ->GetSubmenu();
++  // External model-backed menus have no Views menu host to observe.
++  auto* menu_view = static_cast<ToolkitDelegateViews*>(toolkit_delegate())
++                        ->menu_view();
++  if (!menu_view) {
++    return;
++  }
++  auto* submenu_view = menu_view->GetSubmenu();
+   if (submenu_view) {
+     for (auto& observer : observers_) {
+       if (submenu_view->host()) {

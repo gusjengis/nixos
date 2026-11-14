@@ -17,7 +17,7 @@ Rectangle {
     implicitWidth: 30
     implicitHeight: Theme.barItemHeight
     radius: height / 2
-    color: popup.visible ? Theme.barHoverFill : "transparent"
+    color: popup.visible || mouse.containsMouse ? "#17ffffff" : "transparent"
 
     Image {
         id: aiIcon
@@ -32,7 +32,7 @@ Rectangle {
         layer.enabled: true
         layer.effect: MultiEffect {
             colorization: 1
-            colorizationColor: Theme.barText
+            colorizationColor: "#ffffff"
         }
     }
 

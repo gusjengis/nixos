@@ -20,9 +20,19 @@ ShellRoot {
         openLauncher: () => Quickshell.execDetached(["vicinae", "toggle"])
     }
 
+    ExternalContextMenus {}
+
     LazyLoader {
         active: DesktopFeatures.contexts
         source: "DesktopContexts.qml"
+    }
+
+    Variants {
+        model: DesktopFeatures.contexts ? Quickshell.screens : []
+
+        delegate: Component {
+            Dock {}
+        }
     }
 
     IpcHandler {

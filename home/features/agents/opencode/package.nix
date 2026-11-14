@@ -7,8 +7,8 @@ let
   native = inputs.opencode.packages.${pkgs.stdenv.hostPlatform.system}.default.overrideAttrs (old: {
     patches = (old.patches or [ ]) ++ [
       ./context-sessions.patch
-      ./context-freshness.patch
-      ./context-stale.patch
+      ./todo-title.patch
+      ./model-carry.patch
     ];
     postPatch = (old.postPatch or "") + ''
       cp ${./context-sessions.ts} packages/opencode/src/session/context-sessions.ts
@@ -18,7 +18,13 @@ let
       cp ${./history-controller.mjs} packages/tui/src/util/history-controller.mjs
       cp ${./history-client.mjs} packages/tui/src/util/history-client.mjs
       cp ${./desktop-history.tsx} packages/tui/src/component/desktop-history.tsx
-      cp ${./context-stale-host.tsx} packages/tui/src/context/desktop-stale.tsx
+      cp ${./test-todo-title.ts} packages/opencode/test/tool/todo-title.test.ts
+    '';
+    doCheck = true;
+    checkPhase = ''
+      runHook preCheck
+      (cd "$NIX_BUILD_TOP/source/packages/opencode" && bun test test/tool/todo-title.test.ts)
+      runHook postCheck
     '';
   });
   launcher = pkgs.writeShellApplication {

@@ -1,0 +1,21 @@
+diff --git a/src/ui/mod.rs b/src/ui/mod.rs
+--- a/src/ui/mod.rs
++++ b/src/ui/mod.rs
+@@ -61,5 +61,6 @@ mod top_bar_navigation;
+ mod udiskie_preferences;
+ mod virtual_preview;
++mod wallpaper_tint;
+ mod window;
+ 
+ #[cfg(feature = "qa")]
+diff --git a/src/ui/theme.rs b/src/ui/theme.rs
+--- a/src/ui/theme.rs
++++ b/src/ui/theme.rs
+@@ -343,6 +343,7 @@ impl ThemeManager {
+             .user_provider
+             .load_from_string(&read_user_stylesheet());
+         manager.monitor_user_stylesheet();
++        super::wallpaper_tint::install();
+         manager
+     }
+ 

@@ -21,7 +21,7 @@ ShellRoot {
             state.snapshot = {
                 active: "s1", previous: "s2",
                 sessions: [
-                    { id: "s1", name: "Working", window_count: 2 },
+                    { id: "s1", name: "Working", window_count: 2, windows: ["0xone", "0xtwo"] },
                     { id: "s2", name: "Runtime only", window_count: 0 }
                 ]
             };
@@ -34,6 +34,18 @@ ShellRoot {
             check(picker.results.length === 2, "Switcher must show both live sessions");
             check(picker.results.every(item => item.runtime_id === item.id), "Switcher must use runtime IDs");
             check(!picker.results.some(item => item.name === "Saved only"), "Saved-only context leaked into switcher");
+            function findGallery(item) {
+                if (item.objectName === "session-gallery") return item;
+                for (const child of item.children || []) {
+                    const result = findGallery(child);
+                    if (result) return result;
+                }
+                return null;
+            }
+            const gallery = findGallery(picker.contentItem);
+            check(gallery && gallery.currentItem, "Gallery creates session cards");
+            check(Array.isArray(gallery.currentItem.session.windows), "Card ownership must retain JS arrays, not GridView QVariant wrappers");
+            check(gallery.currentItem.session.windows[0] === "0xone", "Card receives exact owned window IDs");
             picker.submit(true);
             check(state.pendingAction === "", "Switcher must not create contexts");
 

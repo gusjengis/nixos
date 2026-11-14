@@ -5,6 +5,8 @@ import base64
 import fcntl
 import json
 import os
+import sqlite3
+import subprocess
 import sys
 import tempfile
 import time
@@ -12,7 +14,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from pathlib import Path
 
 
@@ -35,6 +37,37 @@ def data_home(home):
 
 def auth_path(home):
     return data_home(home) / "opencode" / "auth.json"
+
+
+def v2_database_path(home):
+    return data_home(home) / "opencode-v2" / "opencode.db"
+
+
+def v2_profile(home):
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "contexts"))
+    import opencode_backend
+    return opencode_backend.profile(home=home)
+
+
+def using_v2(home):
+    return v2_database_path(home).is_file() and bool(v2_profile(home))
+
+
+def v2_bridge(command, *args):
+    try:
+        selected = v2_profile(Path.home())
+        environment = dict(os.environ, OPENCODE_CONTEXT_HELPER="1")
+        environment.update(selected.get("environment", {}))
+        if selected:
+            environment["OPENCODE_DB"] = selected["database"]
+        result = subprocess.run([os.environ.get("OPENCODE_V2_COMMAND") or selected.get("binary", "opencode"), "auth", command, *args, "--standalone"],
+                                stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=TIMEOUT,
+                                env=environment)
+        if result.returncode:
+            raise AccountError("OpenCode account operation failed")
+        return json.loads(result.stdout)
+    except (OSError, subprocess.SubprocessError, ValueError) as error:
+        raise AccountError("OpenCode account operation failed") from error
 
 
 def profile_path(home, profile):
@@ -69,7 +102,9 @@ def write_private_json(path, value):
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = None
     try:
-        with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=path.parent, delete=False) as file:
+        with tempfile.NamedTemporaryFile(
+            "w", encoding="utf-8", dir=path.parent, delete=False
+        ) as file:
             temporary = Path(file.name)
             json.dump(value, file, separators=(",", ":"))
             file.flush()
@@ -132,8 +167,16 @@ def normalize_claude(data):
         "name": "Anthropic",
         "available": True,
         "windows": [
-            window("5h", data.get("five_hour", {}).get("utilization"), data.get("five_hour", {}).get("resets_at")),
-            window("7d", data.get("seven_day", {}).get("utilization"), data.get("seven_day", {}).get("resets_at")),
+            window(
+                "5h",
+                data.get("five_hour", {}).get("utilization"),
+                data.get("five_hour", {}).get("resets_at"),
+            ),
+            window(
+                "7d",
+                data.get("seven_day", {}).get("utilization"),
+                data.get("seven_day", {}).get("resets_at"),
+            ),
         ],
     }
 
@@ -199,7 +242,9 @@ def validate_openai_auth(auth):
             raise AccountError("current OpenAI login is incomplete")
     # Not a truthiness check: an already-expired credential is still valid input,
     # because the refresh token is what actually recovers it.
-    if not isinstance(auth.get("expires"), (int, float)) or isinstance(auth.get("expires"), bool):
+    if not isinstance(auth.get("expires"), (int, float)) or isinstance(
+        auth.get("expires"), bool
+    ):
         raise AccountError("current OpenAI login is incomplete")
     return auth
 
@@ -212,7 +257,9 @@ def account_id_from_token(token):
     try:
         part = token.split(".")[1]
         claims = json.loads(base64.urlsafe_b64decode(part + "=" * (-len(part) % 4)))
-        return (claims.get("https://api.openai.com/auth") or {}).get("chatgpt_account_id")
+        return (claims.get("https://api.openai.com/auth") or {}).get(
+            "chatgpt_account_id"
+        )
     except (IndexError, TypeError, ValueError):
         return None
 
@@ -220,11 +267,13 @@ def account_id_from_token(token):
 def refresh_openai_auth(auth):
     if auth["expires"] > int(time.time() * 1000) + 60_000:
         return auth
-    payload = urllib.parse.urlencode({
-        "grant_type": "refresh_token",
-        "refresh_token": auth["refresh"],
-        "client_id": OPENAI_CLIENT_ID,
-    }).encode()
+    payload = urllib.parse.urlencode(
+        {
+            "grant_type": "refresh_token",
+            "refresh_token": auth["refresh"],
+            "client_id": OPENAI_CLIENT_ID,
+        }
+    ).encode()
     try:
         tokens = request_json(
             "https://auth.openai.com/oauth/token",
@@ -237,7 +286,10 @@ def refresh_openai_auth(auth):
         if error.code in (400, 401, 403):
             raise ReauthRequired("saved login expired") from error
         raise
-    account_id = account_id_from_token(tokens.get("id_token") or tokens["access_token"]) or auth["accountId"]
+    account_id = (
+        account_id_from_token(tokens.get("id_token") or tokens["access_token"])
+        or auth["accountId"]
+    )
     if account_id != auth["accountId"]:
         raise AccountError("refreshed login changed workspace")
     return {
@@ -250,6 +302,20 @@ def refresh_openai_auth(auth):
 
 
 def current_openai_auth(home):
+    database = v2_database_path(home)
+    if using_v2(home):
+        try:
+            with closing(sqlite3.connect(database.as_uri() + "?mode=ro", uri=True, timeout=0.1)) as db:
+                row = db.execute("SELECT value FROM credential WHERE integration_id='openai' "
+                                 "ORDER BY active DESC,time_created DESC,id DESC LIMIT 1").fetchone()
+            if not row:
+                raise AccountError("OpenAI is not connected in OpenCode V2")
+            native = json.loads(row[0])
+            auth = {key: native.get(key) for key in ("type", "access", "refresh", "expires")}
+            auth["accountId"] = (native.get("metadata") or {}).get("accountID")
+            return validate_openai_auth(auth)
+        except sqlite3.Error as error:
+            raise AccountError("OpenCode V2 credentials unavailable") from error
     return validate_openai_auth(read_json(auth_path(home))["openai"])
 
 
@@ -273,11 +339,14 @@ def account_status(home):
 
 
 def store_profile(home, profile, auth):
-    write_private_json(profile_path(home, profile), {
-        "id": profile,
-        "label": OPENAI_PROFILES[profile],
-        "auth": auth,
-    })
+    write_private_json(
+        profile_path(home, profile),
+        {
+            "id": profile,
+            "label": OPENAI_PROFILES[profile],
+            "auth": auth,
+        },
+    )
 
 
 def sync_current_profile(home):
@@ -321,8 +390,10 @@ def activate_profile(home, profile):
     sync_current_profile(home)
     selected = refresh_openai_auth(read_profile(home, profile))
     store_profile(home, profile, selected)
+    if using_v2(home):
+        v2_bridge("bridge-select", profile)
     path = auth_path(home)
-    all_auth = read_json(path)
+    all_auth = read_json(path) if path.is_file() or not using_v2(home) else {}
     all_auth["openai"] = selected
     write_private_json(path, all_auth)
 
@@ -340,7 +411,12 @@ def fetch_claude(home, cached):
         )
         return fresh(normalize_claude(data))
     except (KeyError, OSError, ValueError, urllib.error.URLError) as error:
-        return unavailable("Anthropic", error, cached, identity={"id": "anthropic", "name": "Anthropic"})
+        return unavailable(
+            "Anthropic",
+            error,
+            cached,
+            identity={"id": "anthropic", "name": "Anthropic"},
+        )
 
 
 def unsaved_profile(profile, reason):
@@ -355,10 +431,17 @@ def unsaved_profile(profile, reason):
 def fetch_openai_profile(home, profile, active, cached):
     identity = openai_identity(profile, True, active)
     try:
-        auth = refresh_openai_auth(read_profile(home, profile))
+        saved = read_profile(home, profile)
+        if active and using_v2(home) and saved["expires"] <= int(time.time() * 1000) + 60_000:
+            auth = validate_openai_auth(v2_bridge("bridge-current"))
+            if auth["accountId"] != saved["accountId"]:
+                raise AccountError("active workspace changed while refreshing")
+        else:
+            auth = refresh_openai_auth(saved)
         store_profile(home, profile, auth)
         if active:
-            all_auth = read_json(auth_path(home))
+            path = auth_path(home)
+            all_auth = read_json(path) if path.is_file() or not using_v2(home) else {}
             if all_auth.get("openai", {}).get("accountId") == auth["accountId"]:
                 all_auth["openai"] = auth
                 write_private_json(auth_path(home), all_auth)
@@ -382,7 +465,13 @@ def fetch_openai_profile(home, profile, active, cached):
         if error.code in (401, 403):
             return unsaved_profile(profile, "saved login rejected")
         return unavailable(identity["name"], error, cached, identity=identity)
-    except (KeyError, OSError, ValueError, AccountError, urllib.error.URLError) as error:
+    except (
+        KeyError,
+        OSError,
+        ValueError,
+        AccountError,
+        urllib.error.URLError,
+    ) as error:
         return unavailable(identity["name"], error, cached, identity=identity)
 
 
@@ -407,9 +496,15 @@ def account_command(args):
     if args == ["status"]:
         with account_lock(home):
             return account_status(home)
-    if not (len(args) == 2 and args[0] in ("save", "select") or
-            len(args) == 3 and args[0] == "select"):
-        raise AccountError("usage: quickshell-ai-account status | <save|select> <personal|business> [expected-active]")
+    if not (
+        len(args) == 2
+        and args[0] in ("save", "select")
+        or len(args) == 3
+        and args[0] == "select"
+    ):
+        raise AccountError(
+            "usage: quickshell-ai-account status | <save|select> <personal|business> [expected-active]"
+        )
     action, profile = args[:2]
     with account_lock(home):
         # Router selections are conditional; do not undo a switch made by
@@ -420,15 +515,28 @@ def account_command(args):
             save_profile(home, profile)
         else:
             activate_profile(home, profile)
-        return {**account_status(home), "profile": profile, "action": action, "switched": action == "select"}
+        return {
+            **account_status(home),
+            "profile": profile,
+            "action": action,
+            "switched": action == "select",
+        }
 
 
 def main():
     if len(sys.argv) > 1 and sys.argv[1] == "account":
         try:
             result = account_command(sys.argv[2:])
-        except (KeyError, OSError, ValueError, AccountError, urllib.error.URLError) as error:
-            json.dump({"ok": False, "error": str(error)}, sys.stdout, separators=(",", ":"))
+        except (
+            KeyError,
+            OSError,
+            ValueError,
+            AccountError,
+            urllib.error.URLError,
+        ) as error:
+            json.dump(
+                {"ok": False, "error": str(error)}, sys.stdout, separators=(",", ":")
+            )
             sys.stdout.write("\n")
             return 1
     else:

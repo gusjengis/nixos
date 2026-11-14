@@ -102,3 +102,4 @@ application/vnd.step=f3d-plugin-occt.desktop;
 application/vnd.brep=f3d-plugin-occt.desktop;
 model/vnd.usda=f3d-plugin-usd.desktop;
 model/vnd.usdz+zip=f3d-plugin-usd.desktop;
+x-scheme-handler/discord=vesktop.desktop

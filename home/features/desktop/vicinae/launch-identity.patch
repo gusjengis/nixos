@@ -1,0 +1,64 @@
+diff --git a/src/server/src/services/app-service/xdg/xdg-app-database.cpp b/src/server/src/services/app-service/xdg/xdg-app-database.cpp
+index d5fe1bc..d6f26cb 100644
+--- a/src/server/src/services/app-service/xdg/xdg-app-database.cpp
++++ b/src/server/src/services/app-service/xdg/xdg-app-database.cpp
+@@ -29,6 +29,7 @@
+ #include <qurl.h>
+ #include <set>
+ #include <QDir>
++#include <QScopeGuard>
+ #include <unordered_set>
+ #include <xdgpp/env/env.hpp>
+ #include <xdgpp/mime/mime-apps-list.hpp>
+@@ -498,6 +499,10 @@ bool XdgAppDatabase::launchTerminalCommand(const std::vector<QString> &cmdline,
+   return launchProcess(exec.front(), argv, xdgApp->data().workingDirectory(), opts.appId.value_or(QString()));
+ }
+ 
++// Desktop file of the entry being launched. GLib exports the same variable,
++// letting the shell identify windows whose class does not name their entry.
++static thread_local QString launchingDesktopFile;
++
+ bool XdgAppDatabase::launchProcess(const QString &prog, const QStringList &args,
+                                    const std::optional<std::filesystem::path> &workingDirectory,
+                                    const QString &appId) const {
+@@ -512,7 +517,10 @@ bool XdgAppDatabase::launchProcess(const QString &prog, const QStringList &args,
+       return "'" + value + "'";
+     };
+     QString command = "cd -- " + shellQuote(workingDirectory
+-        ? QString::fromStdString(workingDirectory->string()) : QDir::homePath()) + " && exec ";
++        ? QString::fromStdString(workingDirectory->string()) : QDir::homePath()) + " && ";
++    if (!launchingDesktopFile.isEmpty())
++      command += "export GIO_LAUNCHED_DESKTOP_FILE=" + shellQuote(launchingDesktopFile) + " && ";
++    command += "exec ";
+     for (const auto &arg : cmdline) {
+       command += shellQuote(arg) + " ";
+     }
+@@ -541,14 +549,16 @@ bool XdgAppDatabase::launchProcess(const QString &prog, const QStringList &args,
+ 
+   if (workingDirectory) { process.setWorkingDirectory(workingDirectory->c_str()); }
+ 
++  auto env = QProcessEnvironment::systemEnvironment();
++  if (launchingDesktopFile.isEmpty()) env.remove("GIO_LAUNCHED_DESKTOP_FILE");
++  else env.insert("GIO_LAUNCHED_DESKTOP_FILE", launchingDesktopFile);
+   if (auto token = Wayland::XdgActivation::requestLaunchToken(appId)) {
+     qDebug() << "Successfully minted xdg activation token for app" << appId;
+-    auto env = QProcessEnvironment::systemEnvironment();
+     env.insert("XDG_ACTIVATION_TOKEN", *token);
+-    process.setProcessEnvironment(env);
+   } else {
+     qWarning() << "Unable to mint xdg activation token to launch" << appId;
+   }
++  process.setProcessEnvironment(env);
+ 
+   QStringList cmdline;
+   cmdline << prog << args;
+@@ -565,6 +575,9 @@ bool XdgAppDatabase::launchProcess(const QString &prog, const QStringList &args,
+ bool XdgAppDatabase::launch(const AbstractApplication &app, const std::vector<QString> &args) const {
+   auto &xdgApp =
+       static_cast<const XdgApplication &>(app); // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
++  const auto previousDesktopFile = launchingDesktopFile;
++  launchingDesktopFile = QString::fromStdString(xdgApp.path().string());
++  const auto restoreDesktopFile = qScopeGuard([&] { launchingDesktopFile = previousDesktopFile; });
+ 
+   if (auto url = xdgApp.data().url().transform(QString::fromStdString)) {
+     auto opener = findDefaultOpener(*url);

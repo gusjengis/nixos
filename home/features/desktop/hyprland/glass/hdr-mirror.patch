@@ -1,0 +1,65 @@
+diff --git a/src/Shaders.hpp b/src/Shaders.hpp
+--- a/src/Shaders.hpp
++++ b/src/Shaders.hpp
+@@ -573,3 +573,13 @@
+ layout(location = 0) out vec4 fragColor;
++layout(location = 1) out vec4 mirrorColor;
++
++// Hyprland's HDR mirror attachment is SDR sRGB, before monitor SDR boosts.
++vec4 captureColor(vec4 c) {
++    if (workLinear == 0 || c.a <= 0.0) return c;
++    vec3 l = max((c.rgb / c.a - workBlack) / max(workWhite - workBlack, 1e-6), vec3(0.0));
++    vec3 s = mix(1.055 * pow(l, vec3(1.0 / 2.4)) - 0.055,
++                 l * 12.92, lessThanEqual(l, vec3(0.0031308)));
++    return vec4(s * c.a, c.a);
++}
+ 
+ float srgbEnc(float v) {
+@@ -792,3 +803,4 @@
+     fragColor = vec4(outRGB, outA) * opacity;
++    mirrorColor = captureColor(fragColor);
+ }
+ )GLSL"},
+@@ -858,3 +869,13 @@
+ layout(location = 0) out vec4 fragColor;
++layout(location = 1) out vec4 mirrorColor;
++
++// Match the compositor's unmodified SDR screenshare attachment.
++vec4 captureColor(vec4 c) {
++    if (workLinear == 0 || c.a <= 0.0) return c;
++    vec3 l = max((c.rgb / c.a - workBlack) / max(workWhite - workBlack, 1e-6), vec3(0.0));
++    vec3 s = mix(1.055 * pow(l, vec3(1.0 / 2.4)) - 0.055,
++                 l * 12.92, lessThanEqual(l, vec3(0.0031308)));
++    return vec4(s * c.a, c.a);
++}
+ 
+ vec3 toSrgb(vec3 c) {
+@@ -887,7 +910,9 @@
+             fragColor = vec4(o, bg.a) * opacity;
++            mirrorColor = captureColor(fragColor);
+             return;
+         }
+     }
+     fragColor = surf * opacity;
++    mirrorColor = captureColor(fragColor);
+ }
+ )GLSL"},
+@@ -988,3 +1011,13 @@
+ layout(location = 0) out vec4 fragColor;
++layout(location = 1) out vec4 mirrorColor;
++
++// Attachment 0 is the HDR work buffer; attachment 1 is SDR sRGB capture.
++vec4 captureColor(vec4 c) {
++    if (workLinear == 0 || c.a <= 0.0) return c;
++    vec3 l = max((c.rgb / c.a - workBlack) / max(workWhite - workBlack, 1e-6), vec3(0.0));
++    vec3 s = mix(1.055 * pow(l, vec3(1.0 / 2.4)) - 0.055,
++                 l * 12.92, lessThanEqual(l, vec3(0.0031308)));
++    return vec4(s * c.a, c.a);
++}
+ 
+ vec3 fromSrgb(vec3 c) {
+@@ -1294,3 +1330,4 @@
+     fragColor = o * opacity;
++    mirrorColor = captureColor(fragColor);
+ }
+ )GLSL"},

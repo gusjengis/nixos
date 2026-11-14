@@ -1,0 +1,95 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "openai/gpt-6.1-sol",
+  "plugins": [
+    "{env:OPENCODE_V2_AUTH}",
+    "{env:OPENCODE_V2_POLICY}",
+    "{env:OPENCODE_V2_NOTIFY}",
+    "{env:OPENCODE_V2_ROOT}/plugins/context-library",
+    "{env:OPENCODE_V2_ROOT}/plugins/notebook",
+    "{env:OPENCODE_V2_ROOT}/plugins/tmux-status",
+    "{env:OPENCODE_V2_ROOT}/plugins/accounts",
+    {
+      "package": "{env:OPENCODE_V2_ROOT}/plugins/model-filter",
+      "options": {
+        "provider": "nvidia",
+        "models": [
+          "deepseek-ai/deepseek-v4.1-flash",
+          "google/gemma-4-31b-it",
+          "meta/llama-3.2-11b-vision-instruct",
+          "meta/llama-3.2-90b-vision-instruct",
+          "meta/muse-glimmer-30b",
+          "mistralai/mistral-nemotron",
+          "moonshotai/kimi-k3",
+          "nvidia/cosmos-reason2-8b",
+          "nvidia/llama-3.1-nemotron-70b-instruct",
+          "nvidia/llama-3.1-nemotron-ultra-253b-v1",
+          "nvidia/nemotron-3-ultra-550b-a55b",
+          "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "nvidia/nemotron-3-super-120b-a12b",
+          "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
+          "openai/gpt-oss-20b",
+          "poolside/laguna-xs-2.1",
+          "z-ai/glm-5.3",
+          "z-ai/glm-5.3-flash"
+        ]
+      }
+    }
+  ],
+  "agent": {
+    "build": { "color": "secondary" },
+    "plan": { "color": "warning" },
+    "explore": { "color": "accent" },
+    "general": { "color": "success" },
+    "title": { "model": "openai/gpt-6-luna-fast" }
+  },
+  "permissions": [
+    { "action": "read", "resource": "*", "effect": "allow" },
+    { "action": "glob", "resource": "*", "effect": "allow" },
+    { "action": "external_directory", "resource": "/**", "effect": "allow" },
+    { "action": "external_directory", "resource": "~/**", "effect": "allow" }
+  ],
+  "skills": ["{env:OPENCODE_V1_SKILLS}"],
+  "instructions": ["{env:OPENCODE_V1_RULES}"],
+  "experimental": { "todo": true },
+  "mcp": {
+    "servers": {
+      "supernote": { "type": "local", "command": ["supernote-mirror-mcp"], "disabled": false, "codemode": false }
+    }
+  },
+  "providers": {
+    "nvidia": {
+      "name": "NVIDIA Free",
+      "settings": { "apiKey": "{file:~/.config/secrets/api_keys/nvidia}" },
+      "models": {
+        "deepseek-ai/deepseek-v4.1-flash": {
+          "name": "DeepSeek V4.1 Flash",
+          "capabilities": { "tools": true, "input": ["text", "image"], "output": ["text"], "reasoning": { "supported": true } },
+          "limit": { "context": 1048576, "output": 262144 }
+        }
+      }
+    },
+    "ollama-omega": {
+      "name": "Ollama (omega)",
+      "package": "@opencode/ai/providers/openai-compatible",
+      "settings": { "baseURL": "http://omega.tail29bd65.ts.net:11434/v1" },
+      "models": {
+        "qwen3.8:27b": {
+          "name": "Qwen3.8 27B (omega)",
+          "capabilities": { "tools": true, "input": ["text", "image"], "output": ["text"] },
+          "limit": { "context": 65536, "output": 65536 }
+        },
+        "phi4-mini": { "name": "Phi4 Mini (omega)", "limit": { "context": 32768, "output": 8192 } }
+      }
+    },
+    "lmstudio": {
+      "name": "LM Studio (local)",
+      "package": "@opencode/ai/providers/openai-compatible",
+      "settings": { "baseURL": "http://127.0.0.1:1234/v1" },
+      "models": {
+        "google/gemma-4-26b-a4b": { "name": "Gemma 4 26b" },
+        "qwen/qwen3-coder-next": { "name": "Qwen3 Coder Next 6b" }
+      }
+    }
+  }
+}

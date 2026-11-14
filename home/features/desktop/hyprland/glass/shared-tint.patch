@@ -1,0 +1,124 @@
+diff --git a/src/AppleGlass.cpp b/src/AppleGlass.cpp
+--- a/src/AppleGlass.cpp
++++ b/src/AppleGlass.cpp
+@@ -336,6 +336,12 @@
+ std::vector<UP<IPassElement>> CPassElement::draw() {
+-    if (m_data.state && m_data.params)
+-        m_data.state->draw(m_data.monitor.lock(), *m_data.params, m_data.glassBox, m_data.radii, m_data.windowBox, m_data.windowRadius,
++    if (m_data.state && m_data.params) {
++        const auto& config = g_pGlobalState->config;
++        const float tint = config.macTint ? static_cast<float>(**config.macTint) : 1.0f;
++        // Own the resolved parameters through draw; never retain a stack pointer
++        // in the render pass. Layer surfaces use the same resolver.
++        const auto params = paramsForTint(m_data.presetName, tint);
++        m_data.state->draw(m_data.monitor.lock(), params, m_data.glassBox, m_data.radii, m_data.windowBox, m_data.windowRadius,
+                            m_data.alpha, m_data.resample);
++    }
+     return {};
+ }
+@@ -360,10 +366,15 @@
+     const float high = std::max(2.0f * t - 1.0f, 0.0f);
+-    if (name == "apple-dock" || name == "apple-widgets") {
+-        p.blurRadius = name == "apple-dock" ? 1.2f * low : 0.2f + 0.2f * low;
++    if (name == "apple-dock" || name == "apple-widgets" || name == "apple-control-center") {
++        // ControlCenter's diffusion sweep: radius 0..4 at scale .5,
++        // then normal blur-fill 0..1 above diffusion .5. Face tone is fixed.
++        // Keep each preset's extracted full-tint radius, not the Dock radius.
++        p.blurRadius = name == "apple-widgets" ? 0.2f + 0.2f * low : base->blurRadius * low;
++        if (name == "apple-control-center" && t == 0.0f)
++            p.blurAlpha = {0, 0, 0, 0};
+         // Enabling the fill at zero weight is equivalent to Apple's disabled path.
+         p.fillEnabled = true;
+         p.fillNormal = high;
+-    } else if (name == "apple-menu") {
++    } else if (name == "apple-menu" || name == "apple-notification" || name == "apple-toolbar") {
+         // Apple half-precision uniform rows at diffusion .5/.625/.75/.875/1.
+         // Below .5 these rows are constant; blur-fill and luma compression still vary.
+         static constexpr std::array<ColorMatrix, 5> rows = {{
+@@ -382,6 +393,23 @@
+         p.fillNormal = t;
+         p.fillDarken = std::lerp(0.6748f, 0.8999f, low);
+-        p.lumaComplement = std::lerp(0.55f, 0.65f, low);
++        // Notification/toolbar holding tone is .4 at every diffusion value.
++        if (name == "apple-menu")
++            p.lumaComplement = std::lerp(0.55f, 0.65f, low);
++    } else if (name == "apple-toolbar-inactive") {
++        // Same regular diffusion recipe, with Finder's inactive black=.08.
++        // The fill is gray .125*high with alpha .5*high. Preserve the captured
++        // half-precision full-tint matrix exactly at t=1.
++        for (int r = 0; r < 3; ++r) {
++            for (int c = 0; c < 3; ++c)
++                p.faceCm[r][c] *= 2.0f - high;
++            p.faceCm[r][3] += 0.08f * (1.0f - 0.5f * high) + 0.0625f * high * high - 0.1025f;
++        }
++        p.fillNormal = t;
++        p.fillDarken = std::lerp(0.6748f, 0.8999f, low);
++    } else if (name == "apple-sidebar") {
++        // Sidebar retains its own face/bleed matrices and a minimum .25 fill.
++        p.fillNormal = 0.25f + 0.25f * low + 0.5f * high;
++        p.fillDarken = std::lerp(0.6748f, base->fillDarken, low);
+     }
+     return p;
+ }
+diff --git a/src/AppleGlass.hpp b/src/AppleGlass.hpp
+--- a/src/AppleGlass.hpp
++++ b/src/AppleGlass.hpp
+@@ -158,4 +158,5 @@
+     struct SData {
+         std::shared_ptr<CState> state;
+         const SParams*          params = nullptr;
++        std::string             presetName;
+         PHLMONITORREF           monitor;
+diff --git a/src/main.cpp b/src/main.cpp
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -604,4 +604,5 @@
+             AppleGlass::CPassElement::SData glass{
+                 .state         = AppleGlass::stateFor(WP<CWLSurfaceResource>(data.surface), hints->slot),
+                 .params        = params,
++                .presetName    = hints->preset,
+                 .monitor       = data.pMonitor,
+diff --git a/src/GlassRenderer.cpp b/src/GlassRenderer.cpp
+--- a/src/GlassRenderer.cpp
++++ b/src/GlassRenderer.cpp
+@@ -701,11 +701,21 @@
+     auto tp = draw.controlProfile ? MacGlass::paramsForControl(draw.tint) : MacGlass::paramsForTint(draw.tint);
+     const auto& material = draw.material;
+-    if (material.lutSet)
++    const auto full = draw.controlProfile ? MacGlass::paramsForControl(1.0f) : MacGlass::paramsForTint(1.0f);
++    if (material.lutSet) {
++        // Custom materials describe their full-tint endpoint, not a tint lock.
++        // Carry the fitted profile's measured tint delta onto that endpoint.
++        const auto delta = tp.lut;
+         tp.lut = material.lut;
++        for (size_t i = 0; i < tp.lut.size(); ++i)
++            tp.lut[i] = std::clamp(tp.lut[i] + delta[i] - full.lut[i], 0.0f, 1.0f);
++    }
+     if (material.chroma >= 0.0f)
+         tp.chroma = material.chroma;
+-    if (material.blur[0] > 0.0f)
+-        tp.blur = {material.blur[0], material.blur[1], material.blur[2]};
++    if (material.blur[0] > 0.0f) {
++        tp.blur = {material.blur[0] * tp.blur.s1 / full.blur.s1,
++                   material.blur[1] * tp.blur.s2 / full.blur.s2,
++                   std::clamp(material.blur[2] + tp.blur.w2 - full.blur.w2, 0.0f, 1.0f)};
++    }
+     if (material.refraction[0] >= 0.0f)
+         tp.refraction = {material.refraction[0], material.refraction[1], material.refraction[2]};
+     const bool rimSet = material.rim[0] >= 0.0f;
+diff --git a/src/GlassLayerSurface.cpp b/src/GlassLayerSurface.cpp
+--- a/src/GlassLayerSurface.cpp
++++ b/src/GlassLayerSurface.cpp
+@@ -355,9 +355,10 @@
+             const float tint  = currentMacTint();
+             const auto  tp    = mac->controlProfile ? MacGlass::paramsForControl(tint) : MacGlass::paramsForTint(tint);
++            const auto  full  = mac->controlProfile ? MacGlass::paramsForControl(1.0f) : MacGlass::paramsForTint(1.0f);
+             const float scale = monitor ? static_cast<float>(monitor->m_scale) : 1.0f;
+             const bool  blurSet = mac->material.blur[0] > 0.0f;
+-            const float s1    = (blurSet ? mac->material.blur[0] : tp.blur.s1) * scale;
+-            const float s2    = (blurSet ? mac->material.blur[1] : tp.blur.s2) * scale;
++            const float s1    = (blurSet ? mac->material.blur[0] * tp.blur.s1 / full.blur.s1 : tp.blur.s1) * scale;
++            const float s2    = (blurSet ? mac->material.blur[1] * tp.blur.s2 / full.blur.s2 : tp.blur.s2) * scale;
+             GlassRenderer::macBlur(m_sampleFramebuffer, s1, source, true);
+             GlassRenderer::copyFramebuffer(m_sampleFramebuffer, m_macNarrowFramebuffer, source);
+             GlassRenderer::macBlur(m_sampleFramebuffer, std::sqrt(std::max(s2 * s2 - s1 * s1, 0.0f)), source);

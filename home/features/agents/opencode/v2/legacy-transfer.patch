@@ -1,0 +1,46 @@
+--- a/packages/cli/src/commands/commands.ts
++++ b/packages/cli/src/commands/commands.ts
+@@ -452,7 +452,18 @@
+     Spec.make("session", {
+       description: "Manage sessions",
+       globalFlags: ServerFlags,
+       commands: [
++        Spec.make("convert-v1", {
++          description: "Convert a V1 session export to V2 JSON without importing it",
++          params: { file: Argument.String("file").pipe(Argument.withDescription("V1 JSON export to convert")) },
++        }),
++        Spec.make("compat-db", {
++          description: "Run context-library compatibility SQL against V2 storage",
++          params: {
++            query: Argument.String("query").pipe(Argument.withDescription("Compatibility SQL statement")),
++            format: Flag.Literals("format", ["json"]).pipe(Flag.withDefault("json")),
++          },
++        }),
+         Spec.make("list", {
+           description: "List top-level sessions in the current project, newest first",
+           params: {
+--- a/packages/cli/src/index.ts
++++ b/packages/cli/src/index.ts
+@@ -83,6 +83,8 @@
+   session: {
++    "convert-v1": () => import("./commands/handlers/session/convert-v1"),
++    "compat-db": () => import("./commands/handlers/session/compat-db"),
+     list: () => import("./commands/handlers/session/list"),
+     delete: () => import("./commands/handlers/session/delete"),
+     export: () => import("./commands/handlers/session/export"),
+     import: () => import("./commands/handlers/session/import"),
+   },
+--- a/packages/cli/src/commands/handlers/session/import.ts
++++ b/packages/cli/src/commands/handlers/session/import.ts
+@@ -1,3 +1,4 @@
+ import { OpenCode } from "@opencode/client"
++import { convertLegacyTransfer } from "../../../../../core/src/session/legacy-transfer.js"
+ import { Service } from "@opencode/client/effect/service"
+ import { Session } from "@opencode/schema/session"
+@@ -26,4 +27,5 @@
+-    const data = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Record(Schema.String, Schema.Json)))(
++    const parsed = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Record(Schema.String, Schema.Json)))(
+       text,
+     )
++    const data = yield* Effect.try(() => convertLegacyTransfer(parsed))
+     const server = yield* ServerConnection.resolve()

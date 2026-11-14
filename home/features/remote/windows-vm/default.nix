@@ -28,6 +28,7 @@ let
     ]
     ++ lib.optional (domain != "") "/d:${domain}"
     ++ lib.optional cfg.fullscreen "/f"
+    ++ lib.optional (cfg.desktopScale != null) "/scale-desktop:${toString cfg.desktopScale}"
     ++ [
       "/cert:tofu"
       "/sec:nla"
@@ -195,6 +196,11 @@ in
       default = true;
     };
     fullscreen = lib.mkEnableOption "start RDP launchers in fullscreen";
+    desktopScale = lib.mkOption {
+      type = lib.types.nullOr (lib.types.ints.between 100 500);
+      default = null;
+      description = "Windows desktop DPI scaling percentage, independent of framebuffer resolution";
+    };
     displayName = lib.mkOption {
       type = lib.types.str;
       default = "Windows 11";
@@ -286,6 +292,7 @@ in
       Comment=Connect to TrevorNomad over RDP
       Exec=${lib.getExe windowsRdp}
       Icon=windows-logo
+      StartupWMClass=xfreerdp
       Terminal=false
       Categories=Network;RemoteAccess;
     '';
@@ -298,6 +305,7 @@ in
         Comment=Start the OG Windows VM and connect over RDP
         Exec=${lib.getExe ogRdp}
         Icon=windows-logo
+        StartupWMClass=xfreerdp
         Terminal=false
         Categories=Network;RemoteAccess;
       '';

@@ -65,8 +65,8 @@ export default {
       sidebar_footer: (_ctx, props) => <Footer sessionID={props.session_id} />,
     } })
     api.lifecycle.onDispose(() => { disposed = true; stop(); history.cancel() })
-    const helper = (command) => new Promise((resolve, reject) => {
-      execFile("opencode-context-chats", [command], { timeout: 120000 }, (error, stdout, stderr) => {
+    const helper = (command, ...args: string[]) => new Promise<string>((resolve, reject) => {
+      execFile("opencode-context-chats", [command, ...args], { timeout: 120000 }, (error, stdout, stderr) => {
         if (error) reject(new Error(stderr.trim() || error.message))
         else resolve(stdout)
       })
@@ -106,11 +106,48 @@ export default {
     const confirm = (sessionID) => api.ui.dialog.replace(() => <api.ui.DialogConfirm title="Assign conversation?"
       message="Assign this unowned conversation and its subagents to the current context's portable chat library."
       onConfirm={() => { api.ui.dialog.clear(); void adopt(sessionID) }} />)
+    const move = async () => {
+      try {
+        const route = api.route.current
+        if (route.name !== "session") throw new Error("Open a conversation first.")
+        const sessionID = route.params.sessionID
+        let root = (await api.client.session.get({ sessionID }, { throwOnError: true })).data
+        while (root.parentID) root = (await api.client.session.get({ sessionID: root.parentID }, { throwOnError: true })).data
+        const marker = root.metadata?.desktop_context
+        if (!marker) throw new Error("Assign this conversation to a context before moving it.")
+        const options = JSON.parse(await helper("destinations", "--session", sessionID))
+          .filter((context) => context.id !== marker.id || context.retry)
+          .map((context) => ({ title: context.title,
+            description: context.retry ? `${context.directory} — finish interrupted move` : context.directory, value: context.id }))
+        api.ui.dialog.replace(() => <api.ui.DialogSelect title="Move session to context" options={options}
+          onSelect={(option) => api.ui.dialog.replace(() => <api.ui.DialogConfirm title={`Move to ${option.title}?`}
+            message="Move this conversation and its subagents into the destination context's portable chat library. Working directory stays the same. Open the destination context to continue there."
+            onConfirm={() => {
+              api.ui.dialog.clear()
+              void (async () => {
+                const statuses = (await api.client.session.status({}, { throwOnError: true })).data ?? {}
+                const visit = async (info) => {
+                  if ((statuses[info.id]?.type ?? "idle") !== "idle"
+                    || api.state.session.permission(info.id).length || api.state.session.question(info.id).length)
+                    throw new Error("Wait for this conversation and its subagents to finish before moving.")
+                  for (const child of (await api.client.session.children({ sessionID: info.id }, { throwOnError: true })).data ?? []) await visit(child)
+                }
+                await visit(root)
+                api.ui.toast({ message: "Moving conversation…", variant: "info" })
+                await helper("move", "--session", sessionID, "--target", option.value)
+                api.route.navigate("home")
+                await discover()
+                api.ui.toast({ message: `Conversation moved to ${option.title}. Open that context to continue.`, variant: "success" })
+              })().catch(report)
+            }} />)} />)
+      } catch (error) { report(error) }
+    }
     const remove = api.keymap.registerLayer({
       commands: [
-        { name: "context.chat.adopt", title: "Assign unowned conversation to this context", category: "Session",
+        { name: "context.chat.move", title: "Move session to context", category: "Session", namespace: "palette", run: move },
+        { name: "context.chat.adopt", title: "Assign unowned conversation to this context", category: "Session", namespace: "palette",
           run: () => confirm(api.route.current.name === "session" ? api.route.current.params.sessionID : undefined) },
-        { name: "context.chat.import", title: "Browse unowned conversations to assign to this context", category: "Session",
+        { name: "context.chat.import", title: "Browse unowned conversations to assign to this context", category: "Session", namespace: "palette",
           run: async () => {
             try {
               const sessions = JSON.parse(await helper("unowned"))
@@ -119,7 +156,7 @@ export default {
                 onSelect={(option) => confirm(option.value)} />)
             } catch (error) { report(error) }
           } },
-        { name: "context.chat.sync", title: "Sync portable context chat libraries", category: "Session",
+        { name: "context.chat.sync", title: "Sync portable context chat libraries", category: "Session", namespace: "palette",
           run: () => { void sync().catch(report) } },
       ],
     })

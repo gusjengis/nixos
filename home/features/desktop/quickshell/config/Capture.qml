@@ -23,16 +23,19 @@ PanelWindow {
     property string errorText: ""
     property string contextId: ""
     property bool savePending: false
+    readonly property int shadowPadding: Theme.glassShadowPadding
+    readonly property color statusColor: phase === "failed" ? "#ff6961"
+        : phase === "saved" ? "#30d158" : "#0a84ff"
 
     visible: false
     focusable: true
     exclusionMode: ExclusionMode.Ignore
     anchors.top: true
-    margins.top: Math.round(screen.height * 0.2)
-    implicitWidth: Math.min(560, screen.width * 0.8)
-    implicitHeight: 320
+    margins.top: Math.round(screen.height * 0.2) - shadowPadding
+    implicitWidth: Math.min(480, screen.width * 0.8) + 2 * shadowPadding
+    implicitHeight: card.height + 2 * shadowPadding
     color: "transparent"
-    mask: Region { item: card }
+    mask: Region { item: card; radius: card.radius }
     WlrLayershell.namespace: "quickshell-capture"
 
     function open() {
@@ -179,69 +182,96 @@ PanelWindow {
 
     Rectangle {
         id: card
-        width: parent.width
-        height: Math.min(parent.height, content.implicitHeight + 36)
-        radius: 22
-        color: Theme.background
-        border { width: 1; color: Qt.rgba(1, 1, 1, 0.14) }
+        x: capture.shadowPadding
+        y: capture.shadowPadding
+        width: parent.width - 2 * capture.shadowPadding
+        height: content.implicitHeight + 40
+        radius: 24
+        color: Theme.glassActive ? "transparent" : Theme.background
+        border { width: Theme.glassActive ? 0 : 1; color: "#30ffffff" }
 
         ColumnLayout {
             id: content
-            anchors { fill: parent; margins: 18 }
-            spacing: 10
+            anchors { fill: parent; margins: 20 }
+            spacing: 16
 
             RowLayout {
-                spacing: 10
+                spacing: 12
 
-                SFSymbol {
-                    id: micIcon
-                    symbol: capture.phase === "saved" ? "checkmark" : capture.phase === "failed" ? "xmark" : "mic.fill"
-                    size: 18
-                    color: capture.phase === "failed" ? Theme.danger : capture.phase === "listening" ? Theme.accent : Theme.muted
+                Rectangle {
+                    Layout.preferredWidth: 40
+                    Layout.preferredHeight: 40
+                    radius: 20
+                    color: Qt.rgba(capture.statusColor.r, capture.statusColor.g, capture.statusColor.b, 0.18)
 
-                    SequentialAnimation on opacity {
-                        running: capture.visible && capture.phase === "listening"
-                        loops: Animation.Infinite
-                        onRunningChanged: if (!running) micIcon.opacity = 1
-                        NumberAnimation { to: 0.35; duration: 700; easing.type: Easing.InOutQuad }
-                        NumberAnimation { to: 1; duration: 700; easing.type: Easing.InOutQuad }
+                    SFSymbol {
+                        id: micIcon
+                        anchors.centerIn: parent
+                        symbol: capture.phase === "saved" ? "checkmark" : capture.phase === "failed" ? "xmark" : "mic.fill"
+                        size: 18
+                        color: capture.statusColor
+
+                        SequentialAnimation on opacity {
+                            running: capture.visible && capture.phase === "listening"
+                            loops: Animation.Infinite
+                            onRunningChanged: if (!running) micIcon.opacity = 1
+                            NumberAnimation { to: 0.35; duration: 700; easing.type: Easing.InOutQuad }
+                            NumberAnimation { to: 1; duration: 700; easing.type: Easing.InOutQuad }
+                        }
                     }
                 }
 
-                Text {
+                ColumnLayout {
                     Layout.fillWidth: true
-                    text: ({
-                            "listening": "Listening…",
-                            "transcribing": "Transcribing…",
-                            "saving": "Saving…",
-                            "saved": "Saved to notebook",
-                            "failed": "Could not save"
-                        })[capture.phase]
-                    color: capture.phase === "failed" ? Theme.danger : Theme.text
-                    font { family: Theme.fontFamily; pixelSize: 16; weight: Font.DemiBold }
+                    spacing: 3
+                    Text {
+                        Layout.fillWidth: true
+                        text: ({
+                                "listening": "Listening…",
+                                "transcribing": "Transcribing…",
+                                "saving": "Saving…",
+                                "saved": "Saved to notebook",
+                                "failed": "Could not save"
+                            })[capture.phase]
+                        color: capture.phase === "failed" ? capture.statusColor : Theme.menuText
+                        font { family: Theme.fontFamily; pixelSize: 15; weight: Font.DemiBold }
+                    }
+                    Text {
+                        Layout.fillWidth: true
+                        text: capture.phase === "listening" ? "Release the dictation key when finished"
+                            : capture.phase === "transcribing" ? "Turning your voice into a note"
+                            : capture.phase === "saving" ? "Adding to your context notebook"
+                            : capture.phase === "saved" ? "Captured in your context notebook"
+                            : "Your transcript is still shown below"
+                        color: Theme.menuSecondaryText
+                        wrapMode: Text.Wrap
+                        font { family: Theme.fontFamily; pixelSize: 12 }
+                    }
                 }
+            }
 
-                Text {
-                    text: "Esc to discard"
-                    visible: capture.phase === "listening" || capture.phase === "transcribing"
-                    color: Theme.muted
-                    font { family: Theme.fontFamily; pixelSize: 12 }
-                }
+            Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: 1
+                color: Theme.menuSeparator
             }
 
             TextArea {
                 id: field
                 Layout.fillWidth: true
-                Layout.maximumHeight: 230
+                Layout.minimumHeight: 64
+                Layout.maximumHeight: 200
                 // Stays visible even while empty: a hidden item cannot hold
                 // the keyboard focus Handy pastes into.
                 wrapMode: TextEdit.Wrap
-                color: Theme.text
+                color: Theme.menuText
+                placeholderText: capture.phase === "listening" ? "Speak your thought…" : "Waiting for your transcript…"
+                placeholderTextColor: Theme.menuSecondaryText
                 selectionColor: "#0a84ff"
                 selectedTextColor: "#ffffff"
                 padding: 0
                 background: null
-                font { family: Theme.fontFamily; pixelSize: 15 }
+                font { family: Theme.fontFamily; pixelSize: 14 }
                 onTextChanged: {
                     if (capture.phase === "transcribing" && text.trim() !== "") {
                         noTextTimeout.stop();
@@ -256,8 +286,17 @@ PanelWindow {
                 visible: capture.errorText !== ""
                 text: capture.errorText
                 wrapMode: Text.Wrap
-                color: Theme.danger
+                color: capture.statusColor
                 font { family: Theme.fontFamily; pixelSize: 12 }
+            }
+
+            Text {
+                Layout.fillWidth: true
+                text: "Esc to discard"
+                visible: capture.phase === "listening" || capture.phase === "transcribing"
+                horizontalAlignment: Text.AlignRight
+                color: Theme.menuSecondaryText
+                font { family: Theme.fontFamily; pixelSize: 11 }
             }
         }
     }

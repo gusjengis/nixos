@@ -8,7 +8,7 @@ import { test } from "node:test"
 import { ContextLibraryPlugin } from "./plugins/context-library.js"
 import { headToken } from "./context-state.mjs"
 
-test("fresh and existing sends never await discovery; incoming updates revoke eligibility including children", async (t) => {
+test("discovery never installs send gates, including newer remote copies and invalid freshness state", async (t) => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "context-library-test-"))
   const previous = { ...process.env }
   const callbacks = []
@@ -40,10 +40,10 @@ test("fresh and existing sends never await discovery; incoming updates revoke el
     }
     hooks = await ContextLibraryPlugin({ client })
     assert.equal(callbacks.length, 1)
-    const quickSend = (sessionID) => Promise.race([
-      hooks["chat.message"]({ sessionID }),
-      new Promise((_, reject) => { const timer = setTimeout(() => reject(new Error("Send waited for discovery")), 100); timer.unref() }),
-    ])
+    const quickSend = async (_sessionID) => {
+      assert.equal(hooks["chat.message"], undefined)
+      assert.equal(hooks["command.execute.before"], undefined)
+    }
     await quickSend("root")
     await quickSend("child")
     const head = path.join(directory, "current.json")
@@ -59,31 +59,30 @@ test("fresh and existing sends never await discovery; incoming updates revoke el
     assert.equal(callbacks.length, 1, "unchanged foreground send launches no helper")
     // Catch the head/observer race synchronously, before new state is published.
     await writeFile(head, "head r2")
-    await assert.rejects(quickSend("root"), /update is arriving/)
+    await quickSend("root")
     record.generation++
     record.known_revision = "r2"
     record.observed_head = headToken(head)
     record.freshness = "outdated"
     await publish()
-    await assert.rejects(quickSend("root"), /Newer portable conversation/)
-    await assert.rejects(quickSend("child"), /Newer portable conversation/)
-    await assert.rejects(hooks["command.execute.before"]({ sessionID: "root" }), /Newer portable conversation/)
-    // Import completion changes selected root; old native copies remain blocked.
+    await quickSend("root")
+    await quickSend("child")
+    // Import completion changes selected root; local sends remain ungated.
     record.generation++
     record.selected_root = "replacement"
     record.members = { root: "replacement", child: "replacement-child" }
     record.base_revision = "r2"
     record.freshness = "current_as_known"
     await publish()
-    await assert.rejects(quickSend("child"), /Newer portable conversation/)
+    await quickSend("child")
     callbacks.shift()(new Error("discovery failed"), "", "incomplete transfer")
     sessions.fresh = { id: "fresh", metadata: { desktop_context: { ...marker, chat: "fresh", session: "fresh" } } }
     await quickSend("fresh")
     await scope(["root"])
-    await assert.rejects(quickSend("child"), /Newer portable conversation/)
+    await quickSend("child")
     await scope()
     await writeFile(process.env.OPENCODE_CONTEXT_SCOPE_FILE, JSON.stringify({ context_id: "wrong" }))
-    await assert.rejects(quickSend("fresh"), /state is invalid/)
+    await quickSend("fresh")
   } finally {
     await hooks?.event({ event: { type: "server.instance.disposed" } })
     process.env = previous
