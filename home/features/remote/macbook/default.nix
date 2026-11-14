@@ -13,7 +13,8 @@ let
     '';
   };
 in {
-  config = lib.mkIf config.desktopEnv.enable {
+  # RustDesk's Flutter toolchain currently needs aapt, unavailable on ARM Linux.
+  config = lib.mkIf (config.desktopEnv.enable && !pkgs.stdenv.hostPlatform.isAarch64) {
     home.packages = [ launcher ];
     xdg.configFile."macbook-remote".source = config.lib.file.mkOutOfStoreSymlink
       "${repoRoot}/home/features/remote/macbook";
