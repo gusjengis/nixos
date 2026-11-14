@@ -27,7 +27,7 @@ let
     runtimeInputs = [ vicinaePackage pkgs.python3 pkgs.glib ];
     text = ''
       exec python3 "${repoRoot}/home/features/desktop/vicinae/remote-picker.py" \
-        ${if config.windowsVm.remotesFile != null then "--csv" else toString remoteManifest} "$@"
+        ${if config.windowsVm.remotesFile != null then "--csv --csv-file ${lib.escapeShellArg config.windowsVm.remotesFile}" else toString remoteManifest} "$@"
     '';
   };
   vicinaePackage = inputs.vicinae.packages.${pkgs.stdenv.hostPlatform.system}.default.overrideAttrs (old: {
@@ -85,6 +85,18 @@ in
   config = lib.mkIf config.desktopEnv.enable {
     home.packages = [ vicinaePackage vicinaeWithGlass ]
       ++ lib.optional cfg.remoteOnly remotePicker;
+
+    systemd.user.services.conference-remote-status = lib.mkIf (cfg.remoteOnly && config.windowsVm.remotesFile != null) {
+      Unit.Description = "Monitor RDP availability for the remote launcher";
+      Service = {
+        ExecStart = "${remotePicker}/bin/conference-remotes --watch-status";
+        Restart = "always";
+        RestartSec = 3;
+        UMask = "0077";
+        NoNewPrivileges = true;
+      };
+      Install.WantedBy = [ "default.target" ];
+    };
 
     programs.chromium.extensions = [ "kcmipingpfbohfjckomimmahknoddnke" ]; # Vicinae Integration
     home.file.".config/chromium/NativeMessagingHosts/com.vicinae.vicinae.json".source =

@@ -1,0 +1,19 @@
+diff --git a/src/GlassLayerSurface.cpp b/src/GlassLayerSurface.cpp
+--- a/src/GlassLayerSurface.cpp
++++ b/src/GlassLayerSurface.cpp
+@@ -342,9 +342,11 @@
+         if (mac) {
+-            // Full-resolution sample, then the fitted two-scale Gaussian: blur
+-            // to sigma1, keep that as the narrow texture, continue to sigma2.
+-            GlassRenderer::sampleBackground(m_sampleFramebuffer, source, sampleBox, m_samplePaddingRatio, 1);
++            // At HiDPI, sample at logical resolution. Keep the same screen-space
++            // Gaussian widths; text, mask, refraction, and composite stay full-res.
++            const float monitorScale = monitor ? static_cast<float>(monitor->m_scale) : 1.0f;
++            const int downscale = monitorScale >= 2.0f ? 2 : 1;
++            GlassRenderer::sampleBackground(m_sampleFramebuffer, source, sampleBox, m_samplePaddingRatio, downscale);
+             const float tint  = currentMacTint();
+             const auto  tp    = mac->controlProfile ? MacGlass::paramsForControl(tint) : MacGlass::paramsForTint(tint);
+-            const float scale = monitor ? static_cast<float>(monitor->m_scale) : 1.0f;
++            const float scale = monitorScale / downscale;
+             const float s1    = tp.blur.s1 * scale;
+             const float s2    = tp.blur.s2 * scale;

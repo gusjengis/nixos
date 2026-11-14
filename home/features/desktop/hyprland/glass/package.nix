@@ -20,6 +20,7 @@ pkgs.hyprlandPlugins.mkHyprlandPlugin {
     ./layer-shadow.patch
     ./surface-material.patch
     ./portable-backend.patch
+    ./scaled-blur.patch
   ];
   nativeBuildInputs = [ pkgs.wayland-scanner ];
   makeFlags = [ "HYPRGLASS_VERSION=0.9.1-macglass-experimental" ];

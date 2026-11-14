@@ -6,48 +6,58 @@
 }:
 
 {
-  home.packages =
-    with pkgs;
-    [
-    ]
-    ++ lib.optionals (config.desktopEnv.enable && config.personalDesktop.enable) [
-      # TODO: belong in a phone sync/connection folder, not generally used for communication
-      scrcpy
-      kdePackages.kdeconnect-kde
-      kdePackages.kpeople
+  options.nativeZoom.enable = lib.mkOption {
+    type = lib.types.bool;
+    default = true;
+    description = "Install the native Zoom client on supported desktops.";
+  };
 
-      (
-        (mailspring.override {
-          commandLineArgs = "--password-store=gnome-libsecret";
-        }).overrideAttrs
-        (old: {
-          postFixup = (old.postFixup or "") + ''
-            wrapProgram $out/bin/mailspring \
-              --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath [ libayatana-appindicator ]}
-          '';
-        })
-      )
-    ]
-    # No aarch64 builds. The Hyprland keybinds fall back to the webapp
-    # launchers where these are missing; see the hyprland feature's
-    # platform-variables selection.
-    ++
-      lib.optionals
+  config = {
+    home.packages =
+      with pkgs;
+      [
+      ]
+      ++ lib.optionals (config.desktopEnv.enable && config.personalDesktop.enable) [
+        # TODO: belong in a phone sync/connection folder, not generally used for communication
+        scrcpy
+        kdePackages.kdeconnect-kde
+        kdePackages.kpeople
+
+        (
+          (mailspring.override {
+            commandLineArgs = "--password-store=gnome-libsecret";
+          }).overrideAttrs
+          (old: {
+            postFixup = (old.postFixup or "") + ''
+              wrapProgram $out/bin/mailspring \
+                --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath [ libayatana-appindicator ]}
+            '';
+          })
+        )
+      ]
+      # No aarch64 builds. The Hyprland keybinds fall back to the webapp
+      # launchers where these are missing; see the hyprland feature's
+      # platform-variables selection.
+      ++
+        lib.optionals
+          (pkgs.stdenv.hostPlatform.isx86_64 && config.desktopEnv.enable && config.personalDesktop.enable)
+          [
+            slack
+          ]
+      ++ lib.optionals (
+        pkgs.stdenv.hostPlatform.isx86_64 && config.desktopEnv.enable && config.nativeZoom.enable
+      ) [ zoom-us ];
+
+    programs.discord =
+      lib.mkIf
         (pkgs.stdenv.hostPlatform.isx86_64 && config.desktopEnv.enable && config.personalDesktop.enable)
-        [
-          slack
-        ]
-    ++ lib.optionals (pkgs.stdenv.hostPlatform.isx86_64 && config.desktopEnv.enable) [ zoom-us ];
+        {
+          enable = true;
+          package = pkgs.discord-canary;
+          configName = "discordcanary";
+          settings.SKIP_HOST_UPDATE = true;
+        };
 
-  programs.discord =
-    lib.mkIf
-      (pkgs.stdenv.hostPlatform.isx86_64 && config.desktopEnv.enable && config.personalDesktop.enable)
-      {
-        enable = true;
-        package = pkgs.discord-canary;
-        configName = "discordcanary";
-        settings.SKIP_HOST_UPDATE = true;
-      };
-
-  # KDE Connect needs one-time pairing after first installation.
+    # KDE Connect needs one-time pairing after first installation.
+  };
 }

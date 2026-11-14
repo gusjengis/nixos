@@ -22,7 +22,6 @@ assert !conference.personalDesktop.enable;
 assert !conference.dev.enable;
 assert present [
   "hyprland"
-  "zoom"
   "supernote-mirror"
   "lazygit"
   "tmux"
@@ -32,6 +31,7 @@ assert present [
   "chromium"
 ] conference;
 assert absent [
+  "zoom"
   "opencode"
   "claude-code"
   "mailspring"
@@ -61,6 +61,12 @@ assert conference.home.sessionVariables.SYNC_REPO_GROUPS == "core,desktop";
 assert conference.programs.git.package.pname == "git";
 assert !conference.programs.direnv.enable;
 assert builtins.hasAttr "applications/webapp-supernote.desktop" conference.xdg.dataFile;
+assert !conference.nativeZoom.enable;
+assert conference.xdg.desktopEntries.zoom.name == "Zoom";
+assert
+  builtins.match ".*--app=https://app.zoom.us/wc/home[?]ref_from=waffle_home.*" conference.xdg.desktopEntries.zoom.exec
+  != null;
+assert workstation.nativeZoom.enable;
 assert
   builtins.fromJSON conference.xdg.dataFile."quickshell/features.json".text == {
     contexts = false;

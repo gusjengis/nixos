@@ -28,6 +28,7 @@ let
     ]
     ++ lib.optional (domain != "") "/d:${domain}"
     ++ lib.optional cfg.fullscreen "/f"
+    ++ lib.optional (cfg.desktopScale != null) "/scale-desktop:${toString cfg.desktopScale}"
     ++ [
       "/cert:tofu"
       "/sec:nla"
@@ -177,12 +178,12 @@ let
 
   launchers = [ windowsRdp ] ++ lib.optional cfg.og.enable ogRdp;
   csvOptions = pkgs.writeText "conference-rdp-options.json" (builtins.toJSON (
-    lib.drop 2 (rdpArgs { address = ""; user = ""; domain = ""; })
-    ++ [ "/dvc:rdpecam" "/microphone:sys:pulse" ]
+    lib.remove "/cert:tofu" (lib.drop 2 (rdpArgs { address = ""; user = ""; domain = ""; }))
+    ++ [ "/cert:ignore" "/dvc:rdpecam" "/microphone:sys:pulse" ]
   ));
   csvRdp = pkgs.writeShellApplication {
     name = "conference-rdp";
-    runtimeInputs = [ pkgs.python3 rdpClient pkgs.libnotify ];
+    runtimeInputs = [ pkgs.python3 rdpClient pkgs.libnotify pkgs.quickshell ];
     text = ''
       exec python3 "${repoRoot}/home/features/remote/windows-vm/csv-rdp.py" \
         ${lib.escapeShellArg cfg.remotesFile} ${csvOptions} "$@"
@@ -195,6 +196,11 @@ in
       default = true;
     };
     fullscreen = lib.mkEnableOption "start RDP launchers in fullscreen";
+    desktopScale = lib.mkOption {
+      type = lib.types.nullOr (lib.types.ints.between 100 500);
+      default = null;
+      description = "Windows desktop DPI scaling percentage, independent of framebuffer resolution";
+    };
     displayName = lib.mkOption {
       type = lib.types.str;
       default = "Windows 11";

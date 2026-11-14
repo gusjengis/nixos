@@ -18,18 +18,64 @@ diff --git a/src/server/src/ui/views/dmenu-model.cpp b/src/server/src/ui/views/d
    if (entry.starts_with('/')) {
      return QString::fromStdString(getLastPathComponent(std::filesystem::path(entry)));
    }
-@@ -72,5 +74,11 @@ QString DMenuSection::itemSubtitle(int i) const {
+@@ -72,5 +74,17 @@ QString DMenuSection::itemSubtitle(int i) const {
  std::optional<ImageURL> DMenuSection::itemIcon(int i) const {
    auto entry = entryAt(i).first;
-+  // Optional title<TAB>icon-path rows. Plain dmenu rows retain their behavior.
++  // Optional title<TAB>icon-path<TAB>accessory-icon<TAB>numeric-RDP-address rows.
 +  if (auto separator = entry.find('\t'); separator != std::string_view::npos) {
 +    auto icon = entry.substr(separator + 1);
++    icon = icon.substr(0, icon.find('\t'));
++    if (auto status = m_remoteStatus.find(entryAt(i).second); status != m_remoteStatus.end()) {
++      auto path = std::filesystem::path(icon).parent_path() /
++                  (status->second ? "windows-tile.svg" : "windows-tile-offline.svg");
++      return ImageURL::local(QString::fromStdString(path.string()));
++    }
 +    if (!icon.empty())
 +      return ImageURL::local(QString::fromUtf8(icon.data(), icon.size()));
 +  }
    if (entry.starts_with('/')) {
      std::error_code ec;
      if (std::filesystem::exists(entry, ec)) { return ImageURL::fileIcon(entry); }
+@@ -81,1 +90,16 @@
++AccessoryList DMenuSection::itemAccessories(int i) const {
++  auto entry = entryAt(i).first;
++  auto first = entry.find('\t');
++  if (first == std::string_view::npos) return {};
++  auto second = entry.find('\t', first + 1);
++  if (second == std::string_view::npos) return {};
++  auto icon = entry.substr(second + 1);
++  icon = icon.substr(0, icon.find('\t'));
++  if (icon.empty()) return {};
++  ListAccessory accessory;
++  accessory.icon = ImageURL::local(QString::fromUtf8(icon.data(), icon.size()));
++  accessory.tooltip = tr("Password required when connecting");
++  return {accessory};
++}
++
+ void DMenuSection::selectEntry(const QString &text) const {
+diff --git a/src/server/src/ui/views/dmenu-model.hpp b/src/server/src/ui/views/dmenu-model.hpp
+--- a/src/server/src/ui/views/dmenu-model.hpp
++++ b/src/server/src/ui/views/dmenu-model.hpp
+@@ -2,1 +2,3 @@
+ #include "fuzzy/scored.hpp"
++#include <QObject>
++#include <unordered_map>
+@@ -15,1 +17,3 @@
+   void setRawEntries(std::vector<std::string_view> entries);
++  void startRemoteStatus();
++  void stopRemoteStatus();
+@@ -32,2 +32,3 @@ protected:
+   std::optional<ImageURL> itemIcon(int i) const override;
++  AccessoryList itemAccessories(int i) const override;
+   std::unique_ptr<ActionPanelState> actionPanel(int i) const override;
+@@ -51,3 +56,7 @@
+   std::function<void(const QString &)> m_onEntryChosen;
+   std::function<void(std::string_view)> m_onFileHighlighted;
++  std::unordered_map<std::size_t, bool> m_remoteStatus;
++  void refreshRemoteStatus();
++  // Destroy the refresh timer before the section's other members.
++  QObject m_statusContext;
+ };
 diff --git a/src/server/src/ui/qml/list/ListItemDelegate.qml b/src/server/src/ui/qml/list/ListItemDelegate.qml
 --- a/src/server/src/ui/qml/list/ListItemDelegate.qml
 +++ b/src/server/src/ui/qml/list/ListItemDelegate.qml
@@ -37,9 +83,11 @@ diff --git a/src/server/src/ui/qml/list/ListItemDelegate.qml b/src/server/src/ui
  SelectableDelegate {
      id: root
 -    height: featured ? 52 : 38
-+    readonly property bool remotePicker: itemIconSource.includes("windows-tile.svg")
++    readonly property bool remotePicker: itemIconSource.includes("windows-tile")
 +    height: remotePicker ? 72 : featured ? 52 : 38
-@@ -30 +31 @@
+@@ -29,2 +30,2 @@
+-        anchors.rightMargin: root.appearance.rowRightPadding
++        anchors.rightMargin: root.remotePicker ? 26 : root.appearance.rowRightPadding
 -        spacing: 10
 +        spacing: root.remotePicker ? 14 : 10
 @@ -33,3 +34,3 @@
@@ -52,3 +100,149 @@ diff --git a/src/server/src/ui/qml/list/ListItemDelegate.qml b/src/server/src/ui
 -                font.pointSize: root.featured ? Theme.regularFontSize * 1.14 : Theme.regularFontSize
 +                font.pointSize: root.remotePicker ? Theme.regularFontSize * 1.5 : root.featured ? Theme.regularFontSize * 1.14 : Theme.regularFontSize
                  font.weight: root.featured ? Font.DemiBold : Font.Normal
+diff --git a/src/server/src/ui/qml/list/ListAccessory.qml b/src/server/src/ui/qml/list/ListAccessory.qml
+--- a/src/server/src/ui/qml/list/ListAccessory.qml
++++ b/src/server/src/ui/qml/list/ListAccessory.qml
+@@ -28,2 +28,2 @@
+-            width: 14
+-            height: 14
++            width: root.icon.includes("password-lock.svg") ? 24 : 14
++            height: width
+diff --git a/src/server/src/ui/qml/list/SelectableDelegate.qml b/src/server/src/ui/qml/list/SelectableDelegate.qml
+--- a/src/server/src/ui/qml/list/SelectableDelegate.qml
++++ b/src/server/src/ui/qml/list/SelectableDelegate.qml
+@@ -53,2 +53,2 @@
+             if (root.hovered)
+-                return root.appearance.hoverFill;
++                return Qt.rgba(1, 1, 1, 0.07);
+diff --git a/src/lib/figura/src/codegen/glaze-qt.hpp b/src/lib/figura/src/codegen/glaze-qt.hpp
+--- a/src/lib/figura/src/codegen/glaze-qt.hpp
++++ b/src/lib/figura/src/codegen/glaze-qt.hpp
+@@ -55,1 +55,1 @@
+-  virtual void bindReply(int id) { (void)id; }
++  virtual std::function<void()> bindReply(int id) { (void)id; return [] {}; }
+@@ -220,1 +220,1 @@
+-		void bindReply(int id) { m_transport.bindReply(id); }
++		std::function<void()> bindReply(int id) { return m_transport.bindReply(id); }
+@@ -769,1 +769,1 @@
+-		m_transport.bindReply(id);
++		auto activateReply = m_transport.bindReply(id);
+@@ -774,1 +774,2 @@
+-		connect(watcher, &QFutureWatcherBase::finished, this, [this, id, methodStr, sentAt, watcher]() {
++		connect(watcher, &QFutureWatcherBase::finished, this, [this, id, methodStr, sentAt, watcher, activateReply = std::move(activateReply)]() {
++			activateReply();
+diff --git a/src/server/src/ipc/ipc-command-server.hpp b/src/server/src/ipc/ipc-command-server.hpp
+--- a/src/server/src/ipc/ipc-command-server.hpp
++++ b/src/server/src/ipc/ipc-command-server.hpp
+@@ -3,1 +3,2 @@
+ #include <QLocalSocket>
++#include <QPointer>
+@@ -69,5 +70,2 @@
+-    // Pending reply routing: filled by `bindReply` at dispatch time when a
+-    // handler returns an unfinished future, drained by `activateReply` when
+-    // the reply is finally produced. Lets async replies find their peer even
+-    // after the dispatching frame has unwound.
+-    std::unordered_map<int, QLocalSocket *> pendingReplies;
++    // Each unfinished request captures its peer independently: request ids
++    // are local to a connection and may collide across CLI clients.
+@@ -76,2 +74,1 @@
+-    void bindReply(int id) override;
+-    void activateReply(int id) override;
++    std::function<void()> bindReply(int id) override;
+diff --git a/src/server/src/ipc/ipc-command-server.cpp b/src/server/src/ipc/ipc-command-server.cpp
+--- a/src/server/src/ipc/ipc-command-server.cpp
++++ b/src/server/src/ipc/ipc-command-server.cpp
+@@ -42,10 +42,4 @@
+-void IpcCommandServer::IpcTransport::bindReply(int id) {
+-  if (conn) pendingReplies[id] = conn;
+-}
+-
+-void IpcCommandServer::IpcTransport::activateReply(int id) {
+-  if (auto it = pendingReplies.find(id); it != pendingReplies.end()) {
+-    conn = it->second;
+-    pendingReplies.erase(it);
+-  }
++std::function<void()> IpcCommandServer::IpcTransport::bindReply(int id) {
++  (void)id;
++  return [this, peer = QPointer<QLocalSocket>(conn)] { conn = peer.data(); };
+ }
+@@ -54,1 +48,1 @@
+-  std::erase_if(pendingReplies, [dead](const auto &kv) { return kv.second == dead; });
++  if (conn == dead) conn = nullptr;
+@@ -426,2 +421,4 @@
+   connect(conn, &QLocalSocket::readyRead, this, [this, conn]() { handleRead(conn); });
++  // A client may have sent its frame before readyRead was connected.
++  if (conn->bytesAvailable() > 0) handleRead(conn);
+ }
+diff --git a/src/server/src/ui/views/dmenu-view-host.cpp b/src/server/src/ui/views/dmenu-view-host.cpp
+--- a/src/server/src/ui/views/dmenu-view-host.cpp
++++ b/src/server/src/ui/views/dmenu-view-host.cpp
+@@ -1,1 +1,2 @@
+ #include "ui/views/dmenu-view-host.hpp"
++#include "navigation-controller.hpp"
+@@ -25,1 +26,5 @@
+   initModel();
++  connect(context()->navigation.get(), &NavigationController::windowVisiblityChanged, this,
++          [this](bool visible) {
++            if (!visible) beforePop();
++          });
+@@ -56,2 +61,3 @@
+   model()->addSource(&m_section);
++  m_section.startRemoteStatus();
+ }
+@@ -70,1 +75,2 @@
+-  if (!m_selected) { emit selected(""); }
++  m_section.stopRemoteStatus();
++  if (!m_selected) { m_selected = true; emit selected(""); }
+diff --git a/src/server/src/ui/views/dmenu-model.cpp b/src/server/src/ui/views/dmenu-model.cpp
+--- a/src/server/src/ui/views/dmenu-model.cpp
++++ b/src/server/src/ui/views/dmenu-model.cpp
+@@ -12,1 +12,48 @@
+ #include <utility>
++#include <QDateTime>
++#include <QFile>
++#include <QJsonDocument>
++#include <QJsonObject>
++#include <QStandardPaths>
++#include <QTimer>
++
++void DMenuSection::startRemoteStatus() {
++  if (std::ranges::none_of(m_entries, [](auto entry) {
++        return entry.find("/windows-tile-pending.svg\t") != std::string_view::npos;
++      })) return;
++  // A tiny local snapshot supplies known status before the first frame.
++  refreshRemoteStatus();
++  auto *timer = new QTimer(&m_statusContext);
++  QObject::connect(timer, &QTimer::timeout, &m_statusContext, [this] { refreshRemoteStatus(); });
++  timer->start(500);
++}
++
++void DMenuSection::stopRemoteStatus() {
++  for (auto *timer : m_statusContext.findChildren<QTimer *>()) delete timer;
++}
++
++void DMenuSection::refreshRemoteStatus() {
++  std::unordered_map<std::size_t, bool> status;
++  QFile file(QStandardPaths::writableLocation(QStandardPaths::RuntimeLocation) +
++             "/conference-remotes-status.json");
++  if (file.open(QIODevice::ReadOnly) && file.size() <= 65536) {
++    auto snapshot = QJsonDocument::fromJson(file.readAll()).object();
++    auto checked = snapshot.value("checked_at");
++    auto age = QDateTime::currentMSecsSinceEpoch() / 1000.0 - checked.toDouble();
++    // Expired or invalid data is unknown, never falsely online/offline.
++    if (checked.isDouble() && age >= 0 && age <= 20) {
++      auto hosts = snapshot.value("hosts").toObject();
++      for (auto [idx, entry] : vicinae::enumerate(m_entries)) {
++        auto third = entry.find_last_of('\t');
++        if (third == std::string_view::npos) continue;
++        auto address = entry.substr(third + 1);
++        auto online = hosts.value(QString::fromUtf8(address.data(), address.size()));
++        if (online.isBool()) status[idx] = online.toBool();
++      }
++    }
++  }
++  if (status != m_remoteStatus) {
++    m_remoteStatus = std::move(status);
++    notifyItemsRefreshed();
++  }
++}
