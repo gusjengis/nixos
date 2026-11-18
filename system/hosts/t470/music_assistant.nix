@@ -17,8 +17,8 @@ let
   musicAssistantFork = pkgs.fetchFromGitHub {
     owner = "gusjengis";
     repo = "mass-server";
-    rev = "b4e39bab316098ba8437a26e9f03f69f8af93fe5";
-    hash = "sha256-G2kFmDfmAy0FgVY/oxzw1FHpc21p9T+kSOC3lMlhyZ0=";
+    rev = "a11d94edcb226fe02d3d914ee86a0bc131c44aaf";
+    hash = "sha256-vsmDJ26sfthxktA7DCaC7Qit3GtkRgK/HZA/TfrFgWQ=";
   };
 
   frontendSrc = pkgs.fetchFromGitHub {
@@ -68,6 +68,7 @@ let
   sitePackages = "/app/venv/lib/python3.14/site-packages";
   serverPackage = "${sitePackages}/music_assistant";
   serverMounts = [
+    "-v ${musicAssistantFork}/music_assistant/constants.py:${serverPackage}/constants.py:ro"
     "-v ${musicAssistantFork}/music_assistant/controllers/music/controller.py:${serverPackage}/controllers/music/controller.py:ro"
     "-v ${musicAssistantFork}/music_assistant/controllers/player_queues/controller.py:${serverPackage}/controllers/player_queues/controller.py:ro"
     "-v ${musicAssistantFork}/music_assistant/controllers/player_queues/queue_loader.py:${serverPackage}/controllers/player_queues/queue_loader.py:ro"
